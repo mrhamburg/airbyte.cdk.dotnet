@@ -9,7 +9,7 @@ The CDK provides an improved developer experience by providing basic implementat
 
 ## Quick Start
 
-Generate an empty connector using the code generator. First clone the this repository then from the repository root run
+Generate an empty connector using the code generator. Create a new directory and run:
 
 ```bash
 git clone https://github.com/mrhamburg/airbyte.cdk.dotnet.git
