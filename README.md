@@ -21,10 +21,10 @@ dotnet run init
 
 ## Components
 
-Component | Code | Installation | Version
-----------|-----------|------|--------
-Airbyte CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
-Exchange Rates Free | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull mennoh/airbyte.exchangerates` | v0.0.1-preview
+Component | Type |Code | Installation | Version
+----------|------|-----|------|--------
+Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
+Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull mennoh/airbyte.exchangerates` | v0.0.1-preview
 
 ## Concepts & Documentation
 This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
