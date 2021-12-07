@@ -1,5 +1,7 @@
-name: Build Dotnet CDK
-on: [push, pull_request]
+name: Release Dotnet CDK
+on:
+  release:
+    types: [published]
 
 jobs:
   publish-dotnet-cdk:
@@ -18,5 +20,6 @@ jobs:
           push: false
           tags: local/dotnet-cdk:latest
           context: .
-          target: build
-          
+        env:
+          NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+          NUGET_VERSION: ${{ github.event.release.tag_name }}
