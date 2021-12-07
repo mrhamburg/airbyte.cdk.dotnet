@@ -34,7 +34,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// <summary>
         /// Most HTTP streams use a source defined cursor (i.e: the user can't configure it like on a SQL table)
         /// </summary>
-        public virtual bool SourceDefinedCursor { get; protected set; } = true;
+        public new virtual bool SourceDefinedCursor { get; protected set; } = true;
 
         /// <summary>
         /// Use this variable to define page size for API http requests with pagination support

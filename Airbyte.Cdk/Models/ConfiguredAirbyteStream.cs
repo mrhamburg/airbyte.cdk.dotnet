@@ -7,7 +7,7 @@ namespace Airbyte.Cdk.Models
     public class ConfiguredAirbyteStream
     {
         [JsonPropertyName("stream")]
-        public AirbyteStream Stream { get; set; }
+        public AirbyteStream? Stream { get; set; }
 
         [JsonPropertyName("sync_mode")]
         public SyncMode SyncMode { get; set; }
@@ -16,7 +16,7 @@ namespace Airbyte.Cdk.Models
         /// Path to the field that will be used to determine if a record is new or modified since the last sync. This field is REQUIRED if `sync_mode` is `incremental`. Otherwise it is ignored.
         /// </summary>
         [JsonPropertyName("cursor_field")]
-        public string[] CursorField { get; set; }
+        public string[]? CursorField { get; set; }
 
         [JsonPropertyName("destination_sync_mode")]
         public DestinationSyncMode DestinationSyncMode { get; set; }

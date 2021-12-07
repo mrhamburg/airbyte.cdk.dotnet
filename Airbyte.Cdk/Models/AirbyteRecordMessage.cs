@@ -10,7 +10,7 @@ namespace Airbyte.Cdk.Models
         /// The name of this record's stream
         /// </summary>
         [JsonPropertyName("stream")]
-        public string Stream { get; set; }
+        public string? Stream { get; set; }
 
         /// <summary>
         /// The record data

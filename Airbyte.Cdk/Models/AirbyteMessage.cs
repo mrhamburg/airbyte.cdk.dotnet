@@ -15,7 +15,7 @@ namespace Airbyte.Cdk.Models
         /// Log message: any kind of logging you want the platform to know about.
         /// </summary>
         [JsonPropertyName("log")]
-        public AirbyteLogMessage Log { get; set; }
+        public AirbyteLogMessage? Log { get; set; }
 
         [JsonPropertyName("spec")]
         public ConnectorSpecification? Spec { get; set; }

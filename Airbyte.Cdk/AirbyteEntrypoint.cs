@@ -65,7 +65,7 @@ namespace Airbyte.Cdk
             Connector = instance;
             try
             {
-                await Launch();
+                Launch();
             }
             catch (Exception e)
             {
@@ -87,7 +87,7 @@ namespace Airbyte.Cdk
             return destination;
         }
 
-        private static async Task Launch()
+        private static void Launch()
         {
             var spec = Connector.Spec();
 

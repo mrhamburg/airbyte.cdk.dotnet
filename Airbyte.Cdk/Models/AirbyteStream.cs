@@ -11,7 +11,7 @@ namespace Airbyte.Cdk.Models
         /// Stream's name.
         /// </summary>
         [JsonPropertyName("name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         /// <summary>
         /// Stream schema using Json Schema specs.

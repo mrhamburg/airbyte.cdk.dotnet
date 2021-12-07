@@ -16,7 +16,7 @@ namespace Airbyte.Cdk.Models
         /// ConnectorDefinition specific blob. Must be a valid JSON string.
         /// </summary>
         [JsonPropertyName("connectionSpecification")]
-        public JsonDocument ConnectionSpecification { get; set; }
+        public JsonDocument? ConnectionSpecification { get; set; }
 
         /// <summary>
         /// If the connector supports incremental mode or not.
