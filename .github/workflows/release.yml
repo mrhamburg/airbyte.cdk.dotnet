@@ -22,4 +22,4 @@ jobs:
           context: .
         env:
           NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
-          NUGET_VERSION: ${{ github.event.release.tag_name }}
+          BUILD_VERSION: ${{ github.event.release.tag_name }}
