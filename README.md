@@ -1,4 +1,4 @@
-# Airbyte .NET CDK
+# Airbyte .NET CDK [![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/) 
 
 The Airbyte Dotnet CDK is a framework for rapidly developing production-grade Airbyte connectors. The CDK currently offers helpers specific for creating Airbyte source connectors for:
 
