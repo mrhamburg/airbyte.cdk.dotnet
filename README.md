@@ -107,7 +107,7 @@ Make sure the latest version of dotnet is installed, this can be found using the
 
 * Iterate on the code locally
 * Run tests via `dotnet test`
-* Try to build the nuget package using docker `docker build .`
+* Try to build the nuget package using docker `docker build --target build .`
 
 #### Testing
 
