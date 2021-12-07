@@ -17,18 +17,22 @@ cd airbyte.cdk.dotnet
 dotnet run init
 ```
 
+## Example Connectors
+
+No known connectors as of yet.
+
 ## Installation
 
 You can download the Airbyte.CDK via [NuGet](https://www.nuget.org/packages/Airbyte.Cdk/).
 
-### Concepts & Documentation
+## Concepts & Documentation
 This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
 
 If you have any issues with troubleshooting or want to learn more about the CDK from the Airbyte team, head to the \#connector-development channel in [Slack](https://airbytehq.slack.com/ssb/redirect) to inquire further!
 
-#### Basic Concepts
+### Basic Concepts
 If you want to learn more about the classes required to implement an Airbyte Source, head to our [basic concepts doc](..\cdk-python\basic-concepts.md) as described in the python-cdk.
-#### Full Refresh Streams
+### Full Refresh Streams
 A `Stream` is the atomic unit for reading data from a Source. A stream can read data from anywhere: a relational database, an API, or even scrape a web page! \(although that might be stretching the limits of what a connector should do\).
 To implement a stream, there are two minimum requirements: 1. Define the stream's schema 2. Implement the logic for reading records from the underlying data source
 Schema's should be stored in the schemas folder part of your project.
@@ -45,7 +49,7 @@ public override Stream[] Streams(JsonElement config)
 }
 ```
 
-#### Incremental Streams
+### Incremental Streams
 An incremental Stream is a stream which reads data incrementally. That is, it only reads data that was generated or updated since the last time it ran, and is thus far more efficient than a stream which reads all the source data every time it runs. If possible, developers are encouraged to implement incremental streams to reduce sync times and resource usage.
 
 Several new pieces are essential to understand how incrementality works with the CDK:
@@ -89,13 +93,9 @@ public override Stream[] Streams(JsonElement config)
 }
 ```
 
-#### Practical Tips
+### Practical Tips
 
 Airbyte recommends using the CDK template generator to develop with the CDK. The template generates created all the required scaffolding, with convenient TODOs, allowing developers to truly focus on implementing the API.
-
-### Example Connectors
-
-No known connectors as of yet.
 
 ## Contributing
 
