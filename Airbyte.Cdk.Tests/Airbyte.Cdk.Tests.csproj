@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\airbyte.cdk\Airbyte.Cdk.csproj" />
+    <ProjectReference Include="..\Airbyte.Cdk\Airbyte.Cdk.csproj" />
   </ItemGroup>
 
 </Project>

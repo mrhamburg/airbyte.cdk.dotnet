@@ -2,7 +2,7 @@ name: Build Dotnet CDK
 on: [push, pull_request]
 
 jobs:
-  publish-dotnet-cdk:
+  build-dotnet-cdk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Airbyte
