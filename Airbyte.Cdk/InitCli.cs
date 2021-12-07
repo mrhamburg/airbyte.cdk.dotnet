@@ -32,7 +32,6 @@ namespace Airbyte.Cdk
                         await CheckDocker();
                     });
 
-                string airbytelocation = AnsiConsole.Ask<string>("Airbyte project root directory (absolute path):");
                 string connectorname = AnsiConsole.Ask<string>("Connector name:");
                 connectorname = connectorname.ToSnakeCase().Replace(" ", "-").ToLower();
                 var connectortype = AnsiConsole.Prompt(
@@ -50,7 +49,7 @@ namespace Airbyte.Cdk
                 }
                 SourceConnectorType = connectortype;
 
-                var location = Path.Combine(airbytelocation, "airbyte-integrations", "connectors", $"{connectortype.Split('-')[0]}-{connectorname}");
+                var location = Path.Combine(Assembly.GetExecutingAssembly().Location, "airbyte-integrations", "connectors", $"{connectortype.Split('-')[0]}-{connectorname}");
                 if (location.Any(Path.GetInvalidPathChars().Contains))
                     throw new Exception($"Path is invalid: " + location);
                 if (!AnsiConsole.Confirm("Is this destination correct? " + location))
