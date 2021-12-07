@@ -18,5 +18,5 @@ ENV NUGET_SOURCE="https://api.nuget.org/v3/index.json"
 
 ENV WORKDIR=/airbyte/integration_code
 WORKDIR $WORKDIR
-COPY --from=build /airbyte/build/output .
-RUN dotnet nuget push ./output/Airbyte.Cdk.$BUILD_VERSION.nupkg --api-key $NUGET_APIKEY --source $NUGET_SOURCE
+COPY --from=build /airbyte/build/Airbyte.Cdk/output .
+RUN dotnet nuget push ./Airbyte.Cdk.$BUILD_VERSION.nupkg --api-key $NUGET_APIKEY --source $NUGET_SOURCE
