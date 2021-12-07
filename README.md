@@ -1,4 +1,6 @@
-# Airbyte .NET CDK [![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/) 
+# Airbyte .NET CDK  
+
+ [![CI](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/build.yml/badge.svg?query=branch%3Amain)](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/build.yml?query=branch%3Amain) [![CI](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/release.yml/badge.svg)](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/release.yml)  
 
 The Airbyte Dotnet CDK is a framework for rapidly developing production-grade Airbyte connectors. The CDK currently offers helpers specific for creating Airbyte source connectors for:
 
@@ -17,13 +19,11 @@ cd airbyte.cdk.dotnet
 dotnet run init
 ```
 
-## Example Connectors
+## Components
 
-No known connectors as of yet.
-
-## Installation
-
-You can download the Airbyte.CDK via [NuGet](https://www.nuget.org/packages/Airbyte.Cdk/).
+Component | Code | Installation | Version
+----------|-----------|------|--------
+Airbyte CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
 
 ## Concepts & Documentation
 This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
