@@ -7,10 +7,6 @@ The Airbyte Dotnet CDK is a framework for rapidly developing production-grade Ai
 
 The CDK provides an improved developer experience by providing basic implementation structure and abstracting away low-level glue boilerplate.
 
-This document is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
-
-If you have any issues with troubleshooting or want to learn more about the CDK from the Airbyte team, head to the \#connector-development channel in [our Slack](https://airbytehq.slack.com/ssb/redirect) to inquire further!
-
 ## Quick Start
 
 Generate an empty connector using the code generator. First clone the this repository then from the repository root run
@@ -26,6 +22,10 @@ dotnet run init
 You can download the Airbyte.CDK via [NuGet](https://www.nuget.org/packages/Airbyte.Cdk/).
 
 ### Concepts & Documentation
+This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
+
+If you have any issues with troubleshooting or want to learn more about the CDK from the Airbyte team, head to the \#connector-development channel in [Slack](https://airbytehq.slack.com/ssb/redirect) to inquire further!
+
 #### Basic Concepts
 If you want to learn more about the classes required to implement an Airbyte Source, head to our [basic concepts doc](..\cdk-python\basic-concepts.md) as described in the python-cdk.
 #### Full Refresh Streams
