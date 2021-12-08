@@ -146,6 +146,7 @@ namespace Airbyte.Cdk
             if (!pushimages) return true;
             ToConsole(Check, $"Publishing Docker Image...");
             cmd = Cli.Wrap("docker")
+                .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
                 .WithArguments(new []{"push", "-a", connectorname}) | Console.WriteLine;
             result = await cmd.ExecuteAsync();
             if (result.ExitCode != 0)
@@ -158,8 +159,8 @@ namespace Airbyte.Cdk
         {
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("docker")
-                .WithArguments(new []{"manifest", "inspect"})
-                .WithArguments(imagename) | stdOutBuffer;
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithArguments(new []{"manifest", "inspect", imagename}) | stdOutBuffer;
             
             await cmd.ExecuteAsync();
 
