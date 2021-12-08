@@ -18,6 +18,10 @@ jobs:
         dotnet-version: 6.0.x
     - name: Restore dependencies
       run: dotnet restore
+    - name: Git test
+      run: |
+        # test git command
+        git diff --name-only HEAD HEAD~1
     - name: Build and Test Connector
       working-directory: ./Airbyte.Cdk
       run: dotnet run publish -b
