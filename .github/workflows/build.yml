@@ -1,5 +1,9 @@
 name: Build Dotnet CDK
-on: [pull_request]
+on:
+  pull_request:
+    paths: 
+      - 'Airbyte.Cdk/**'
+      - 'Airbyte.Cdk.Tests/**'
 
 jobs:
   build-dotnet-cdk:
