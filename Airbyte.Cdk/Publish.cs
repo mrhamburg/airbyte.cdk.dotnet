@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using CliWrap;
@@ -21,6 +22,8 @@ namespace Airbyte.Cdk
             {
                 //Use git cli to get the last commit and check which files have changed, from those files get first path for connector name and use that to build and publish
                 //Get the version from the readme and use that as the tag, also push to latest
+                if(options.IsBuildOnly)
+                    ToConsole(Progress, "---> Running as build only! <---");
                 var files = await GetFilesChanged();
                 var connectors = GetConnectorsFromChanges(files);
                 if(connectors.Length == 0)
@@ -33,21 +36,30 @@ namespace Airbyte.Cdk
                 
                     if (string.IsNullOrWhiteSpace(item))
                         throw new Exception("Could not find connector name");
-                    string connectorpath = Path.Join("airbyte-integrations", "connectors", item);
+                    string connectorpath = Path.Join(MoveToUpperPath(Assembly.GetExecutingAssembly().Location, 5, true), "airbyte-integrations", "connectors", item);
                     var semver = GetSemver(connectorpath);
 
                     if (string.IsNullOrWhiteSpace(semver))
                         throw new Exception("Could not acquire semver from readme");
 
                     await CheckDocker();
-                    if (!await TryBuildAndPush(connectorpath, semver, image, options.Push))
+                    if (!await TryBuildAndPush(connectorpath, semver, image, !options.IsBuildOnly))
                         throw new Exception("Failed to build and publish connector image");   
                 }
             }
             catch (Exception e)
             {
                 ToConsole(Error, $"Could not finish execution due to error: {e.Message}");
+                Environment.Exit(1);
             }
+        }
+        
+        private static string MoveToUpperPath(string path, int level, bool removefilename = false)
+        {
+            for (int i = 0; i < level; i++)
+                path = Path.Combine(Path.GetDirectoryName(path), removefilename ? "" : Path.GetFileName(path));
+
+            return path;
         }
 
         private static async Task<string[]> GetFilesChanged()
@@ -69,7 +81,7 @@ namespace Airbyte.Cdk
                 return string.Empty;
             var contents = File.ReadAllText(readme);
             List<Version> _versions = new List<Version>();
-            foreach (var line in contents.Split(" "))
+            foreach (var line in contents.Split(" ").SelectMany(x => x.Split("\r")).ToArray())
                 if (Version.TryParse(line, out var ver))
                     _versions.Add(ver);
 
@@ -81,7 +93,7 @@ namespace Airbyte.Cdk
 
         private static string[] GetConnectorsFromChanges(string[] filechanges) =>
             filechanges.Where(x => x.StartsWith("airbyte-integrations/connectors/"))
-                .Select(x => string.Concat(x.Split("connectors/")).Split("/").First()).Distinct().ToArray();
+                .Select(x => x.Split("connectors/").Last().Split("/").First()).Distinct().ToArray();
 
         private static async Task CheckDocker()
         {
@@ -111,16 +123,18 @@ namespace Airbyte.Cdk
             ToConsole(Check, $"Building Docker Image...");
             var cmd = Cli.Wrap("docker")
                 .WithWorkingDirectory(folderpath)
-                .WithArguments(new []{"build", "-t", targetversionedimage, "-t", targetlatestimage, "."} ) | (s => ToConsole(Progress, s));
+                .WithValidation(CommandResultValidation.None)
+                .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
+                .WithArguments(new []{"build", "-t", targetversionedimage, "-t", targetlatestimage, "."} ) | Console.WriteLine;
             var result = await cmd.ExecuteAsync();
-            if (result.ExitCode != 0)
+            if (result.ExitCode == 1)
                 return false;
             ToConsole(Check, $"Building Docker Image...done");
 
             if (!pushimages) return true;
             ToConsole(Check, $"Publishing Docker Image...");
             cmd = Cli.Wrap("docker")
-                .WithArguments(new []{"push", "-a"}) | (s => ToConsole(Progress, s));
+                .WithArguments(new []{"push", "-a", connectorname}) | Console.WriteLine;
             result = await cmd.ExecuteAsync();
             if (result.ExitCode != 0)
                 return false;
