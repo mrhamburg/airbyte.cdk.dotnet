@@ -22,9 +22,10 @@ namespace Airbyte.Cdk
                 //Use git cli to get the last commit and check which files have changed, from those files get first path for connector name and use that to build and publish
                 //Get the version from the readme and use that as the tag, also push to latest
                 var files = await GetFilesChanged();
-                if (files.Length == 0)
-                    throw new Exception("Could not find any changed files");
                 var connectors = GetConnectorsFromChanges(files);
+                if(connectors.Length == 0)
+                    throw new Exception("Could not find any changed connector files");
+                
                 foreach (var item in connectors)
                 {
                     string image = $"airbytedotnet/{item}";
@@ -54,11 +55,9 @@ namespace Airbyte.Cdk
             ToConsole(Check, "Getting files changed...");
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("git")
-                .WithArguments("--name-only")
-                .WithArguments("HEAD")
-                .WithArguments("HEAD~1") | stdOutBuffer;
+                .WithArguments(new []{"diff", "--name-only", "HEAD", "HEAD~1"}) | stdOutBuffer;
             await cmd.ExecuteAsync();
-            var found = stdOutBuffer.ToString().Split(Environment.NewLine);
+            var found = stdOutBuffer.ToString().Split("\n");
             ToConsole(Check, $"Getting files changed... {found.Length} files found");
             return found;
         }
@@ -112,10 +111,7 @@ namespace Airbyte.Cdk
             ToConsole(Check, $"Building Docker Image...");
             var cmd = Cli.Wrap("docker")
                 .WithWorkingDirectory(folderpath)
-                .WithArguments("build")
-                .WithArguments(new[] {"-t", targetversionedimage})
-                .WithArguments(new[] {"-t", targetlatestimage})
-                .WithArguments(".") | (s => ToConsole(Progress, s));
+                .WithArguments(new []{"build", "-t", targetversionedimage, "-t", targetlatestimage, "."} ) | (s => ToConsole(Progress, s));
             var result = await cmd.ExecuteAsync();
             if (result.ExitCode != 0)
                 return false;
@@ -124,8 +120,7 @@ namespace Airbyte.Cdk
             if (!pushimages) return true;
             ToConsole(Check, $"Publishing Docker Image...");
             cmd = Cli.Wrap("docker")
-                .WithArguments("push")
-                .WithArguments("-a") | (s => ToConsole(Progress, s));
+                .WithArguments(new []{"push", "-a"}) | (s => ToConsole(Progress, s));
             result = await cmd.ExecuteAsync();
             if (result.ExitCode != 0)
                 return false;
@@ -137,8 +132,7 @@ namespace Airbyte.Cdk
         {
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("docker")
-                .WithArguments("manifest")
-                .WithArguments("inspect")
+                .WithArguments(new []{"manifest", "inspect"})
                 .WithArguments(imagename) | stdOutBuffer;
             
             await cmd.ExecuteAsync();
