@@ -8,19 +8,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    - uses: docker-practice/actions-setup-docker@master
     - uses: actions/checkout@v2
       with:
         fetch-depth: '2'
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v1
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 6.0.x
     - name: Restore dependencies
       run: dotnet restore
-    - name: Build, Test and Publish Connector
+    - name: Changed files
+      run: |
+        # test git command
+        git diff --name-only HEAD HEAD~1    
+    - name: Build and Test Connector
       working-directory: ./Airbyte.Cdk
-      run: dotnet run publish
+      run: dotnet run publish -b

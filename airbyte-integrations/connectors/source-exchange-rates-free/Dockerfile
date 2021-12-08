@@ -10,7 +10,7 @@ RUN dotnet test
 RUN dotnet build -c Release -o output
 
 # Run implementation
-FROM mcr.microsoft.com/dotnet/runtime:5.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:6.0 AS runtime
 
 ENV WORKDIR=/airbyte/integration_code
 WORKDIR $WORKDIR
