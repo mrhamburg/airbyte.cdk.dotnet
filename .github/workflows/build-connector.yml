@@ -20,4 +20,5 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build and Test Connector
+      working-directory: ./Airbyte.Cdk
       run: dotnet run publish -b
