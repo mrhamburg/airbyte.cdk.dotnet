@@ -129,8 +129,8 @@ namespace Airbyte.Cdk
             var targetlatestimage = $"{connectorname}:latest";
             
             //Check if image already exists remotely
-            if (pushimages && await ImageAlreadyExists(targetversionedimage))
-                throw new Exception($"Image {targetversionedimage} already exists remotely.");
+            if (await ImageAlreadyExists(targetversionedimage))
+                throw new Exception($"Image {targetversionedimage} already exists remotely, please update the CHANGELOG.md with a new version before proceeding.");
 
             ToConsole(Check, $"Building Docker Image...");
             var cmd = Cli.Wrap("docker")
