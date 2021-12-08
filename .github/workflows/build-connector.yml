@@ -1,7 +1,6 @@
 name: Build Connector Image
 on:
-  push:
-    branches: [ pull_request ]
+  pull_request:
     paths: 'airbyte-integrations/connectors/**'
 
 jobs:
