@@ -88,7 +88,8 @@ namespace Airbyte.Cdk
                 .Replace("\n", " ")
                 .Replace(Environment.NewLine, " ")
                 .Replace("#", " ")
-                .Replace("\r", " ");
+                .Replace("\r", " ")
+                .Replace("v", " ");
             List<Version> _versions = new List<Version>();
             foreach (var v in contents.Split(" "))
                 if (Version.TryParse(v, out var ver))
