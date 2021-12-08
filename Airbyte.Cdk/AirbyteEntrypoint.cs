@@ -270,7 +270,7 @@ namespace Airbyte.Cdk
             Console.WriteLine(Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(item, new JsonSerializerOptions
             {
                 WriteIndented = false,
-                IgnoreNullValues = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 Converters = { new JsonStringEnumConverter() },
                 Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
             })));
