@@ -12,7 +12,7 @@ namespace Airbyte.Cdk
 {
     public class Publish
     {
-        private static string Check = "[bold gray]CHECK[/] ";
+        private static string Check = "[bold orange]CHECK[/] ";
         private static string Error = "[bold red]ERROR[/] ";
         private static string Progress = "[bold green]PROGRESS[/] ";
 
@@ -76,10 +76,11 @@ namespace Airbyte.Cdk
 
         private static string GetSemver(string connectorpath)
         {
-            var readme = Path.Join(connectorpath, "CHANGELOG.md");
-            if (!File.Exists(readme))
+            var changelog = Path.Join(connectorpath, "CHANGELOG.md");
+            ToConsole(Check, $"Changelog path: {changelog}");
+            if (!File.Exists(changelog))
                 return string.Empty;
-            var contents = File.ReadAllText(readme);
+            var contents = File.ReadAllText(changelog);
             List<Version> _versions = new List<Version>();
             foreach (var line in contents.Split(" ").SelectMany(x => x.Split("\r")).ToArray())
                 if (Version.TryParse(line, out var ver))
