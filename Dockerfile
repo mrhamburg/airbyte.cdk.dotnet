@@ -1,5 +1,5 @@
 ﻿# Build and publish cdk
-FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 
 ENV BUILD_VERSION="0.0.1"
 ENV WORKDIR=/airbyte/build

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CliWrap;
 using Spectre.Console;
@@ -12,7 +13,7 @@ namespace Airbyte.Cdk
 {
     public class Publish
     {
-        private static string Check = "[bold gray]CHECK[/] ";
+        private static string Check = "[bold yellow]CHECK[/] ";
         private static string Error = "[bold red]ERROR[/] ";
         private static string Progress = "[bold green]PROGRESS[/] ";
 
@@ -40,7 +41,7 @@ namespace Airbyte.Cdk
                     var semver = GetSemver(connectorpath);
 
                     if (string.IsNullOrWhiteSpace(semver))
-                        throw new Exception("Could not acquire semver from readme");
+                        throw new Exception("Could not acquire semver from changelog");
 
                     await CheckDocker();
                     if (!await TryBuildAndPush(connectorpath, semver, image, !options.IsBuildOnly))
@@ -54,7 +55,7 @@ namespace Airbyte.Cdk
             }
         }
         
-        private static string MoveToUpperPath(string path, int level, bool removefilename = false)
+        public static string MoveToUpperPath(string path, int level, bool removefilename = false)
         {
             for (int i = 0; i < level; i++)
                 path = Path.Combine(Path.GetDirectoryName(path), removefilename ? "" : Path.GetFileName(path));
@@ -74,19 +75,30 @@ namespace Airbyte.Cdk
             return found;
         }
 
-        private static string GetSemver(string connectorpath)
+        public static string GetSemver(string connectorpath)
         {
-            var readme = Path.Join(connectorpath, "CHANGELOG.md");
-            if (!File.Exists(readme))
+            var changelog = Path.Join(connectorpath, "CHANGELOG.md");
+            if (!File.Exists(changelog))
+            {
+                ToConsole(Error, $"Could not find changelog, searched in path: {changelog}");
                 return string.Empty;
-            var contents = File.ReadAllText(readme);
+            }
+
+            var contents = File.ReadAllText(changelog)
+                .Replace("\n", " ")
+                .Replace(Environment.NewLine, " ")
+                .Replace("#", " ")
+                .Replace("\r", " ");
             List<Version> _versions = new List<Version>();
-            foreach (var line in contents.Split(" ").SelectMany(x => x.Split("\r")).ToArray())
-                if (Version.TryParse(line, out var ver))
+            foreach (var v in contents.Split(" "))
+                if (Version.TryParse(v, out var ver))
                     _versions.Add(ver);
 
             if (_versions.Count == 0)
+            {
+                ToConsole(Error, "Could not find any semver versions");
                 return string.Empty;
+            }
 
             return _versions.OrderByDescending(x => x).First().ToString();
         }

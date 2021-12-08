@@ -18,7 +18,7 @@ namespace source_exchange_rates
 
         public string UrlBase => "https://api.exchangerate.host";
 
-        public override bool CheckConnection(AirbyteLogger logger, JsonDocument config, out Exception exc)
+        public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
         {
             exc = null;
             try
@@ -35,7 +35,7 @@ namespace source_exchange_rates
             return false;
         }
 
-        public override Stream[] Streams(JsonDocument config)
+        public override Stream[] Streams(JsonElement config)
         {
             var baseimpl = UrlBase.HttpStream().ParseResponseObject("$");
             var baseimpl_symbols = baseimpl
@@ -45,7 +45,7 @@ namespace source_exchange_rates
 
             DateTime? _lastDateTime = null;
             string _currentsymbol = "";
-            string[] _configuredsymbols = config.RootElement.TryGetProperty("base", out var symbols)
+            string[] _configuredsymbols = config.TryGetProperty("base", out var symbols)
                 ? symbols.GetString().Split(",").Select(x => x.Replace(" ", "").ToUpper()).ToArray()
                 : Array.Empty<string>();
             Dictionary<string, DateTime> _currentstate = new Dictionary<string, DateTime>();
@@ -53,7 +53,7 @@ namespace source_exchange_rates
             var incrementalimpl = baseimpl
                 .CursorField(new[] { "date" })
                 .BackoffTime(((i, _) => TimeSpan.FromMinutes(i * 10)))
-                .GetUpdatedState((_, _) => _currentstate.AsJsonDocument())
+                .GetUpdatedState((_, _) => _currentstate.AsJsonElement())
                 .NextPageToken((request, _) =>
                 {
                     DateTime date = DateTime.Parse(request.Url.PathSegments[0]);
@@ -93,7 +93,7 @@ namespace source_exchange_rates
                     else if (nextpagetoken == null && _currentstate.Count > 0)
                         return _currentstate.Min(x => x.Value).ToString("yyyy-MM-dd");
                     else
-                        return config.RootElement.TryGetProperty("start_date", out var startdate) ? startdate.GetString() : "2008-01-01";
+                        return config.TryGetProperty("start_date", out var startdate) ? startdate.GetString() : "2008-01-01";
                 })
                 .RequestParams((_, _, nextpagetoken) => new Dictionary<string, object>
                 {
