@@ -1,11 +1,10 @@
 ﻿# Build and test implementation
-FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 
 ENV WORKDIR=/airbyte/build
 WORKDIR $WORKDIR
 
 COPY . ./
-COPY NuGet.Config /root/.nuget/NuGet/
 
 RUN dotnet test
 RUN dotnet build -c Release -o output
