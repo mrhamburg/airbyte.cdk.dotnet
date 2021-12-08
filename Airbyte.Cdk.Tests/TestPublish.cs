@@ -10,7 +10,7 @@ namespace Airbyte.Cdk.Tests
         /// <summary>
         /// Tests to see if we can get the semver version
         /// </summary>
-        [Fact]
+        [Fact(Skip = "local only")]
         public void TestGetSemver()
         {
             string connectorpath = Path.Join(Publish.MoveToUpperPath(Assembly.GetExecutingAssembly().Location, 5, true), 

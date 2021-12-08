@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CliWrap;
 using Spectre.Console;
@@ -83,11 +84,14 @@ namespace Airbyte.Cdk
                 return string.Empty;
             }
 
-            var contents = File.ReadAllText(changelog);
+            var contents = File.ReadAllText(changelog)
+                .Replace("\n", " ")
+                .Replace(Environment.NewLine, " ")
+                .Replace("#", " ")
+                .Replace("\r", " ");
             List<Version> _versions = new List<Version>();
-            ToConsole(Check, contents);
-            foreach (var line in contents.Split(" ").SelectMany(x => x.Split("\r")).ToArray())
-                if (Version.TryParse(line, out var ver))
+            foreach (var v in contents.Split(" "))
+                if (Version.TryParse(v, out var ver))
                     _versions.Add(ver);
 
             if (_versions.Count == 0)
