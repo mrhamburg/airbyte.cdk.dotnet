@@ -16,7 +16,7 @@ Generate a boilerplate connector using the code generator. Create a new director
 ```bash
 git clone https://github.com/mrhamburg/airbyte.cdk.dotnet.git
 cd airbyte.cdk.dotnet
-dotnet run init
+dotnet run init --project Airbyte.Cdk
 ```
 
 ## Components

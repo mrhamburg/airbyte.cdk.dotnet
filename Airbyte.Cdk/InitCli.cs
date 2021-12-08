@@ -49,11 +49,11 @@ namespace Airbyte.Cdk
                 }
                 SourceConnectorType = connectortype;
 
-                var location = Path.Combine(Assembly.GetExecutingAssembly().Location, "airbyte-integrations", "connectors", $"{connectortype.Split('-')[0]}-{connectorname}");
+                var location = Path.Combine(MoveToUpperPath(Assembly.GetExecutingAssembly().Location, 5, true), "airbyte-integrations", "connectors", $"{connectortype.Split('-')[0]}-{connectorname}");
                 if (location.Any(Path.GetInvalidPathChars().Contains))
                     throw new Exception($"Path is invalid: " + location);
-                if (!AnsiConsole.Confirm("Is this destination correct? " + location))
-                    return;
+                //if (!AnsiConsole.Confirm("Is this destination correct? " + location))
+                //    return;
 
                 var dir = Directory.CreateDirectory(location);
 
@@ -75,6 +75,7 @@ namespace Airbyte.Cdk
                         await TryAndBuildResult(dir, connectorname);
                     });
 
+                ToConsole(Progress, $"You can start developing in the following directory: \n {location}");
                 ToConsole("[bold green]DONE[/]", " Happy programming ", Emoji.Known.SmilingFace);
 
             }
@@ -277,7 +278,7 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet").WithArguments("--version") | stdOutBuffer;
             await cmd.ExecuteAsync();
-            if (Version.TryParse(stdOutBuffer.ToString(), out var v) && v.Major >= 5)
+            if (Version.TryParse(stdOutBuffer.ToString(), out var v) && v.Major >= 6)
                 ToConsole(Check, "Found dotnet version: ", v.ToString(), " ", Emoji.Known.CheckMark);
             else if (v?.Major < 5)
             {

@@ -17,28 +17,35 @@ namespace Airbyte.Cdk
 
         public static async Task Process(PublishOptions options)
         {
-            //Use git cli to get the last commit and check which files have changed, from those files get first path for connector name and use that to build and publish
-            //Get the version from the readme and use that as the tag, also push to latest
-            var files = await GetFilesChanged();
-            if (files.Length == 0)
-                throw new Exception("Could not find any changed files");
-            var connectors = GetConnectorsFromChanges(files);
-            foreach (var item in connectors)
+            try
             {
-                string image = $"airbytedotnet/{item}";
-                ToConsole(Progress, $"Processing changes for connector: {item}");
+                //Use git cli to get the last commit and check which files have changed, from those files get first path for connector name and use that to build and publish
+                //Get the version from the readme and use that as the tag, also push to latest
+                var files = await GetFilesChanged();
+                if (files.Length == 0)
+                    throw new Exception("Could not find any changed files");
+                var connectors = GetConnectorsFromChanges(files);
+                foreach (var item in connectors)
+                {
+                    string image = $"airbytedotnet/{item}";
+                    ToConsole(Progress, $"Processing changes for connector: {item}");
                 
-                if (string.IsNullOrWhiteSpace(item))
-                    throw new Exception("Could not find connector name");
-                string connectorpath = Path.Join("airbyte-integrations", "connectors", item);
-                var semver = GetSemver(connectorpath);
+                    if (string.IsNullOrWhiteSpace(item))
+                        throw new Exception("Could not find connector name");
+                    string connectorpath = Path.Join("airbyte-integrations", "connectors", item);
+                    var semver = GetSemver(connectorpath);
 
-                if (string.IsNullOrWhiteSpace(semver))
-                    throw new Exception("Could not acquire semver from readme");
+                    if (string.IsNullOrWhiteSpace(semver))
+                        throw new Exception("Could not acquire semver from readme");
 
-                await CheckDocker();
-                if (!await TryBuildAndPush(connectorpath, semver, image, options.Push))
-                    throw new Exception("Failed to build and publish connector image");   
+                    await CheckDocker();
+                    if (!await TryBuildAndPush(connectorpath, semver, image, options.Push))
+                        throw new Exception("Failed to build and publish connector image");   
+                }
+            }
+            catch (Exception e)
+            {
+                ToConsole(Error, $"Could not finish execution due to error: {e.Message}");
             }
         }
 
