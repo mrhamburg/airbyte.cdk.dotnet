@@ -156,7 +156,7 @@ namespace Airbyte.Cdk
             return true;
         }
 
-        private static async Task<bool> ImageAlreadyExists(string imagename)
+        public static async Task<bool> ImageAlreadyExists(string imagename)
         {
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("docker")
@@ -166,7 +166,7 @@ namespace Airbyte.Cdk
             
             await cmd.ExecuteAsync();
 
-            return !stdOutBuffer.ToString().Contains("no such manifest");
+            return !stdOutBuffer.ToString().Contains("no such manifest") && !stdOutBuffer.ToString().Contains("requested access to the resource is denied");
         }
 
         private static void ToConsole(params string[] lines) => AnsiConsole.MarkupLine(string.Concat(lines));
