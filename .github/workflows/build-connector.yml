@@ -20,7 +20,7 @@ jobs:
         dotnet-version: 6.0.x
     - name: Restore dependencies
       run: dotnet restore
-    - name: Git test
+    - name: Changed files
       run: |
         # test git command
         git diff --name-only HEAD HEAD~1

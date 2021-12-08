@@ -40,7 +40,7 @@ namespace Airbyte.Cdk
                     var semver = GetSemver(connectorpath);
 
                     if (string.IsNullOrWhiteSpace(semver))
-                        throw new Exception("Could not acquire semver from readme");
+                        throw new Exception("Could not acquire semver from changelog");
 
                     await CheckDocker();
                     if (!await TryBuildAndPush(connectorpath, semver, image, !options.IsBuildOnly))
@@ -54,7 +54,7 @@ namespace Airbyte.Cdk
             }
         }
         
-        private static string MoveToUpperPath(string path, int level, bool removefilename = false)
+        public static string MoveToUpperPath(string path, int level, bool removefilename = false)
         {
             for (int i = 0; i < level; i++)
                 path = Path.Combine(Path.GetDirectoryName(path), removefilename ? "" : Path.GetFileName(path));
@@ -74,7 +74,7 @@ namespace Airbyte.Cdk
             return found;
         }
 
-        private static string GetSemver(string connectorpath)
+        public static string GetSemver(string connectorpath)
         {
             var changelog = Path.Join(connectorpath, "CHANGELOG.md");
             if (!File.Exists(changelog))
@@ -85,6 +85,7 @@ namespace Airbyte.Cdk
 
             var contents = File.ReadAllText(changelog);
             List<Version> _versions = new List<Version>();
+            ToConsole(Check, contents);
             foreach (var line in contents.Split(" ").SelectMany(x => x.Split("\r")).ToArray())
                 if (Version.TryParse(line, out var ver))
                     _versions.Add(ver);
