@@ -88,7 +88,8 @@ namespace Airbyte.Cdk
                 .Replace("\n", " ")
                 .Replace(Environment.NewLine, " ")
                 .Replace("#", " ")
-                .Replace("\r", " ");
+                .Replace("\r", " ")
+                .Replace("v", " ");
             List<Version> _versions = new List<Version>();
             foreach (var v in contents.Split(" "))
                 if (Version.TryParse(v, out var ver))
@@ -146,6 +147,7 @@ namespace Airbyte.Cdk
             if (!pushimages) return true;
             ToConsole(Check, $"Publishing Docker Image...");
             cmd = Cli.Wrap("docker")
+                .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
                 .WithArguments(new []{"push", "-a", connectorname}) | Console.WriteLine;
             result = await cmd.ExecuteAsync();
             if (result.ExitCode != 0)
@@ -154,16 +156,17 @@ namespace Airbyte.Cdk
             return true;
         }
 
-        private static async Task<bool> ImageAlreadyExists(string imagename)
+        public static async Task<bool> ImageAlreadyExists(string imagename)
         {
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("docker")
-                .WithArguments(new []{"manifest", "inspect"})
-                .WithArguments(imagename) | stdOutBuffer;
+                .WithValidation(CommandResultValidation.None)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithArguments(new []{"manifest", "inspect", imagename}) | stdOutBuffer;
             
             await cmd.ExecuteAsync();
 
-            return !stdOutBuffer.ToString().Contains("no such manifest");
+            return !stdOutBuffer.ToString().Contains("no such manifest") && !stdOutBuffer.ToString().Contains("requested access to the resource is denied");
         }
 
         private static void ToConsole(params string[] lines) => AnsiConsole.MarkupLine(string.Concat(lines));

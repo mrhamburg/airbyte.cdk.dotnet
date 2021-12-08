@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
 
@@ -18,6 +19,15 @@ namespace Airbyte.Cdk.Tests
             var found = Publish.GetSemver(connectorpath);
 
             found.Should().NotBeEmpty();
+        }
+        
+        [Fact(Skip = "local only")]
+        public async Task TestGetImageAlreadyExists()
+        {
+            string imagetest = "airbytedotnet/source-exchange-rates-free:nonexistent";
+            var found = await Publish.ImageAlreadyExists(imagetest);
+
+            found.Should().BeFalse();
         }
     }
 }
