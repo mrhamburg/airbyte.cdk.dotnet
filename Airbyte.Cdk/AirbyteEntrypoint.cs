@@ -36,16 +36,22 @@ namespace Airbyte.Cdk
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
-            Parser.Default.ParseArguments<ReadOptions, WriteOptions, InitOptions>(args)
+            Parser.Default.ParseArguments<ReadOptions, WriteOptions, InitOptions, PublishOptions>(args)
                 .WithParsed<ReadOptions>(options => Options = options)
                 .WithParsed<WriteOptions>(options => Options = options)
                 .WithParsed<InitOptions>(options => Options = options)
+                .WithParsed<PublishOptions>(options => Options = options)
                 .WithNotParsed(_ => Environment.Exit(1));
 
             //Check if this is an init
             if (Options is InitOptions)
             {
                 await InitCli.Process();
+                return;
+            }
+            if (Options is PublishOptions publishOptions)
+            {
+                await Publish.Process(publishOptions);
                 return;
             }
 
