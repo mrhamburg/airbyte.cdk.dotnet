@@ -12,7 +12,7 @@ namespace Airbyte.Cdk
 {
     public class Publish
     {
-        private static string Check = "[bold orange]CHECK[/] ";
+        private static string Check = "[bold yellow]CHECK[/] ";
         private static string Error = "[bold red]ERROR[/] ";
         private static string Progress = "[bold green]PROGRESS[/] ";
 
