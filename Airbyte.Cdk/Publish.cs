@@ -77,9 +77,12 @@ namespace Airbyte.Cdk
         private static string GetSemver(string connectorpath)
         {
             var changelog = Path.Join(connectorpath, "CHANGELOG.md");
-            ToConsole(Check, $"Changelog path: {changelog}");
             if (!File.Exists(changelog))
+            {
+                ToConsole(Error, $"Could not find changelog, searched in path: {changelog}");
                 return string.Empty;
+            }
+
             var contents = File.ReadAllText(changelog);
             List<Version> _versions = new List<Version>();
             foreach (var line in contents.Split(" ").SelectMany(x => x.Split("\r")).ToArray())
@@ -87,7 +90,10 @@ namespace Airbyte.Cdk
                     _versions.Add(ver);
 
             if (_versions.Count == 0)
+            {
+                ToConsole(Error, "Could not find any semver versions");
                 return string.Empty;
+            }
 
             return _versions.OrderByDescending(x => x).First().ToString();
         }
