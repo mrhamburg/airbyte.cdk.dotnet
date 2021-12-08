@@ -160,6 +160,7 @@ namespace Airbyte.Cdk
         {
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("docker")
+                .WithValidation(CommandResultValidation.None)
                 .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
                 .WithArguments(new []{"manifest", "inspect", imagename}) | stdOutBuffer;
             
