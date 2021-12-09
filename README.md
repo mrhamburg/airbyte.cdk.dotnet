@@ -24,7 +24,7 @@ dotnet run init --project Airbyte.Cdk
 Component | Type |Code | Installation | Version
 ----------|------|-----|------|--------
 Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
-Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/airbyte.exchangerates` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbyte/source-mongodb-v2?sort=semver&style=flat)
+Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/source-exchange-rates-free` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbyte/source-mongodb-v2?sort=semver&style=flat)
 
 ## Concepts & Documentation
 This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
@@ -32,7 +32,7 @@ This readme is a general introduction to the CDK. Readers should have basic fami
 If you have any issues with troubleshooting or want to learn more about the CDK from the Airbyte team, head to the \#connector-development channel in [Slack](https://airbytehq.slack.com/ssb/redirect) to inquire further!
 
 ### Basic Concepts
-If you want to learn more about the classes required to implement an Airbyte Source, head to our [basic concepts doc](..\cdk-python\basic-concepts.md) as described in the python-cdk.
+If you want to learn more about the classes required to implement an Airbyte Source, head to our [basic concepts doc](https://docs.airbyte.io/connector-development/cdk-python/basic-concepts) as described in the python-cdk.
 ### Full Refresh Streams
 A `Stream` is the atomic unit for reading data from a Source. A stream can read data from anywhere: a relational database, an API, or even scrape a web page! \(although that might be stretching the limits of what a connector should do\).
 To implement a stream, there are two minimum requirements: 1. Define the stream's schema 2. Implement the logic for reading records from the underlying data source
@@ -98,11 +98,42 @@ public override Stream[] Streams(JsonElement config)
 
 Airbyte recommends using the CDK template generator to develop with the CDK. The template generates created all the required scaffolding, with convenient TODOs, allowing developers to truly focus on implementing the API.
 
-## Contributing
+## Contributing - Connector
 
 ### First time setup
 
-Make sure the latest version of dotnet is installed, this can be found using the following link: [Dotnet SDK](https://dotnet.microsoft.com/download)
+Make sure the latest version of dotnet is installed, this can be found using the following link: [Dotnet SDK](https://dotnet.microsoft.com/download). Also, make sure you have docker installed, information to do so can be found here: [Get Docker](https://docs.docker.com/get-docker/)
+
+Run the following commands to get a boilerplate for creating a new connector:
+```bash
+git clone https://github.com/mrhamburg/airbyte.cdk.dotnet.git
+cd airbyte.cdk.dotnet
+dotnet run init --project Airbyte.Cdk
+```
+
+Once ready, check the README.md file in your connector directory for instructions. Include your connector in this readme as well, see the components section at the top.
+
+#### Iteration
+
+* Iterate on the code locally
+* Run tests via `dotnet test`
+* Try to build the connector using docker `docker build .`
+
+#### Testing
+
+All tests are located in the `*.Tests` directory where your connector is created. Run `dotnet test` to run them.
+
+#### Publishing a new version of a connector
+
+1. Open a PR
+2. Once ready, update the CHANGELOG.md file, which should include a new version number 
+3. Connectors are automatically released once merged into the main branch
+
+## Contributing - CDK
+
+### First time setup
+
+Make sure the latest version of dotnet is installed, this can be found using the following link: [Dotnet SDK](https://dotnet.microsoft.com/download). Also, make sure you have docker installed, information to do so can be found here: [Get Docker](https://docs.docker.com/get-docker/)
 
 #### Iteration
 
