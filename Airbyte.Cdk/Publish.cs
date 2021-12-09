@@ -99,8 +99,13 @@ namespace Airbyte.Cdk
                 ToConsole(Error, "Could not find any semver versions");
                 return string.Empty;
             }
+            
+            _versions.Sort();
+            _versions.Reverse();
+            var version = _versions.First().ToString();
+            ToConsole(Check, $"Found connector version {version}");
 
-            return _versions.OrderByDescending(x => x).First().ToString();
+            return version;
         }
 
         private static string[] GetConnectorsFromChanges(string[] filechanges) =>
@@ -133,11 +138,15 @@ namespace Airbyte.Cdk
                 throw new Exception($"Image {targetversionedimage} already exists remotely, please update the CHANGELOG.md with a new version before proceeding.");
 
             ToConsole(Check, $"Building Docker Image...");
+            string[] commandargs = {
+                "build", "--build-arg", $"BUILD_VERSION={semver}", "-t", targetversionedimage, "-t", targetlatestimage, "."
+            };
+            ToConsole(Check, $"Command args: {string.Join(" ", commandargs)}");
             var cmd = Cli.Wrap("docker")
                 .WithWorkingDirectory(folderpath)
                 .WithValidation(CommandResultValidation.None)
                 .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
-                .WithArguments(new []{"build", "-t", targetversionedimage, "-t", targetlatestimage, "."} ) | Console.WriteLine;
+                .WithArguments(commandargs) | Console.WriteLine;
             var result = await cmd.ExecuteAsync();
             if (result.ExitCode == 1)
                 return false;
