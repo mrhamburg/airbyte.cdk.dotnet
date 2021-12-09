@@ -99,8 +99,11 @@ namespace Airbyte.Cdk
                 ToConsole(Error, "Could not find any semver versions");
                 return string.Empty;
             }
-
-            return _versions.OrderByDescending(x => x).First().ToString();
+            
+            _versions.Sort();
+            _versions.Reverse();
+            
+            return _versions.First().ToString();
         }
 
         private static string[] GetConnectorsFromChanges(string[] filechanges) =>
@@ -137,7 +140,7 @@ namespace Airbyte.Cdk
                 .WithWorkingDirectory(folderpath)
                 .WithValidation(CommandResultValidation.None)
                 .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
-                .WithArguments(new []{"build", "-t", targetversionedimage, "-t", targetlatestimage, "."} ) | Console.WriteLine;
+                .WithArguments(new []{"build", $"--build-arg BUILD_VERSION={semver}", "-t", targetversionedimage, "-t", targetlatestimage, "."} ) | Console.WriteLine;
             var result = await cmd.ExecuteAsync();
             if (result.ExitCode == 1)
                 return false;
