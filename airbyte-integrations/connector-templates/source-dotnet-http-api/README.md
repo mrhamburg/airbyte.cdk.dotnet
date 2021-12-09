@@ -13,9 +13,9 @@ For information about how to use this connector within Airbyte, see [the documen
 ### Locally running the connector
 ```
 dotnet read --command spec
-dotnet read --command check --config secrets/config.json
-dotnet read --command discover --config secrets/config.json
-dotnet read --command read --config secrets/config.json --catalog integration_tests/configured_catalog.json
+dotnet read --command check --config sample_files/config.json
+dotnet read --command discover --config sample_files/config.json
+dotnet read --command read --config sample_files/config.json --catalog sample_files/configured_catalog.json
 ```
 
 ### Locally running the connector docker image
@@ -30,9 +30,9 @@ docker build . -t airbytedotnet/{{dashcasename}}:dev
 Then run any of the connector commands as follows:
 ```
 docker run --rm airbyte/{{dashcasename}}:dev spec
-docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{dashcasename}}:dev check --config /secrets/config.json
-docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{dashcasename}}:dev discover --config /secrets/config.json
-docker run --rm -v $(pwd)/secrets:/secrets -v $(pwd)/integration_tests:/integration_tests airbyte/{{dashcasename}}:dev read --config /secrets/config.json --catalog /integration_tests/configured_catalog.json
+docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{dashcasename}}:dev check --config /sample_files/config.json
+docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{dashcasename}}:dev discover --config /sample_files/config.json
+docker run --rm -v $(pwd)/secrets:/secrets -v $(pwd)/integration_tests:/integration_tests airbyte/{{dashcasename}}:dev read --config /sample_files/config.json --catalog /sample_files/configured_catalog.json
 ```
 ## Testing
 To run tests locally, from the connector directory run:
