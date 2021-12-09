@@ -23,6 +23,6 @@ jobs:
           push: false
           tags: local/dotnet-cdk:latest
           context: .
-          build-args:
-            NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
-            BUILD_VERSION: ${{ github.event.release.tag_name }}
+          build-args: |
+            NUGET_APIKEY=${{ secrets.NUGET_APIKEY }}
+            BUILD_VERSION=${{ github.event.release.tag_name }}
