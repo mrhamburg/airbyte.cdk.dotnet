@@ -127,7 +127,7 @@ All tests are located in the `*.Tests` directory where your connector is created
 
 1. Open a PR
 2. Once ready, update the CHANGELOG.md file, which should include a new version number 
-3. Connectors are automatically released once merged into the main branch
+3. Connectors are automatically published to Docker Hub after updates to the main branch. If the connector is updated without incrementing the version, GitHub will NOT overwrite the existing image in Docker Hub.
 
 ## Contributing - CDK
 
