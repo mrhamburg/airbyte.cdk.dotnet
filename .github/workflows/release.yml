@@ -1,3 +1,6 @@
+#TODO: version is not working
+# error: Source parameter was not specified.
+# see: https://github.com/mrhamburg/airbyte.cdk.dotnet/runs/4473155151?check_suite_focus=true
 name: Release Dotnet CDK
 on:
   release:
@@ -20,6 +23,6 @@ jobs:
           push: false
           tags: local/dotnet-cdk:latest
           context: .
-        env:
-          NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
-          BUILD_VERSION: ${{ github.event.release.tag_name }}
+          build-args:
+            NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+            BUILD_VERSION: ${{ github.event.release.tag_name }}
