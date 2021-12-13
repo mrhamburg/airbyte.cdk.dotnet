@@ -2,6 +2,12 @@
 
  [![CI](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/build.yml/badge.svg?query=branch%3Amain)](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/build.yml?query=branch%3Amain) [![CI](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/release.yml/badge.svg)](https://github.com/mrhamburg/airbyte.cdk.dotnet/actions/workflows/release.yml)  
 
+- [Quick Start](#quick-start)
+- [Components](#components)
+- [Concepts & Documentation](#concepts--documentation)
+- [Contributing - Connector](#contributing---connector)
+- [Contributing - CDK](#contributing---cdk)
+
 The Airbyte Dotnet CDK is a framework for rapidly developing production-grade Airbyte connectors. The CDK currently offers helpers specific for creating Airbyte source connectors for:
 
 * HTTP APIs \(REST APIs, GraphQL, etc..\)
@@ -33,6 +39,7 @@ If you have any issues with troubleshooting or want to learn more about the CDK 
 
 ### Basic Concepts
 If you want to learn more about the classes required to implement an Airbyte Source, head to our [basic concepts doc](https://docs.airbyte.io/connector-development/cdk-python/basic-concepts) as described in the python-cdk.
+
 ### Full Refresh Streams
 A `Stream` is the atomic unit for reading data from a Source. A stream can read data from anywhere: a relational database, an API, or even scrape a web page! \(although that might be stretching the limits of what a connector should do\).
 To implement a stream, there are two minimum requirements: 1. Define the stream's schema 2. Implement the logic for reading records from the underlying data source
