@@ -38,12 +38,12 @@ namespace Airbyte.Cdk
                     new SelectionPrompt<string>()
                         .Title("What kind of connector are you building")
                         .PageSize(3)
-                        .AddChoices("source-dotnet-http-api", "source-dotnet-generic", "destination-dotnet-generic"));
+                        .AddChoices(Cdk.SourceConnectorType.GetAll()));
 
                 //TODO: We only support template for source for now
-                if (connectortype != "source-dotnet-http-api")
+                if (connectortype != Cdk.SourceConnectorType.SOURCE_API)
                 {
-                    ToConsole(Error, $"Only supporting source-http connectors for now. " +
+                    ToConsole(Error, $"Only supporting {Cdk.SourceConnectorType.SOURCE_API} connectors for now. " +
                                      $"Please check the connector source code for implementing a {connectortype} connector.");
                     return;
                 }
