@@ -19,7 +19,7 @@ WORKDIR $WORKDIR
 COPY --from=build /airbyte/build/output .
 
 ENV AIRBYTE_IMPL_PATH="/airbyte/integration_code/{{connectorname}}.dll"
-ENV AIRBYTE_IMPL_MODULE="{{connectorname}}"
+ENV AIRBYTE_IMPL_MODULE="Program"
 ENV AIRBYTE_ENTRYPOINT "dotnet /airbyte/integration_code/{{connectorname}}.dll read --command"
 ENTRYPOINT ["dotnet", "/airbyte/integration_code/{{connectorname}}.dll", "read", "--command"]
 
