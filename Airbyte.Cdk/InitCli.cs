@@ -105,22 +105,28 @@ namespace Airbyte.Cdk
         private static async Task CreateSolutionFile(DirectoryInfo dir, params string[] proj)
         {
             string step = $"Adding solution file...";
+            bool isSucceeded = true;
             ToConsole(Progress, step);
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(dir.FullName)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "new", "sln" }) | stdOutBuffer;
-            await cmd.ExecuteAsync();
+            isSucceeded = (await cmd.ExecuteAsync()).ExitCode == 0;
 
             foreach (var p in proj)
             {
                 cmd = Cli.Wrap("dotnet")
                     .WithWorkingDirectory(dir.FullName)
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                    .WithValidation(CommandResultValidation.None)
                     .WithArguments(new[] { "sln", "add", p }) | stdOutBuffer;
-                await cmd.ExecuteAsync();
+                if(isSucceeded)
+                    isSucceeded = (await cmd.ExecuteAsync()).ExitCode == 0;
             }
 
-            if (stdOutBuffer.ToString().Contains("added to the solution"))
+            if (isSucceeded)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
                 throw new Exception("[CreateSolutionFile] Could not create dotnet solution due to error: \n" + stdOutBuffer);
@@ -133,11 +139,13 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(dir.FullName)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "new", "gitignore" }) | stdOutBuffer;
 
-            await cmd.ExecuteAsync();
+            var commandResult = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("successfully"))
+            if (commandResult.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
                 throw new Exception("[AddGitIgnore] Could not create dotnet project due to error: \n" + stdOutBuffer);
@@ -240,10 +248,12 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(path)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "add", "package", nuget }) | stdOutBuffer;
-            await cmd.ExecuteAsync();
+            var commandResult = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("Restored"))
+            if (commandResult.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
                 throw new Exception("[AddDepdendency] Could not create dotnet project due to error: \n" + stdOutBuffer);
@@ -260,10 +270,12 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(workingdir.FullName)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "new", dotnettype }) | stdOutBuffer;
-            await cmd.ExecuteAsync();
+            var commandResult = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("succeeded"))
+            if (commandResult.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
                 throw new Exception("[CreateDotnetProject] Could not create dotnet project due to error: \n" + stdOutBuffer);
