@@ -33,17 +33,17 @@ namespace Airbyte.Cdk
                     });
 
                 string connectorname = AnsiConsole.Ask<string>("Connector name:");
-                connectorname = connectorname.ToSnakeCase().Replace(" ", "-").ToLower();
+                connectorname = connectorname.ToPascalCase();
                 var connectortype = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("What kind of connector are you building")
                         .PageSize(3)
-                        .AddChoices("source-dotnet-http-api", "source-dotnet-generic", "destination-dotnet-generic"));
+                        .AddChoices(Cdk.SourceConnectorType.GetAll()));
 
-                //TODO: We only support template for source for now
-                if (connectortype != "source-dotnet-http-api")
+                //TODO: We only support source api template for now
+                if (connectortype != Cdk.SourceConnectorType.SOURCE_API)
                 {
-                    ToConsole(Error, $"Only supporting source-http connectors for now. " +
+                    ToConsole(Error, $"Only supporting {Cdk.SourceConnectorType.SOURCE_API} connectors for now. " +
                                      $"Please check the connector source code for implementing a {connectortype} connector.");
                     return;
                 }
@@ -105,25 +105,31 @@ namespace Airbyte.Cdk
         private static async Task CreateSolutionFile(DirectoryInfo dir, params string[] proj)
         {
             string step = $"Adding solution file...";
+            bool isSucceeded = true;
             ToConsole(Progress, step);
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(dir.FullName)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "new", "sln" }) | stdOutBuffer;
-            await cmd.ExecuteAsync();
+            isSucceeded = (await cmd.ExecuteAsync()).ExitCode == 0;
 
             foreach (var p in proj)
             {
                 cmd = Cli.Wrap("dotnet")
                     .WithWorkingDirectory(dir.FullName)
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                    .WithValidation(CommandResultValidation.None)
                     .WithArguments(new[] { "sln", "add", p }) | stdOutBuffer;
-                await cmd.ExecuteAsync();
+                if(isSucceeded)
+                    isSucceeded = (await cmd.ExecuteAsync()).ExitCode == 0;
             }
 
-            if (stdOutBuffer.ToString().Contains("added to the solution"))
+            if (isSucceeded)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet solution due to error: \n" + stdOutBuffer);
+                throw new Exception("[CreateSolutionFile] Could not create dotnet solution due to error: \n" + stdOutBuffer);
         }
 
         private static async Task AddGitIgnore(DirectoryInfo dir)
@@ -133,14 +139,16 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(dir.FullName)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "new", "gitignore" }) | stdOutBuffer;
 
-            await cmd.ExecuteAsync();
+            var commandResult = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("successfully"))
+            if (commandResult.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet project due to error: \n" + stdOutBuffer);
+                throw new Exception("[AddGitIgnore] Could not create dotnet project due to error: \n" + stdOutBuffer);
         }
 
         private static string ConnectorTemplateFolder(DirectoryInfo dir) => Path.Combine(MoveToUpperPath(dir.FullName, 2, true),
@@ -161,8 +169,7 @@ namespace Airbyte.Cdk
             var template = Handlebars.Compile(File.ReadAllText(source));
             File.WriteAllText(target, template(new
             {
-                dashname = connectorname.Replace(" ", "-").Replace("-", "_"),
-                snakename = connectorname.ToSnakeCase().Replace("_", "-")
+                connectorname
             }));
 
             if (File.Exists(target))
@@ -183,7 +190,7 @@ namespace Airbyte.Cdk
             var template = Handlebars.Compile(File.ReadAllText(source));
             File.WriteAllText(target, template(new
             {
-                name = connectorname
+                connectorname
             }));
 
             if (File.Exists(target))
@@ -205,7 +212,7 @@ namespace Airbyte.Cdk
             var template = Handlebars.Compile(File.ReadAllText(source));
             File.WriteAllText(target, template(new
             {
-                snakename = ToUpperFirstString(connectorname.ToSnakeCase().Replace("-", "_"))
+                connectorname
             }));
 
             if (File.Exists(target))
@@ -241,13 +248,15 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(path)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "add", "package", nuget }) | stdOutBuffer;
-            await cmd.ExecuteAsync();
+            var commandResult = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("Restored"))
+            if (commandResult.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet project due to error: \n" + stdOutBuffer);
+                throw new Exception("[AddDepdendency] Could not create dotnet project due to error: \n" + stdOutBuffer);
         }
 
         private static async Task<string> CreateDotnetProject(DirectoryInfo dir, string name, bool istestproject = false)
@@ -261,13 +270,15 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet")
                 .WithWorkingDirectory(workingdir.FullName)
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+                .WithValidation(CommandResultValidation.None)
                 .WithArguments(new[] { "new", dotnettype }) | stdOutBuffer;
-            await cmd.ExecuteAsync();
+            var commandResult = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("succeeded"))
+            if (commandResult.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet project due to error: \n" + stdOutBuffer);
+                throw new Exception("[CreateDotnetProject] Could not create dotnet project due to error: \n" + stdOutBuffer);
 
             return workingdir.FullName;
         }
