@@ -1,6 +1,6 @@
-# {{titlecasename}} Source
+# {{connectorname}} Source
 
-This is the repository for the {{titlecasename}} source connector, written in C#.
+This is the repository for the {{connectorname}} source connector, written in C#.
 For information about how to use this connector within Airbyte, see [the documentation](https://docs.airbyte.io/integrations/sources/{{dashcasename}}).
 
 ## Local development
@@ -23,16 +23,16 @@ dotnet read --command read --config sample_files/config.json --catalog sample_fi
 #### Build
 First, make sure you build the latest Docker image:
 ```
-docker build . -t airbytedotnet/{{dashcasename}}:dev
+docker build . -t airbytedotnet/{{connectorname}}:dev
 ```
 
 #### Run
 Then run any of the connector commands as follows:
 ```
-docker run --rm airbyte/{{dashcasename}}:dev spec
-docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{dashcasename}}:dev check --config /sample_files/config.json
-docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{dashcasename}}:dev discover --config /sample_files/config.json
-docker run --rm -v $(pwd)/secrets:/secrets -v $(pwd)/integration_tests:/integration_tests airbyte/{{dashcasename}}:dev read --config /sample_files/config.json --catalog /sample_files/configured_catalog.json
+docker run --rm airbyte/{{connectorname}}:dev spec
+docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{connectorname}}:dev check --config /sample_files/config.json
+docker run --rm -v $(pwd)/secrets:/secrets airbyte/{{connectorname}}:dev discover --config /sample_files/config.json
+docker run --rm -v $(pwd)/secrets:/secrets -v $(pwd)/integration_tests:/integration_tests airbyte/{{connectorname}}:dev read --config /sample_files/config.json --catalog /sample_files/configured_catalog.json
 ```
 ## Testing
 To run tests locally, from the connector directory run:

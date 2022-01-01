@@ -38,6 +38,7 @@ namespace Airbyte.Cdk.Sources.Streams
 
         public string Name
         {
+            //TODO: should be converted to PascalCase or is snake case an Airbyte protocol requirement?
             get => (string.IsNullOrWhiteSpace(_givenName) ? GetType().Name : _givenName).ToSnakeCase();
         }
 

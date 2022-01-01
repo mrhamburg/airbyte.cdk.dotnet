@@ -33,14 +33,14 @@ namespace Airbyte.Cdk
                     });
 
                 string connectorname = AnsiConsole.Ask<string>("Connector name:");
-                connectorname = connectorname.ToSnakeCase().Replace(" ", "-").ToLower();
+                connectorname = connectorname.ToPascalCase();
                 var connectortype = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("What kind of connector are you building")
                         .PageSize(3)
                         .AddChoices(Cdk.SourceConnectorType.GetAll()));
 
-                //TODO: We only support template for source for now
+                //TODO: We only support source api template for now
                 if (connectortype != Cdk.SourceConnectorType.SOURCE_API)
                 {
                     ToConsole(Error, $"Only supporting {Cdk.SourceConnectorType.SOURCE_API} connectors for now. " +
@@ -123,7 +123,7 @@ namespace Airbyte.Cdk
             if (stdOutBuffer.ToString().Contains("added to the solution"))
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet solution due to error: \n" + stdOutBuffer);
+                throw new Exception("[CreateSolutionFile] Could not create dotnet solution due to error: \n" + stdOutBuffer);
         }
 
         private static async Task AddGitIgnore(DirectoryInfo dir)
@@ -140,7 +140,7 @@ namespace Airbyte.Cdk
             if (stdOutBuffer.ToString().Contains("successfully"))
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet project due to error: \n" + stdOutBuffer);
+                throw new Exception("[AddGitIgnore] Could not create dotnet project due to error: \n" + stdOutBuffer);
         }
 
         private static string ConnectorTemplateFolder(DirectoryInfo dir) => Path.Combine(MoveToUpperPath(dir.FullName, 2, true),
@@ -161,8 +161,7 @@ namespace Airbyte.Cdk
             var template = Handlebars.Compile(File.ReadAllText(source));
             File.WriteAllText(target, template(new
             {
-                dashname = connectorname.Replace(" ", "-").Replace("-", "_"),
-                snakename = connectorname.ToSnakeCase().Replace("_", "-")
+                connectorname
             }));
 
             if (File.Exists(target))
@@ -183,7 +182,7 @@ namespace Airbyte.Cdk
             var template = Handlebars.Compile(File.ReadAllText(source));
             File.WriteAllText(target, template(new
             {
-                name = connectorname
+                connectorname
             }));
 
             if (File.Exists(target))
@@ -205,7 +204,7 @@ namespace Airbyte.Cdk
             var template = Handlebars.Compile(File.ReadAllText(source));
             File.WriteAllText(target, template(new
             {
-                snakename = ToUpperFirstString(connectorname.ToSnakeCase().Replace("-", "_"))
+                connectorname
             }));
 
             if (File.Exists(target))
@@ -247,7 +246,7 @@ namespace Airbyte.Cdk
             if (stdOutBuffer.ToString().Contains("Restored"))
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet project due to error: \n" + stdOutBuffer);
+                throw new Exception("[AddDepdendency] Could not create dotnet project due to error: \n" + stdOutBuffer);
         }
 
         private static async Task<string> CreateDotnetProject(DirectoryInfo dir, string name, bool istestproject = false)
@@ -267,7 +266,7 @@ namespace Airbyte.Cdk
             if (stdOutBuffer.ToString().Contains("succeeded"))
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not create dotnet project due to error: \n" + stdOutBuffer);
+                throw new Exception("[CreateDotnetProject] Could not create dotnet project due to error: \n" + stdOutBuffer);
 
             return workingdir.FullName;
         }
