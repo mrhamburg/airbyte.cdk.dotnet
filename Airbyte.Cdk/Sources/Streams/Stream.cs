@@ -27,33 +27,41 @@ namespace Airbyte.Cdk.Sources.Streams
         /// </summary>
         public virtual int? StateCheckpointInterval { get; protected set; } = null;
 
+        /// <summary>
+        /// Logger instance, for sending log messages as per Airbyte protocol
+        /// </summary>
         public AirbyteLogger Logger { get; protected set; }
 
+        /// <summary>
+        /// If true, this stream supports incremental updates
+        /// </summary>
         public bool SupportsIncremental
         {
             get => CursorField.Length > 0;
         }
 
+        /// <summary>
+        /// If incremental support is to be implemented, this field needs to be set for determining the range of updates
+        /// </summary>
         public bool SourceDefinedCursor { get; protected set; } = true;
 
+        /// <summary>
+        /// Name of this stream 
+        /// </summary>
         public string Name
         {
             //TODO: should be converted to PascalCase or is snake case an Airbyte protocol requirement?
             get => (string.IsNullOrWhiteSpace(_givenName) ? GetType().Name : _givenName).ToSnakeCase();
         }
 
+        /// <summary>
+        /// An internal name, which can deviate from the default classname
+        /// </summary>
         protected string _givenName = string.Empty;
 
         /// <summary>
         /// This method should be overridden by subclasses to read records based on the inputs
         /// </summary>
-        /// <param name="syncMode"></param>
-        /// <param name="streamchannel"></param>
-        /// <param name="recordlimit"></param>
-        /// <param name="cursorfield"></param>
-        /// <param name="streamslice"></param>
-        /// <param name="streamstate"></param>
-        /// <returns></returns>
         public abstract Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode, ChannelWriter<AirbyteMessage> streamchannel,
             JsonElement streamstate,
             long? recordlimit = null,
@@ -76,12 +84,12 @@ namespace Airbyte.Cdk.Sources.Streams
         /// {'name': 'octavia', 'created_at': 20 } then this method would return {'created_at': 20}
         /// to indicate state should be updated to this object.
         /// </summary>
-        /// <param name="currentstreamstate"></param>
-        /// <param name="latestrecord"></param>
-        /// <returns></returns>
         public virtual JsonElement GetUpdatedState(JsonElement currentstreamstate,
             JsonElement latestrecord) => "{}".AsJsonElement();
 
+        /// <summary>
+        /// Converts the current stream to an Airbyte stream, to determine stream specifications
+        /// </summary>
         public virtual AirbyteStream AsAirbyteStream()
         {
             var stream = new AirbyteStream { Name = Name, JsonSchema = GetJsonSchema().AsJsonElement(), SupportedSyncModes = new[] { SyncMode.full_refresh } };
@@ -105,10 +113,6 @@ namespace Airbyte.Cdk.Sources.Streams
         /// <summary>
         /// Override to define the slices for this stream. See the stream slicing section of the docs for more information.
         /// </summary>
-        /// <param name="syncmode"></param>
-        /// <param name="cursorfield"></param>
-        /// <param name="streamstate"></param>
-        /// <returns></returns>
         public virtual Dictionary<string, object> StreamSlices(SyncMode syncmode, string[] cursorfield,
             JsonElement streamstate) => new();
     }

@@ -43,6 +43,7 @@ namespace Airbyte.Cdk
                         throw new Exception("Could not acquire semver from changelog");
 
                     await CheckDocker();
+                    await CheckIfDockerIsRunning();
                     if (!await TryBuildAndPush(connectorpath, semver, image, !options.IsBuildOnly))
                         throw new Exception("Failed to build and publish connector image");   
                 }
@@ -112,6 +113,10 @@ namespace Airbyte.Cdk
             filechanges.Where(x => x.StartsWith("airbyte-integrations/connectors/"))
                 .Select(x => x.Split("connectors/").Last().Split("/").First()).Distinct().ToArray();
 
+        /// <summary>
+        /// TODO: this should be a generic check, InitCli has the same implementation
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private static async Task CheckDocker()
         {
             ToConsole(Check, "Validating Docker...");
@@ -124,6 +129,29 @@ namespace Airbyte.Cdk
             {
                 ToConsole(Check, "Validating Docker...", Emoji.Known.CrossMark);
                 throw new Exception("Could not find docker, please download at: https://docs.docker.com/get-docker/");
+            }
+        }
+        
+        /// <summary>
+        /// TODO: this should be a generic check, InitCli has the same implementation
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private static async Task CheckIfDockerIsRunning()
+        {
+            ToConsole(Check, "Validating Docker is running...");
+            var stdOutBuffer = new StringBuilder();
+            var stdOutError = new StringBuilder();
+            var cmd = Cli.Wrap("docker")
+                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutError))
+                .WithValidation(CommandResultValidation.None)
+                .WithArguments("version") | stdOutBuffer;
+            await cmd.ExecuteAsync();
+            if(stdOutError.Length == 0)
+                ToConsole(Check, "Docker is running...", Emoji.Known.CheckMark);
+            else
+            {
+                ToConsole(Check, "Docker is running...", Emoji.Known.CrossMark);
+                throw new Exception("Docker is currently not running, please start docker first!");
             }
         }
 
