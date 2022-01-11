@@ -45,7 +45,6 @@ namespace Airbyte.Cdk.Sources.Utils
             _authentication = authentication;
         }
 
-
         /// <summary>
         /// Override to set different conditions for backoff based on the response from the server.
         /// 
@@ -56,7 +55,6 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Unexpected but transient exceptions (connection timeout, DNS resolution failed, etc..) are retried by default.
         /// </summary>
         /// <param name="func">Input: FlurlHttpException exception | Output: boolean to retry yes or no</param>
-        /// <returns></returns>
         public FluentStreamBuilder ShouldRetry(Func<FlurlHttpException, bool> func) =>
             AddFunc(func, nameof(ShouldRetry));
 
@@ -65,7 +63,6 @@ namespace Airbyte.Cdk.Sources.Utils
         /// This method is called only if ShouldBackoff returns True for the input request.
         /// </summary>
         /// <param name="func">Input: int retrycount, IFlurlResponse response | Output: Timespan to backoff</param>
-        /// <returns></returns>
         public FluentStreamBuilder BackoffTime(Func<int, IFlurlResponse, TimeSpan> func) =>
             AddFunc(func, nameof(BackoffTime));
 
@@ -73,7 +70,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Override this method to define a pagination strategy.
         /// The value returned from this method is passed to most other methods in this class. Use it to form a request e.g: set headers or query params.
         /// </summary>
-        /// <param name="func">Input: IFlurlRequest request, IFlurlResponse response | Dictionary<string, object> with next page token</param>
+        /// <param name="func">Input: IFlurlRequest request, IFlurlResponse response | Dictionary with next page token</param>
         /// <returns>The token for the next page from the input response object. Returning None means there are no more pages to read in this response.</returns>
         public FluentStreamBuilder NextPageToken(Func<IFlurlRequest, IFlurlResponse, Dictionary<string, object>> func) =>
             AddFunc(func, nameof(NextPageToken));
@@ -82,8 +79,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Returns the URL path for the API endpoint e.g: if you wanted to hit https://myapi.com/v1/some_entity then this should return "some_entity"
         /// Defaults to {UrlBase}/{Name} where Name is the name of this stream
         /// </summary>
-        /// <param name="func">Input: JsonElement StreamState, Dictionary<string, object> StreamSlice, Dictionary<string, object> nextpagetoken | Output string subpath for the request</param>
-        /// <returns></returns>
+        /// <param name="func">Input: JsonElement StreamState, Dictionary StreamSlice, Dictionary nextpagetoken | Output string subpath for the request</param>
         public FluentStreamBuilder Path(Func<JsonElement, Dictionary<string, object>?,
             Dictionary<string, object>?, string> func) =>
             AddFunc(func, nameof(Path));
@@ -92,7 +88,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Parses the raw response object into a list of records.
         /// By default, this returns an iterable containing the input. Override to parse differently.
         /// </summary>
-        /// <param name="func">Input: IFlurlResponse response to parse, JsonElement streamstate, Dictionary<string, object> streamslice, Dictionary<string, object> nextpagetoken | Output IEnumerable<JsonElement> records</param>
+        /// <param name="func">Input: IFlurlResponse response to parse, JsonElement streamstate, Dictionary streamslice, Dictionary nextpagetoken | Output IEnumerable records</param>
         public FluentStreamBuilder ParseResponse(
             Func<IFlurlResponse, JsonElement, Dictionary<string, object>?,
                 Dictionary<string, object>?, IEnumerable<JsonElement>> func) =>
@@ -107,7 +103,6 @@ namespace Airbyte.Cdk.Sources.Utils
         public FluentStreamBuilder GetJsonSchema(Func<JsonSchema> func) =>
             AddFunc(func, nameof(GetJsonSchema));
 
-
         /// <summary>
         /// Override to extract state from the latest record.Needed to implement incremental sync.
         ///
@@ -118,7 +113,6 @@ namespace Airbyte.Cdk.Sources.Utils
         /// to indicate state should be updated to this object.
         /// </summary>
         /// <param name="func">Input: JsonElement currentstreamstate, JsonElement latestrecord | Output: JsonElement</param>
-        /// <returns></returns>
         public FluentStreamBuilder GetUpdatedState(
             Func<JsonElement, JsonElement, JsonElement> func) =>
             AddFunc(func, nameof(GetUpdatedState));
@@ -126,8 +120,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// This method should be overridden by subclasses to read records based on the inputs
         /// </summary>
-        /// <param name="func">Input: SyncMode syncmode, ChannelWriter<AirbyteMessage> streamchannel, long? recordlimit, Dictionary<string, object[]> cursorfield, Dictionary<string, object> streamslice, JsonElement streamstate | Output Task<long></long></param>
-        /// <returns></returns>
+        /// <param name="func">Input: SyncMode syncmode, ChannelWriter streamchannel, long? recordlimit, Dictionary cursorfield, Dictionary streamslice, JsonElement streamstate | Output Task></param>
         public FluentStreamBuilder ReadRecords(
             Func<AirbyteLogger, SyncMode, ChannelWriter<AirbyteMessage>, long?, string[],
                 Dictionary<string, object>, Dictionary<string, object>, Task<long>> func) =>
@@ -142,8 +135,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// 
         /// At the same time only one of the 'request_body_data' and 'request_body_json' functions can be overridden.
         /// </summary>
-        /// <param name="func">Input: JsonElement streamstate, Dictionary<string, object> streamslice, Dictionary<string, object> nextpagetoken | Output: string</param>
-        /// <returns></returns>
+        /// <param name="func">Input: JsonElement streamstate, Dictionary streamslice, Dictionary nextpagetoken | Output: string</param>
         public FluentStreamBuilder RequestBodyData(
             Func<JsonElement, Dictionary<string, object>, Dictionary<string, object>, string> func) =>
             AddFunc(func, nameof(RequestBodyData));
@@ -152,8 +144,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Override when creating POST/PUT/PATCH requests to populate the body of the request with a JSON payload.
         /// At the same time only one of the 'request_body_data' and 'request_body_json' functions can be overridden.
         /// </summary>
-        /// <param name="func">Input: JsonElement streamstate, Dictionary<string, object> streamslice, Dictionary<string, object> nextpagetoken | Output: string</param>
-        /// <returns></returns>
+        /// <param name="func">Input: JsonElement streamstate, Dictionary streamslice, Dictionary nextpagetoken | Output: string</param>
         public FluentStreamBuilder RequestBodyJson(
             Func<JsonElement, Dictionary<string, object>, Dictionary<string, object>, string> func) =>
             AddFunc(func, nameof(RequestBodyJson));
@@ -162,8 +153,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Override when creating POST/PUT/PATCH requests to populate the body of the request with a JSON payload.
         /// At the same time only one of the 'request_body_data' and 'request_body_json' functions can be overridden.
         /// </summary>
-        /// <param name="func">Input: JsonElement streamstate, Dictionary<string, object> streamslice, Dictionary<string, object> nextpagetoken | Output: Dictionary<string, object></param>
-        /// <returns></returns>
+        /// <param name="func">Input: JsonElement streamstate, Dictionary streamslice, Dictionary nextpagetoken | Output: Dictionary</param>
         public FluentStreamBuilder RequestHeaders(
             Func<JsonElement, Dictionary<string, object>, Dictionary<string, object>,
                 Dictionary<string, object>> func) =>
@@ -173,8 +163,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Override this method to define the query parameters that should be set on an outgoing HTTP request given the inputs.
         /// E.g: you might want to define query parameters for paging if next_page_token is not None.
         /// </summary>
-        /// <param name="func">Input: JsonElement streamstate, Dictionary<string, object> streamslice, Dictionary<string, object> nextpagetoken | Output: Dictionary<string, object></param>
-        /// <returns></returns>
+        /// <param name="func">Input: JsonElement streamstate, Dictionary streamslice, Dictionary nextpagetoken | Output: Dictionary</param>
         public FluentStreamBuilder RequestParams(
             Func<JsonElement, Dictionary<string, object>, Dictionary<string, object>,
                 Dictionary<string, object>> func) =>
@@ -183,8 +172,7 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Override to define the slices for this stream. See the stream slicing section of the docs for more information.
         /// </summary>
-        /// <param name="func">Input: SyncMode syncmode, string[] cursorfield, JsonElement streamstate | Output: Dictionary<string, object></param>
-        /// <returns></returns>
+        /// <param name="func">Input: SyncMode syncmode, string[] cursorfield, JsonElement streamstate | Output: Dictionary</param>
         public FluentStreamBuilder StreamSlices(
             Func<SyncMode, string[], Dictionary<string, object>, Dictionary<string, object>>
                 func) =>
@@ -193,8 +181,6 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Override the parse response by parsing an array that can be found using JSONPath
         /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
         public FluentStreamBuilder ParseResponseArray(string path) => ParseResponse((response, _, _, _) =>
         {
             var responseobject = response.GetStringAsync().Result.AsJsonElement();
@@ -210,8 +196,6 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Override the parse response by parsing an object that can be found using JSONPath
         /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
         public FluentStreamBuilder ParseResponseObject(string path) => ParseResponse((response, _, _, _) =>
         {
             var responseobject = response.GetStringAsync().Result.AsJsonElement();
@@ -225,13 +209,11 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// URL base for the  API endpoint e.g: if you wanted to hit https://myapi.com/v1/some_entity then this should return "https://myapi.com/v1/"
         /// </summary>
-        /// <returns></returns>
         public FluentStreamBuilder UrlBase(Func<string> func) => AddFunc(func, nameof(UrlBase));
 
         /// <summary>
         /// Override if needed. Specifies timeout period for a request.
         /// </summary>
-        /// <returns></returns>
         public FluentStreamBuilder TimeOut(TimeSpan timeout) => AddProperty(timeout, nameof(AddProperty));
 
         /// <summary>
@@ -249,35 +231,26 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Most HTTP streams use a source defined cursor (i.e: the user can't configure it like on a SQL table)
         /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
         public FluentStreamBuilder SourceDefinedCursor(bool value) => AddProperty(value, nameof(SourceDefinedCursor));
 
         /// <summary>
         /// Use this variable to define page size for API http requests with pagination support
         /// </summary>
-        /// <param name="value"></param>
         public FluentStreamBuilder PageSize(int? value) => AddProperty(value, nameof(PageSize));
 
         /// <summary>
         /// Override if needed. See get_request_data/get_request_json if using POST/PUT/PATCH.
         /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
         public FluentStreamBuilder HttpMethod(HttpMethod value) => AddProperty(value, nameof(HttpMethod));
 
         /// <summary>
         /// Override if needed. If set to False, allows opting-out of raising HTTP code exception.
         /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
         public FluentStreamBuilder RaiseOnHttpErrors(bool value) => AddProperty(value, nameof(RaiseOnHttpErrors));
 
         /// <summary>
         /// Override if needed. Specifies maximum amount of retries for backoff policy. Return 0 for no limit.
         /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
         public FluentStreamBuilder MaxRetries(int value) => AddProperty(value, nameof(MaxRetries));
 
         /// <summary>
@@ -289,20 +262,14 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Set the authentication implementation for this stream
         /// </summary>
-        /// <param name="auth"></param>
-        /// <returns></returns>
         public FluentStreamBuilder WithAuth(AuthBase auth) => new(Name ?? "", _methods, _properties, auth);
 
         /// <summary>
         /// Have one stream depend on another stream and cache this output as input for the other stream
         /// </summary>
-        /// <param name="stream"></param>
-        /// <param name="jsonpath"></param>
-        /// <param name="currentitems"></param>
-        /// <returns></returns>
         public FluentStreamBuilder CacheResultsForStream(string stream, string jsonpath,
             Func<JsonElement[], List<JsonElement>, List<JsonElement>> currentitems) =>
-            AddFunc(new Func<Tuple<string, string, Func<JsonElement[], List<JsonElement>, List<JsonElement>>>>(() => Tuple.Create(stream, jsonpath, currentitems)), "CachedFor" + "_" + stream);
+            AddFunc(() => Tuple.Create(stream, jsonpath, currentitems), "CachedFor" + "_" + stream);
 
         private FluentStreamBuilder AddProperty<T>(T value, string signature) =>
         new(Name ?? "", _methods, new List<DynamicProperty>(_properties.Where(x => x.Signature != signature))
@@ -346,7 +313,8 @@ namespace Airbyte.Cdk.Sources.Utils
         public GenericStream(string name, IEnumerable<DynamicMethod> methods, IEnumerable<DynamicProperty> properies, AuthBase auth = null!)
         {
             _givenName = name;
-            _methods = methods;
+            var dynamicMethods = methods as DynamicMethod[] ?? methods.ToArray();
+            _methods = dynamicMethods;
             _properties = properies;
             WithAuth(auth);
 
@@ -354,7 +322,7 @@ namespace Airbyte.Cdk.Sources.Utils
             CachedFor = GetCachedFor().Select(x => x.Item1).ToArray();
 
             //Check for default path 
-            if (!methods.Any(x => x.Signature == nameof(Path)))
+            if (!dynamicMethods.Any(x => x.Signature == nameof(Path)))
             {
                 var current = _methods.ToList();
                 current.Add(new DynamicMethod
@@ -365,7 +333,7 @@ namespace Airbyte.Cdk.Sources.Utils
                 _methods = current;
             }
             //Check if default nextpagetoken has been implemented
-            if (!methods.Any(x => x.Signature == nameof(NextPageToken)))
+            if (!dynamicMethods.Any(x => x.Signature == nameof(NextPageToken)))
             {
                 var current = _methods.ToList();
                 current.Add(new DynamicMethod

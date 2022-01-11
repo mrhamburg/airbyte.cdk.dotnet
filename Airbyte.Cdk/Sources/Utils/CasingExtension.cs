@@ -6,9 +6,15 @@ namespace Airbyte.Cdk.Sources.Utils
 {
     public static class CasingExtension
     {
+        /// <summary>
+        /// Convert string to snake case formatting
+        /// </summary>
         public static string ToSnakeCase(this string str) => 
             string.Concat((str ?? string.Empty).Select((x, i) => i > 0 && char.IsUpper(x) && !char.IsUpper(str[i - 1]) ? $"_{x}" : x.ToString())).ToLower();
         
+        /// <summary>
+        /// Convert string to pascal case formatting
+        /// </summary>
         public static string ToPascalCase(this string str)
         {
             //SOURCE: https://stackoverflow.com/questions/18627112/how-can-i-convert-text-to-pascal-case

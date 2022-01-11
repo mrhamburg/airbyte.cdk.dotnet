@@ -7,8 +7,6 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Updates the sync mode on all streams in this catalog to be full refresh
         /// </summary>
-        /// <param name="catalog"></param>
-        /// <returns></returns>
         public static AirbyteCatalog CoerceAirbyteCatalogAsFullRefresh(AirbyteCatalog catalog)
         {
             var coercedCatalog = new AirbyteCatalog { Streams = catalog.Streams };

@@ -18,9 +18,15 @@ namespace Airbyte.Cdk.Sources.Utils
             return default;
         }
 
+        /// <summary>
+        /// Converts an object to its jsonelement form
+        /// </summary>
         public static JsonElement AsJsonElement(this object obj) =>
             JsonDocument.Parse(JsonSerializer.Serialize(obj)).RootElement.Clone();
 
+        /// <summary>
+        /// Converts a json string to its jsonelement form
+        /// </summary>
         public static JsonElement AsJsonElement(this string str) =>
             (string.IsNullOrWhiteSpace(str) ? JsonDocument.Parse("{}") : JsonDocument.Parse(str)).RootElement.Clone();
     }
