@@ -169,6 +169,12 @@ All tests are located in the `Airbyte.Cdk.Test` directory. Run `dotnet test` to 
 
 1. Open a PR
 2. Testing and releasing is part of the CI/CD process
+3. To publish, create a GitHub release with a SemVer tag (e.g. `0.0.8`). The `release.yml` workflow tests the CDK, packs it with that version, and pushes it to nuget.org.
+
+The package is published with [NuGet trusted publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing), so no NuGet API key is stored in this repository. A short-lived key is requested through GitHub OIDC, which requires:
+
+* A trusted publishing policy on [nuget.org](https://www.nuget.org/account/trustedpublishing) for repository owner `mrhamburg`, repository `airbyte.cdk.dotnet`, workflow file `release.yml`, environment `release`.
+* A GitHub environment named `release` holding the secret `NUGET_USER` (your nuget.org profile name, not your email address).
 
 ## Coming Soon
 
