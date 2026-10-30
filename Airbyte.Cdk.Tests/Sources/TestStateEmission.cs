@@ -101,6 +101,23 @@ namespace Airbyte.Cdk.Tests.Sources
         }
 
         [Fact]
+        public async Task Test_ReadUsesCallerProvidedLogger()
+        {
+            var source = new OrderedSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var log = new List<AirbyteMessage>();
+
+            await source.Read(new AirbyteLogger(log.Add), channel.Writer, "{}".AsJsonElement(),
+                Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement());
+            channel.Writer.Complete();
+
+            log.Any(x => IsStatus(x, AirbyteStreamStatus.STARTED)).ShouldBeTrue();
+            log.Any(x => IsStatus(x, AirbyteStreamStatus.RUNNING)).ShouldBeTrue();
+            log.Any(x => IsStatus(x, AirbyteStreamStatus.COMPLETE)).ShouldBeTrue();
+            log.Any(x => x.Type == MessageType.LOG && x.Log!.Message == "inside stream").ShouldBeTrue();
+        }
+
+        [Fact]
         public async Task Test_ReadEmitsRunningForCustomStream()
         {
             var source = new OrderedSource();
