@@ -55,6 +55,7 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 - Stream names are converted to `snake_case`; schema files must match that name (e.g. stream `vatRates` → `schemas/vat_rates.json`).
 - Tests use xUnit with FluentAssertions and Moq. Name tests `Test_<Behavior>` and place them under the matching namespace/folder in `Airbyte.Cdk.Tests`.
 - The fluent builder is immutable: each method returns a new `FluentStreamBuilder`. Add new builder options as `AddProperty`/`AddFunc` entries and expose them on `GenericStream` with the matching `TryGetProperty`/`TryGetMethod` fallback pattern.
+- Package versions are centralized in `Directory.Packages.props` (Central Package Management). Add a `PackageVersion` there instead of a `Version` attribute on `PackageReference`.
 - There is no `.editorconfig` or formatter configuration. Do not introduce new formatting/linting tooling as part of an unrelated change.
 - Keep new XML doc comments consistent with the existing prose in `Stream.cs` and `StreamBuilder.cs`.
 

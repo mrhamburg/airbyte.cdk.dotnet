@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "parameters": "--include-transitive",
+  "projects": [
+    {
+      "path": "/home/jean/github/airbyte.cdk.dotnet/airbyte-integrations/connectors/source-exchange-rates-free/source_exchange_rates.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "topLevelPackages": [
+            {
+              "id": "Airbyte.Cdk",
+              "requestedVersion": "0.0.2-preview",
+              "resolvedVersion": "0.0.2-preview"
+            },
+            {
+              "id": "Flurl.Http",
+              "requestedVersion": "3.2.0",
+              "resolvedVersion": "3.2.0"
+            },
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "13.0.4",
+              "resolvedVersion": "13.0.4"
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "CliWrap",
+              "resolvedVersion": "3.3.3"
+            },
+            {
+              "id": "CommandLineParser",
+              "resolvedVersion": "2.8.0"
+            },
+            {
+              "id": "Flurl",
+              "resolvedVersion": "3.0.2"
+            },
+            {
+              "id": "Handlebars.Net",
+              "resolvedVersion": "2.0.9"
+            },
+            {
+              "id": "JetBrains.Annotations",
+              "resolvedVersion": "2021.2.0"
+            },
+            {
+              "id": "Json.More.Net",
+              "resolvedVersion": "1.4.4"
+            },
+            {
+              "id": "JsonCons.JsonPath",
+              "resolvedVersion": "1.1.0"
+            },
+            {
+              "id": "JsonCons.Utilities",
+              "resolvedVersion": "1.0.0"
+            },
+            {
+              "id": "JsonPointer.Net",
+              "resolvedVersion": "1.4.0"
+            },
+            {
+              "id": "JsonSchema.Net",
+              "resolvedVersion": "1.11.3"
+            },
+            {
+              "id": "Polly",
+              "resolvedVersion": "7.2.2"
+            },
+            {
+              "id": "Spectre.Console",
+              "resolvedVersion": "0.42.0"
+            },
+            {
+              "id": "Wcwidth",
+              "resolvedVersion": "0.2.0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
