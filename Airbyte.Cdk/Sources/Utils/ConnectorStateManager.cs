@@ -31,6 +31,11 @@ namespace Airbyte.Cdk.Sources.Utils
                     AddStreamState(message.Stream);
                     break;
                 case AirbyteStateType.GLOBAL:
+                    if (message.Global?.SharedState.HasValue == true &&
+                        message.Global.SharedState.Value.ValueKind != JsonValueKind.Undefined)
+                        throw new NotSupportedException(
+                            "GLOBAL state with shared_state is not supported by this CDK; use per-stream STREAM state.");
+
                     if (message.Global?.StreamStates != null)
                         foreach (var streamState in message.Global.StreamStates)
                             AddStreamState(streamState);

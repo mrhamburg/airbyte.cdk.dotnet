@@ -84,6 +84,16 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
         }
 
         [Fact]
+        public void Test_StateManager_RejectsGlobalSharedState()
+        {
+            var messages = StateReader.Parse(
+                "{\"type\":\"GLOBAL\",\"global\":{\"shared_state\":{\"cursor\":\"a\"},\"stream_states\":[]}}"
+                    .AsJsonElement());
+
+            Should.Throw<NotSupportedException>(() => new ConnectorStateManager(messages));
+        }
+
+        [Fact]
         public void Test_StateManager_FallsBackToNameOnlyState()
         {
             var manager = new ConnectorStateManager(StateReader.Parse(

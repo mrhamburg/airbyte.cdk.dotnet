@@ -26,6 +26,15 @@ namespace Airbyte.Cdk.Tests.Models
         }
 
         [Fact]
+        public void Test_AuthType_DeserializesOAuth2DotZero()
+        {
+            var auth = JsonSerializer.Deserialize<AuthSpecification>(
+                "{\"auth_type\":\"oauth2.0\"}", AirbyteProtocolJson.Options);
+
+            auth.AuthType.ShouldBe(AuthType.oauth2_0);
+        }
+
+        [Fact]
         public void Test_StreamState_SerializesDescriptorAndStats()
         {
             var message = new AirbyteStateMessage
