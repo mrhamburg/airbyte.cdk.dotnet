@@ -62,24 +62,16 @@ namespace Airbyte.Cdk.Tests
         [Fact]
         public void Test_ToConsole_WritesOneJsonLine()
         {
-            var original = Console.Out;
             var writer = new StringWriter();
-            try
+
+            AirbyteEntrypoint.ToConsole(new AirbyteMessage
             {
-                Console.SetOut(writer);
-                AirbyteEntrypoint.ToConsole(new AirbyteMessage
+                Type = MessageType.SPEC,
+                Spec = new ConnectorSpecification
                 {
-                    Type = MessageType.SPEC,
-                    Spec = new ConnectorSpecification
-                    {
-                        ConnectionSpecification = JsonDocument.Parse("{}")
-                    }
-                });
-            }
-            finally
-            {
-                Console.SetOut(original);
-            }
+                    ConnectionSpecification = JsonDocument.Parse("{}")
+                }
+            }, writer);
 
             var output = writer.ToString().TrimEnd('\r', '\n');
             output.ShouldNotContain("\n");

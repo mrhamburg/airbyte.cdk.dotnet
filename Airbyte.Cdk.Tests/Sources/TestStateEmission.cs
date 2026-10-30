@@ -39,6 +39,42 @@ namespace Airbyte.Cdk.Tests.Sources
         }
 
         [Fact]
+        public async Task Test_ReadEmitsStreamStatusTraces()
+        {
+            var source = new StateEmissionSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var log = new List<AirbyteMessage>();
+            var logger = new AirbyteLogger(log.Add);
+
+            await source.Read(logger, channel.Writer, "{}".AsJsonElement(),
+                Catalog("users", SyncMode.full_refresh, "public"), "{}".AsJsonElement());
+
+            var statuses = log
+                .Where(x => x.Type == MessageType.TRACE && x.Trace!.Type == AirbyteTraceType.STREAM_STATUS)
+                .Select(x => x.Trace!.StreamStatus!.Status)
+                .ToArray();
+
+            statuses.ShouldContain(AirbyteStreamStatus.STARTED);
+            statuses.ShouldContain(AirbyteStreamStatus.COMPLETE);
+        }
+
+        [Fact]
+        public async Task Test_ReadEmitsIncompleteStreamStatusOnFailure()
+        {
+            var source = new FailingSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var log = new List<AirbyteMessage>();
+            var logger = new AirbyteLogger(log.Add);
+
+            await Should.ThrowAsync<InvalidOperationException>(() => source.Read(logger, channel.Writer,
+                "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement()));
+
+            log.Count(x => x.Type == MessageType.TRACE &&
+                           x.Trace!.Type == AirbyteTraceType.STREAM_STATUS &&
+                           x.Trace!.StreamStatus!.Status == AirbyteStreamStatus.INCOMPLETE).ShouldBe(1);
+        }
+
+        [Fact]
         public async Task Test_ReadPassesPerStreamStateToStream()
         {
             var source = new StateEmissionSource();
@@ -95,6 +131,27 @@ namespace Airbyte.Cdk.Tests.Sources
                 ReceivedState = streamstate;
                 return Task.FromResult(0L);
             }
+        }
+
+        private class FailingSource : AbstractSource
+        {
+            public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
+            {
+                exc = null!;
+                return true;
+            }
+
+            public override Stream[] Streams(JsonElement config) => new Stream[] { new FailingStream() };
+        }
+
+        private class FailingStream : Stream
+        {
+            public FailingStream() => _givenName = "users";
+
+            public override Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+                ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
+                string[]? cursorfield = null, Dictionary<string, object>? streamslice = null) =>
+                throw new InvalidOperationException("boom");
         }
     }
 }

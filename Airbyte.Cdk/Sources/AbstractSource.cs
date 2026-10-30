@@ -121,6 +121,12 @@ namespace Airbyte.Cdk.Sources
                 catch (Exception e)
                 {
                     logger.Exception(e);
+                    logger.TraceError(e.Message, e.GetType().Name, e.StackTrace,
+                        AirbyteFailureType.system_error, new StreamDescriptor
+                        {
+                            Name = streamInstance.Name,
+                            Namespace = streamInstance.Namespace
+                        });
                     logger.Fatal($"Fatal exception occurred during ReadStream: {e.Message}");
                     throw;
                 }
@@ -151,6 +157,7 @@ namespace Airbyte.Cdk.Sources
             Logger.Info($"Setting state of {streamname} stream to {stateElement.GetRawText()}");
 
             streaminstance.StateEmitter = stateEmitter;
+            logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.STARTED);
 
             try
             {
@@ -159,9 +166,15 @@ namespace Airbyte.Cdk.Sources
                     recordcount = await ReadIncremental(logger, streaminstance, configuredstream, stateElement, recordlimit);
                 else
                     recordcount = await streaminstance.ReadRecords(logger, SyncMode.full_refresh, Channel, stateElement, recordlimit,
-                        configuredstream.CursorField, null);
+                        configuredstream.CursorField!, null!);
 
+                logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.COMPLETE);
                 Logger.Info($"Read {recordcount} records from {streaminstance.Name} stream");
+            }
+            catch (Exception)
+            {
+                logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.INCOMPLETE);
+                throw;
             }
             finally
             {
@@ -173,8 +186,8 @@ namespace Airbyte.Cdk.Sources
 
         private async Task<long> ReadIncremental(AirbyteLogger logger, Stream streaminstance, ConfiguredAirbyteStream configuredstream, JsonElement stateElement, long? recordlimit = null)
         {
-            var slices = streaminstance.StreamSlices(SyncMode.incremental, configuredstream.CursorField, stateElement);
-            return await streaminstance.ReadRecords(logger, SyncMode.incremental, Channel, stateElement, recordlimit, null, slices);
+            var slices = streaminstance.StreamSlices(SyncMode.incremental, configuredstream.CursorField!, stateElement);
+            return await streaminstance.ReadRecords(logger, SyncMode.incremental, Channel, stateElement, recordlimit, null!, slices);
         }
 
         public static AirbyteMessage AsAirbyteMessage(string streamname, string? namespaceName, JsonElement data) => new()

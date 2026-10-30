@@ -72,6 +72,7 @@ namespace Airbyte.Cdk
             }
             catch (Exception e)
             {
+                Logger.TraceError(e.Message, e.GetType().Name, e.StackTrace, AirbyteFailureType.system_error);
                 Logger.Fatal($"Exception ({e.GetType()}): {e.Message}");
                 Environment.ExitCode = 1;
             }
@@ -140,6 +141,8 @@ namespace Airbyte.Cdk
                             catch (Exception e)
                             {
                                 Logger.Exception(e);
+                                Logger.TraceError(e.Message, e.GetType().Name, e.StackTrace,
+                                    AirbyteFailureType.system_error);
                                 Logger.Fatal("Could not process data due to exception: " + e.Message);
                                 Environment.ExitCode = 1;
                             }
@@ -262,8 +265,10 @@ namespace Airbyte.Cdk
             return !string.IsNullOrWhiteSpace(filepath);
         }
 
-        public static void ToConsole<T>(T item) where T : AirbyteMessage =>
-            Console.WriteLine(JsonSerializer.Serialize(item, AirbyteProtocolJson.Options));
+        public static void ToConsole<T>(T item) where T : AirbyteMessage => ToConsole(item, Console.Out);
+
+        public static void ToConsole<T>(T item, TextWriter writer) where T : AirbyteMessage =>
+            writer.WriteLine(JsonSerializer.Serialize(item, AirbyteProtocolJson.Options));
 
     }
 }
