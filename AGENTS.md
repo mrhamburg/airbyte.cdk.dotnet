@@ -53,7 +53,7 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 
 - Match the surrounding style: block-scoped namespaces, 4-space indentation, PascalCase for types/members, `_camelCase` for private fields.
 - Stream names are converted to `snake_case`; schema files must match that name (e.g. stream `vatRates` → `schemas/vat_rates.json`).
-- Tests use xUnit with FluentAssertions and Moq. Name tests `Test_<Behavior>` and place them under the matching namespace/folder in `Airbyte.Cdk.Tests`.
+- Tests use xUnit with Shouldly and Moq. Name tests `Test_<Behavior>` and place them under the matching namespace/folder in `Airbyte.Cdk.Tests`.
 - The fluent builder is immutable: each method returns a new `FluentStreamBuilder`. Add new builder options as `AddProperty`/`AddFunc` entries and expose them on `GenericStream` with the matching `TryGetProperty`/`TryGetMethod` fallback pattern.
 - Package versions are centralized in `Directory.Packages.props` (Central Package Management). Add a `PackageVersion` there instead of a `Version` attribute on `PackageReference`.
 - Connector Docker images must be built from the repository root so that file is in the build context: `docker build -f airbyte-integrations/connectors/<connector>/Dockerfile -t <tag> .`.

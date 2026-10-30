@@ -1,6 +1,6 @@
 using System.IO;
 using Airbyte.Cdk.Sources.Utils;
-using FluentAssertions;
+using Shouldly;
 using Xunit;
 
 namespace Airbyte.Cdk.Tests
@@ -18,7 +18,7 @@ namespace Airbyte.Cdk.Tests
 
             var result = Connector.ReadConfig(filepath);
 
-            result.GetRawText().Should().Be(testfile, "output should match input");
+            result.GetRawText().ShouldBe(testfile, "output should match input");
         }
 
         [Fact]
@@ -31,7 +31,7 @@ namespace Airbyte.Cdk.Tests
 
             var result = File.ReadAllText(filepath);
 
-            result.Should().Be(testfile, "output should match input");
+            result.ShouldBe(testfile, "output should match input");
         }
     }
 }

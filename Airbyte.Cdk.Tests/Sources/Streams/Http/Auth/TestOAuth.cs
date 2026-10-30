@@ -1,6 +1,6 @@
 ﻿using System;
 using Airbyte.Cdk.Sources.Streams.Http.Auth;
-using FluentAssertions;
+using Shouldly;
 using Flurl;
 using Flurl.Http;
 using Moq;
@@ -29,9 +29,9 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 
             request.Object.WithOauth(system.Object);
 
-            request.Object.Headers.Count.Should().Be(1);
-            request.Object.Headers[0].Name.Should().Be("Authorization");
-            request.Object.Headers[0].Value.Should().Be("Bearer access_token");
+            request.Object.Headers.Count.ShouldBe(1);
+            request.Object.Headers[0].Name.ShouldBe("Authorization");
+            request.Object.Headers[0].Value.ShouldBe("Bearer access_token");
         }
 
         [Fact]
@@ -47,17 +47,17 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 
             //First expired
             request.Object.WithOauth(system.Object);
-            system.Object.TokenHasExpired().Should().BeTrue();
+            system.Object.TokenHasExpired().ShouldBeTrue();
 
             //Second, not expired
             system.Setup(x => x.RefreshAccessToken()).Returns(() =>
                 ("access_token_2", DateTime.UtcNow + TimeSpan.FromSeconds(1000)));
             request.Object.WithOauth(system.Object);
 
-            system.Object.TokenHasExpired().Should().BeFalse();
-            request.Object.Headers.Count.Should().Be(1);
-            request.Object.Headers[0].Name.Should().Be("Authorization");
-            request.Object.Headers[0].Value.Should().Be("Bearer access_token_2");
+            system.Object.TokenHasExpired().ShouldBeFalse();
+            request.Object.Headers.Count.ShouldBe(1);
+            request.Object.Headers[0].Name.ShouldBe("Authorization");
+            request.Object.Headers[0].Value.ShouldBe("Bearer access_token_2");
         }
 
         [Fact]
@@ -70,10 +70,10 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 
             var result = system.Object.GetRefreshRequestBody();
 
-            result.Should().NotBeNullOrWhiteSpace();
+            result.ShouldNotBeNullOrWhiteSpace();
             var expected =
                 "{\"grant_type\":\"refresh_token\",\"client_id\":\"client_id\",\"client_secret\":\"client_secret\",\"refresh_token\":\"refresh_token\",\"scopes\":[\"scope1\",\"scope2\"]}";
-            result.Should().Be(expected);
+            result.ShouldBe(expected);
         }
 
         [Fact(Skip = "Not Implemented")]

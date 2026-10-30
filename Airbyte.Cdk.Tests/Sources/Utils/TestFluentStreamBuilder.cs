@@ -1,7 +1,7 @@
 ﻿using System.Linq;
 using System.Text.Json;
 using Airbyte.Cdk.Sources.Utils;
-using FluentAssertions;
+using Shouldly;
 using Flurl.Http;
 using Moq;
 using Xunit;
@@ -23,7 +23,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
-            result.First().GetRawText().Length.Should().Be(input_json.Length);
+            result.First().GetRawText().Length.ShouldBe(input_json.Length);
         }
 
         [Fact]
@@ -38,7 +38,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             var result = func.Create("x").ParseResponse(response.Object,  "".AsJsonElement());
 
-            result.First().GetRawText().Should().Be(expectedsresult);
+            result.First().GetRawText().ShouldBe(expectedsresult);
         }
 
         [Fact]
@@ -51,7 +51,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
-            result.Should().BeEmpty();
+            result.ShouldBeEmpty();
         }
 
         [Fact]
@@ -64,7 +64,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
-            result.Should().BeEmpty();
+            result.ShouldBeEmpty();
         }
 
         [Fact]
@@ -78,7 +78,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
             var items = result.First().EnumerateArray();
-            items.Count().Should().Be(2);
+            items.Count().ShouldBe(2);
         }
 
         [Fact]
@@ -92,9 +92,9 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
             var jsonElements = result as JsonElement[] ?? result.ToArray();
-            jsonElements.Count().Should().Be(2);
-            jsonElements.First().GetProperty("type").GetString().Should().Be("iPhone");
-            jsonElements.ToArray()[1].GetProperty("type").GetString().Should().Be("home");
+            jsonElements.Count().ShouldBe(2);
+            jsonElements.First().GetProperty("type").GetString().ShouldBe("iPhone");
+            jsonElements.ToArray()[1].GetProperty("type").GetString().ShouldBe("home");
         }
 
 
@@ -110,9 +110,9 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
             var jsonElements = result as JsonElement[] ?? result.ToArray();
-            jsonElements.Count().Should().Be(2);
-            jsonElements.First().GetProperty("type").GetString().Should().Be("iPhone");
-            jsonElements.ToArray()[1].GetProperty("type").GetString().Should().Be("home");
+            jsonElements.Count().ShouldBe(2);
+            jsonElements.First().GetProperty("type").GetString().ShouldBe("iPhone");
+            jsonElements.ToArray()[1].GetProperty("type").GetString().ShouldBe("home");
         }
     }
 }
