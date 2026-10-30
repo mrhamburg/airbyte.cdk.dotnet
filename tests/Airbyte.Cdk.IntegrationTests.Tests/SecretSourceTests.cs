@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Airbyte.Cdk.IntegrationTests.Tests
 {
+    [Collection("secret-environment")]
     public class SecretSourceTests : IDisposable
     {
         private const string Key = "AIRBYTE_INT_TEST_SECRET";
@@ -17,6 +18,7 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         {
             Environment.SetEnvironmentVariable(Key, null);
             Environment.SetEnvironmentVariable(SecretSourceFactory.JsonSecretsVariable, null);
+            Environment.SetEnvironmentVariable(SecretsManagerSecretSource.ConnectionStringVariable, null);
         }
 
         [Fact]

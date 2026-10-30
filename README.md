@@ -191,13 +191,20 @@ still fetched in full until the later ones reach the cap; the retained slice kee
 An `incremental` scenario must also emit at least one `STATE` message, so a connector that degrades to a full
 refresh cannot pass quietly.
 
-Secrets are resolved through the `ISecretSource` seam. Two implementations ship: environment variables (a secret
-key is the variable name) and a JSON object supplied through `AIRBYTE_INTEGRATION_SECRETS_JSON`, which lets CI pass
-every connector credential through one repository secret. The SecretsManager PostgreSQL provider plugs into the
-same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as passed; the workflow
-passes `--no-skip` on `main`, so a missing secret fails the build there. Secret values are masked in error output,
-and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in which case the secret
-values in it are masked.
+Secrets are resolved through the `ISecretSource` seam. Three implementations ship:
+
+- **PostgreSQL store** (`mrhamburg.SecretsManager.PostgreSql`) — selected as soon as `SECRETS_POSTGRESQL_CONNECTION_STRING`
+  is set. Connection details never appear in the repository: every value comes from environment variables
+  (`SECRETS_POSTGRESQL_CONNECTION_STRING`, `_SCHEMA`, `_TABLE_PREFIX`, `_AUTO_CREATE_SCHEMA`, `_ENCRYPTION_KEY`,
+  `_ENCRYPTION_KEY_FILE`). A YAML secret key is the key in the store.
+- **JSON object** in `AIRBYTE_INTEGRATION_SECRETS_JSON`.
+- **Environment variables**, where a secret key is the variable name.
+
+A scenario whose secrets are unavailable is reported as **skipped**, never as passed; once a secret store is
+configured (`SECRETS_POSTGRESQL_CONNECTION_STRING` or `AIRBYTE_INTEGRATION_SECRETS_JSON`) the workflow passes
+`--no-skip` on `main`, so a missing credential then fails the build instead of looking green. Secret values are
+masked in error output, and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in
+which case the secret values in it are masked.
 
 `.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
 a push to `main`.
