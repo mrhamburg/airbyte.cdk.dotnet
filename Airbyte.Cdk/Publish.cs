@@ -166,12 +166,15 @@ namespace Airbyte.Cdk
                 throw new Exception($"Image {targetversionedimage} already exists remotely, please update the CHANGELOG.md with a new version before proceeding.");
 
             ToConsole(Check, $"Building Docker Image...");
+            var repositorypath = MoveToUpperPath(folderpath, 3, true);
             string[] commandargs = {
-                "build", "--build-arg", $"BUILD_VERSION={semver}", "-t", targetversionedimage, "-t", targetlatestimage, "."
+                "build", "--build-arg", $"BUILD_VERSION={semver}",
+                "-f", Path.Join(folderpath, "Dockerfile"),
+                "-t", targetversionedimage, "-t", targetlatestimage, repositorypath
             };
             ToConsole(Check, $"Command args: {string.Join(" ", commandargs)}");
             var cmd = Cli.Wrap("docker")
-                .WithWorkingDirectory(folderpath)
+                .WithWorkingDirectory(repositorypath)
                 .WithValidation(CommandResultValidation.None)
                 .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
                 .WithArguments(commandargs) | Console.WriteLine;

@@ -2,7 +2,7 @@
 using System.Text.Json;
 using Airbyte.Cdk.Models;
 using Airbyte.Cdk.Sources.Utils;
-using FluentAssertions;
+using Shouldly;
 using Xunit;
 
 namespace Airbyte.Cdk.Tests
@@ -16,8 +16,8 @@ namespace Airbyte.Cdk.Tests
 
             var result = jsonobject.AsJsonElement();
 
-            result.GetRawText().Should().Be(jsonobject, "the raw text should stay the same");
-            result.ValueKind.Should().Be(JsonValueKind.Object, "we provided a json object");
+            result.GetRawText().ShouldBe(jsonobject, "the raw text should stay the same");
+            result.ValueKind.ShouldBe(JsonValueKind.Object, "we provided a json object");
         }
 
         [Fact]
@@ -27,7 +27,7 @@ namespace Airbyte.Cdk.Tests
 
             var result = jsonobject.AsJsonElement();
 
-            result.ValueKind.Should().Be(JsonValueKind.Object, "we provided a json object");
+            result.ValueKind.ShouldBe(JsonValueKind.Object, "we provided a json object");
         }
 
         [Fact]
@@ -43,7 +43,7 @@ namespace Airbyte.Cdk.Tests
 
             var result = jsonDocument.ToType<Dictionary<string, int>>();
 
-            result.Should().Equal(input, "the output should match the input");
+            result.ShouldBe(input, "the output should match the input");
         }
     }
 }

@@ -25,7 +25,8 @@ namespace source_exchange_rates
             {
                 return UrlBase.AppendPathSegment("latest")
                     .GetAsync()
-                    .Result.GetJsonAsync().Result.success;
+                    .Result.GetJsonAsync<JsonElement>()
+                    .Result.GetProperty("success").GetBoolean();
             }
             catch (Exception e)
             {

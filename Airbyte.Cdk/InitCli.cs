@@ -227,12 +227,16 @@ namespace Airbyte.Cdk
             string step = $"Building and testing result...";
             ToConsole(Progress, step);
             var stdOutBuffer = new StringBuilder();
+            var repositorypath = MoveToUpperPath(dir.FullName, 3, true);
             var cmd = Cli.Wrap("docker")
-                .WithWorkingDirectory(dir.FullName)
+                .WithWorkingDirectory(repositorypath)
                 .WithValidation(CommandResultValidation.None)
                 .WithStandardOutputPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
                 .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
-                .WithArguments(new[] { "build", ".", "-t", "local" });
+                .WithArguments(new[]
+                {
+                    "build", "-f", Path.Join(dir.FullName, "Dockerfile"), "-t", "local", repositorypath
+                });
             await cmd.ExecuteAsync();
 
             if (stdOutBuffer.ToString().Contains("exporting to image"))

@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Source packages -->
+    <PackageVersion Include="Airbyte.Cdk" Version="0.0.6" />
+    <PackageVersion Include="CliWrap" Version="3.10.5" />
+    <PackageVersion Include="CommandLineParser" Version="2.9.1" />
+    <PackageVersion Include="Flurl.Http" Version="4.0.2" />
+    <PackageVersion Include="Handlebars.Net" Version="2.4.3" />
+    <PackageVersion Include="JsonCons.JsonPath" Version="1.1.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.5.0" />
+    <PackageVersion Include="Polly" Version="8.9.0" />
+    <PackageVersion Include="Spectre.Console" Version="0.57.2" />
+
+    <!-- Test packages -->
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="Moq" Version="4.21.0" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+</Project>

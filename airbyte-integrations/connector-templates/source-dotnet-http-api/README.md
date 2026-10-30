@@ -8,7 +8,7 @@ For information about how to use this connector within Airbyte, see [the documen
 ### Prerequisites
 **To iterate on this connector, make sure to complete this prerequisites section.**
 
-#### Minimum Dotnet version required `= 6.0.x`
+#### Minimum Dotnet version required `= 10.0.x`
 
 ### Locally running the connector
 ```
@@ -21,9 +21,9 @@ dotnet read --command read --config sample_files/config.json --catalog sample_fi
 ### Locally running the connector docker image
 
 #### Build
-First, make sure you build the latest Docker image:
+First, from the repository root, build the latest Docker image. The repository root is used as the build context so the central `Directory.Packages.props` is available:
 ```
-docker build . -t airbytedotnet/{{connectorname}}:dev
+docker build -f airbyte-integrations/connectors/source-{{connectorname}}/Dockerfile -t airbytedotnet/{{connectorname}}:dev .
 ```
 
 #### Run

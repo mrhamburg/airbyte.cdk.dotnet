@@ -1,5 +1,5 @@
 ﻿# Build and test implementation
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 ARG BUILD_VERSION="0.0.1"
 ENV WORKDIR=/airbyte/build
@@ -7,16 +7,18 @@ WORKDIR $WORKDIR
 
 COPY . ./
 
+WORKDIR $WORKDIR/airbyte-integrations/connectors/source-exchange-rates-free
+
 RUN dotnet test
 RUN dotnet build -c Release -o output
 
 # Run implementation
-FROM mcr.microsoft.com/dotnet/runtime:6.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
 
 ENV WORKDIR=/airbyte/integration_code
 WORKDIR $WORKDIR
 
-COPY --from=build /airbyte/build/output .
+COPY --from=build /airbyte/build/airbyte-integrations/connectors/source-exchange-rates-free/output .
 
 ENV AIRBYTE_IMPL_PATH="/airbyte/integration_code/source_exchange_rates.dll"
 ENV AIRBYTE_IMPL_MODULE="ExchangeRates"

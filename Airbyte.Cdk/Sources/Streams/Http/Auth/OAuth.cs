@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Airbyte.Cdk.Sources.Utils;
 using Flurl.Http;
 
@@ -76,8 +77,9 @@ namespace Airbyte.Cdk.Sources.Streams.Http.Auth
             try
             {
                 var response = TokenRefreshEndpoint.PostJsonAsync(GetRefreshRequestBody()).Result;
-                var json = response.GetJsonAsync().Result;
-                return (json[AccessTokenName], DateTime.Parse(json[ExpiresInName]));
+                var json = response.GetJsonAsync<JsonElement>().Result;
+                return (json.GetProperty(AccessTokenName).GetString(),
+                    DateTime.Parse(json.GetProperty(ExpiresInName).ToString()));
             }
             catch (Exception e)
             {

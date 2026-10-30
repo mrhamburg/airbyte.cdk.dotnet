@@ -4,7 +4,7 @@ using Airbyte.Cdk.Models;
 using Airbyte.Cdk.Sources;
 using Airbyte.Cdk.Sources.Streams;
 using Airbyte.Cdk.Sources.Utils;
-using FluentAssertions;
+using Shouldly;
 using Moq;
 using Xunit;
 
@@ -27,8 +27,8 @@ namespace Airbyte.Cdk.Tests.Sources
 
             var result = Mock.Object.Check(Logger.Object, "".AsJsonElement());
 
-            result.Should().NotBeNull();
-            result.Status.Should().Be(Status.SUCCEEDED);
+            result.ShouldNotBeNull();
+            result.Status.ShouldBe(Status.SUCCEEDED);
         }
 
         [Fact]
@@ -43,10 +43,10 @@ namespace Airbyte.Cdk.Tests.Sources
 
             var result = Mock.Object.Check(Logger.Object,"".AsJsonElement());
 
-            result.Should().NotBeNull();
-            result.Status.Should().Be(Status.FAILED);
-            result.Message.Should().NotBeNullOrWhiteSpace();
-            result.Message.Should().Be(exceptionmessage);
+            result.ShouldNotBeNull();
+            result.Status.ShouldBe(Status.FAILED);
+            result.Message.ShouldNotBeNullOrWhiteSpace();
+            result.Message.ShouldBe(exceptionmessage);
         }
 
         [Fact]
@@ -85,10 +85,10 @@ namespace Airbyte.Cdk.Tests.Sources
 
             var result = Mock.Object.Discover(Logger.Object, "".AsJsonElement());
 
-            result.Should().NotBeNull();
-            result.Streams.Length.Should().Be(expectedresult.Streams.Length);
-            result.Streams[0].Should().BeSameAs(expectedresult.Streams[0]);
-            result.Streams[1].Should().BeSameAs(expectedresult.Streams[1]);
+            result.ShouldNotBeNull();
+            result.Streams.Length.ShouldBe(expectedresult.Streams.Length);
+            result.Streams[0].ShouldBeSameAs(expectedresult.Streams[0]);
+            result.Streams[1].ShouldBeSameAs(expectedresult.Streams[1]);
         }
 
         [Fact(Skip = "Not Implemented")]

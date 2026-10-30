@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Airbyte.Cdk.Models;
 using Json.Schema;
@@ -45,8 +46,10 @@ namespace Airbyte.Cdk.Sources.Utils
         /// </summary>
         public static bool VerifySchema(JsonElement jsonElement, JsonSchema schema, out Exception exc)
         {
-            var result = schema.Validate(jsonElement, new ValidationOptions { OutputFormat = OutputFormat.Detailed });
-            exc = !result.IsValid ? new Exception(result.Message) : null;
+            var result = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+            exc = !result.IsValid
+                ? new Exception(string.Join("; ", result.Errors.Select(x => $"{x.Key}: {x.Value}")))
+                : null;
             return result.IsValid;
         }
     }

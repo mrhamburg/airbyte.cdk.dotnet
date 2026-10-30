@@ -1,5 +1,5 @@
 ﻿using System.IO;
-using FluentAssertions;
+using Shouldly;
 using Xunit;
 
 namespace Airbyte.Cdk.Tests
@@ -15,12 +15,11 @@ namespace Airbyte.Cdk.Tests
             File.WriteAllText(filename, ValidSpec);
             var result = AirbyteSpec.FromFile(filename);
 
-            result.SpecString.Should().Be(ValidSpec);
+            result.SpecString.ShouldBe(ValidSpec);
         }
 
         [Fact]
         public void TestFromFileNonexistent() =>
-            FluentActions.Invoking(() => AirbyteSpec.FromFile("/asdaaaa/i do not exist")).Should()
-                .Throw<DirectoryNotFoundException>();
+            Should.Throw<DirectoryNotFoundException>(() => AirbyteSpec.FromFile("/asdaaaa/i do not exist"));
     }
 }

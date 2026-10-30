@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
-using FluentAssertions;
+using Shouldly;
 using Xunit;
 
 namespace Airbyte.Cdk.Tests
@@ -18,7 +18,7 @@ namespace Airbyte.Cdk.Tests
                 "airbyte-integrations", "connectors", "source-exchange-rates-free");
             var found = Publish.GetSemver(connectorpath);
 
-            found.Should().NotBeEmpty();
+            found.ShouldNotBeEmpty();
         }
         
         [Fact(Skip = "local only")]
@@ -27,7 +27,7 @@ namespace Airbyte.Cdk.Tests
             string imagetest = "airbytedotnet/source-exchange-rates-free:nonexistent";
             var found = await Publish.ImageAlreadyExists(imagetest);
 
-            found.Should().BeFalse();
+            found.ShouldBeFalse();
         }
     }
 }

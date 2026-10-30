@@ -1,5 +1,5 @@
 ﻿using Airbyte.Cdk.Sources.Streams.Http.Auth;
-using FluentAssertions;
+using Shouldly;
 using Flurl;
 using Flurl.Http;
 using Moq;
@@ -19,9 +19,9 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 
             var header = system.GetAuthHeader(request.Object);
 
-            header.Headers.Count.Should().Be(1);
-            header.Headers[0].Name.Should().Be("Authorization");
-            header.Headers[0].Value.Should().Be("Bearer test-token");
+            header.Headers.Count.ShouldBe(1);
+            header.Headers[0].Name.ShouldBe("Authorization");
+            header.Headers[0].Value.ShouldBe("Bearer test-token");
         }
 
         [Fact]
@@ -34,9 +34,9 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 
             var header = system.GetAuthHeader(request.Object);
 
-            header.Headers.Count.Should().Be(1);
-            header.Headers[0].Name.Should().Be("Authorization");
-            header.Headers[0].Value.Should().Be("Bearer token1 token2");
+            header.Headers.Count.ShouldBe(1);
+            header.Headers[0].Name.ShouldBe("Authorization");
+            header.Headers[0].Value.ShouldBe("Bearer token1 token2");
         }
     }
 }

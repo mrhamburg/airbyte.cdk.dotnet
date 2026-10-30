@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "parameters": "--include-transitive",
+  "projects": [
+    {
+      "path": "/home/jean/github/airbyte.cdk.dotnet/Airbyte.Cdk/Airbyte.Cdk.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "topLevelPackages": [
+            {
+              "id": "CliWrap",
+              "requestedVersion": "3.3.3",
+              "resolvedVersion": "3.3.3"
+            },
+            {
+              "id": "CommandLineParser",
+              "requestedVersion": "2.8.0",
+              "resolvedVersion": "2.8.0"
+            },
+            {
+              "id": "Flurl.Http",
+              "requestedVersion": "3.2.0",
+              "resolvedVersion": "3.2.0"
+            },
+            {
+              "id": "Handlebars.Net",
+              "requestedVersion": "2.0.10",
+              "resolvedVersion": "2.0.10"
+            },
+            {
+              "id": "JsonCons.JsonPath",
+              "requestedVersion": "1.1.0",
+              "resolvedVersion": "1.1.0"
+            },
+            {
+              "id": "JsonSchema.Net",
+              "requestedVersion": "1.12.0",
+              "resolvedVersion": "1.12.0"
+            },
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "13.0.4",
+              "resolvedVersion": "13.0.4"
+            },
+            {
+              "id": "Polly",
+              "requestedVersion": "7.2.2",
+              "resolvedVersion": "7.2.2"
+            },
+            {
+              "id": "Spectre.Console",
+              "requestedVersion": "0.43.0",
+              "resolvedVersion": "0.43.0"
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "Flurl",
+              "resolvedVersion": "3.0.2"
+            },
+            {
+              "id": "JetBrains.Annotations",
+              "resolvedVersion": "2021.2.0"
+            },
+            {
+              "id": "Json.More.Net",
+              "resolvedVersion": "1.4.4"
+            },
+            {
+              "id": "JsonCons.Utilities",
+              "resolvedVersion": "1.0.0"
+            },
+            {
+              "id": "JsonPointer.Net",
+              "resolvedVersion": "2.1.0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/home/jean/github/airbyte.cdk.dotnet/Airbyte.Cdk.Tests/Airbyte.Cdk.Tests.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "topLevelPackages": [
+            {
+              "id": "coverlet.collector",
+              "requestedVersion": "3.1.0",
+              "resolvedVersion": "3.1.0"
+            },
+            {
+              "id": "FluentAssertions",
+              "requestedVersion": "6.3.0",
+              "resolvedVersion": "6.3.0"
+            },
+            {
+              "id": "Microsoft.NET.Test.Sdk",
+              "requestedVersion": "17.0.0",
+              "resolvedVersion": "17.0.0"
+            },
+            {
+              "id": "Moq",
+              "requestedVersion": "4.16.1",
+              "resolvedVersion": "4.16.1"
+            },
+            {
+              "id": "xunit",
+              "requestedVersion": "2.4.1",
+              "resolvedVersion": "2.4.1"
+            },
+            {
+              "id": "xunit.runner.visualstudio",
+              "requestedVersion": "2.4.3",
+              "resolvedVersion": "2.4.3"
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "Castle.Core",
+              "resolvedVersion": "4.4.0"
+            },
+            {
+              "id": "CliWrap",
+              "resolvedVersion": "3.3.3"
+            },
+            {
+              "id": "CommandLineParser",
+              "resolvedVersion": "2.8.0"
+            },
+            {
+              "id": "Flurl",
+              "resolvedVersion": "3.0.2"
+            },
+            {
+              "id": "Flurl.Http",
+              "resolvedVersion": "3.2.0"
+            },
+            {
+              "id": "Handlebars.Net",
+              "resolvedVersion": "2.0.10"
+            },
+            {
+              "id": "JetBrains.Annotations",
+              "resolvedVersion": "2021.2.0"
+            },
+            {
+              "id": "Json.More.Net",
+              "resolvedVersion": "1.4.4"
+            },
+            {
+              "id": "JsonCons.JsonPath",
+              "resolvedVersion": "1.1.0"
+            },
+            {
+              "id": "JsonCons.Utilities",
+              "resolvedVersion": "1.0.0"
+            },
+            {
+              "id": "JsonPointer.Net",
+              "resolvedVersion": "2.1.0"
+            },
+            {
+              "id": "JsonSchema.Net",
+              "resolvedVersion": "1.12.0"
+            },
+            {
+              "id": "Microsoft.CodeCoverage",
+              "resolvedVersion": "17.0.0"
+            },
+            {
+              "id": "Microsoft.NETCore.Platforms",
+              "resolvedVersion": "1.1.0"
+            },
+            {
+              "id": "Microsoft.TestPlatform.ObjectModel",
+              "resolvedVersion": "17.0.0"
+            },
+            {
+              "id": "Microsoft.TestPlatform.TestHost",
+              "resolvedVersion": "17.0.0"
+            },
+            {
+              "id": "NETStandard.Library",
+              "resolvedVersion": "1.6.1"
+            },
+            {
+              "id": "Newtonsoft.Json",
+              "resolvedVersion": "13.0.4"
+            },
+            {
+              "id": "NuGet.Frameworks",
+              "resolvedVersion": "5.0.0"
+            },
+            {
+              "id": "Polly",
+              "resolvedVersion": "7.2.2"
+            },
+            {
+              "id": "Spectre.Console",
+              "resolvedVersion": "0.43.0"
+            },
+            {
+              "id": "System.Configuration.ConfigurationManager",
+              "resolvedVersion": "4.4.0"
+            },
+            {
+              "id": "System.Security.Cryptography.ProtectedData",
+              "resolvedVersion": "4.4.0"
+            },
+            {
+              "id": "xunit.abstractions",
+              "resolvedVersion": "2.0.3"
+            },
+            {
+              "id": "xunit.analyzers",
+              "resolvedVersion": "0.10.0"
+            },
+            {
+              "id": "xunit.assert",
+              "resolvedVersion": "2.4.1"
+            },
+            {
+              "id": "xunit.core",
+              "resolvedVersion": "2.4.1"
+            },
+            {
+              "id": "xunit.extensibility.core",
+              "resolvedVersion": "2.4.1"
+            },
+            {
+              "id": "xunit.extensibility.execution",
+              "resolvedVersion": "2.4.1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

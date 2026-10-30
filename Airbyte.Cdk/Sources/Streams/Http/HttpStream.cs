@@ -163,7 +163,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         {
             //Create initial request object
             Url requestUrl = UrlBase().AppendPathSegment(path);
-            IFlurlRequest request = requestUrl.ConfigureRequest(x => x.Timeout = TimeOut);
+            IFlurlRequest request = requestUrl.WithTimeout(TimeOut);
             LastFlurlResponse = null;
 
             //Set header or query params
