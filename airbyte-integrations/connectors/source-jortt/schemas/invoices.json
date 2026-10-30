@@ -36,31 +36,36 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "invoice_due_date": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "invoice_delivery_period": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "invoice_delivery_period_end": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "invoice_date_sent": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "invoice_total": {
       "type": [
@@ -69,16 +74,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "invoice_total_incl_vat": {
       "type": [
@@ -87,16 +94,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "invoice_due_amount": {
       "type": [
@@ -105,16 +114,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "send_method": {
       "type": [
@@ -162,7 +173,8 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "payment_method": {
       "type": [
@@ -260,7 +272,10 @@
         "array"
       ],
       "items": {
-        "type": "string"
+        "type": [
+          "null",
+          "string"
+        ]
       }
     },
     "language": {
@@ -281,7 +296,10 @@
         ],
         "properties": {
           "description": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "vat": {
             "type": [
@@ -290,18 +308,26 @@
             ],
             "properties": {
               "value": {
-                "type": "number"
+                "type": [
+                  "null",
+                  "number"
+                ]
               },
               "category": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "value"
-            ]
+            }
           },
           "quantity": {
-            "type": "string"
+            "type": [
+              "null",
+              "string",
+              "number",
+              "integer"
+            ]
           },
           "amount": {
             "type": [
@@ -310,16 +336,18 @@
             ],
             "properties": {
               "amount": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "currency": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "amount",
-              "currency"
-            ]
+            }
           },
           "total_amount_ex_vat": {
             "type": [
@@ -328,29 +356,26 @@
             ],
             "properties": {
               "amount": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "currency": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "amount",
-              "currency"
-            ]
+            }
           },
           "ledger_account_id": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        },
-        "required": [
-          "description",
-          "vat",
-          "quantity",
-          "amount",
-          "total_amount_ex_vat",
-          "ledger_account_id"
-        ]
+        }
       }
     },
     "discounts": {
@@ -365,16 +390,18 @@
         ],
         "properties": {
           "description": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "percentage": {
-            "type": "integer"
+            "type": [
+              "null",
+              "integer"
+            ]
           }
-        },
-        "required": [
-          "description",
-          "percentage"
-        ]
+        }
       }
     },
     "reference": {
@@ -387,13 +414,21 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date-time"
     },
     "credit_invoice_ids": {
       "type": [
         "null",
-        "string"
-      ]
+        "string",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "string"
+        ]
+      }
     },
     "peppol_status": {
       "type": [
@@ -413,16 +448,18 @@
         ],
         "properties": {
           "id": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "name": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
+        }
       }
     },
     "_links": {
@@ -444,16 +481,18 @@
               ],
               "properties": {
                 "href": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "type": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
-              },
-              "required": [
-                "href",
-                "type"
-              ]
+              }
             },
             "sources": {
               "type": [
@@ -462,75 +501,22 @@
               ],
               "properties": {
                 "href": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "type": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
-              },
-              "required": [
-                "href",
-                "type"
-              ]
+              }
             }
-          },
-          "required": [
-            "ledger_accounts",
-            "sources"
-          ]
+          }
         }
-      },
-      "required": [
-        "payment_methods"
-      ]
+      }
     }
-  },
-  "required": [
-    "id",
-    "invoice_status",
-    "customer_id",
-    "tradename_id",
-    "invoice_number",
-    "invoice_date",
-    "invoice_due_date",
-    "invoice_delivery_period",
-    "invoice_delivery_period_end",
-    "invoice_date_sent",
-    "invoice_total",
-    "invoice_total_incl_vat",
-    "invoice_due_amount",
-    "send_method",
-    "net_amounts",
-    "invoice_marked_free_of_vat",
-    "credited_invoice_id",
-    "remarks",
-    "introduction",
-    "number_of_reminders_sent",
-    "last_reminded_at",
-    "payment_method",
-    "customer_company_name",
-    "customer_attn",
-    "customer_address_street",
-    "customer_address_city",
-    "customer_address_postal_code",
-    "customer_address_country_code",
-    "customer_address_country_name",
-    "customer_address_extra_information",
-    "customer_vat_shifted",
-    "customer_vat_number",
-    "customer_in_eu",
-    "customer_reference",
-    "customer_is_private",
-    "customer_mail_to",
-    "customer_mail_cc_addresses",
-    "language",
-    "line_items",
-    "discounts",
-    "reference",
-    "created_at",
-    "credit_invoice_ids",
-    "peppol_status",
-    "attachments",
-    "_links"
-  ]
+  }
 }

@@ -38,13 +38,5 @@
         "boolean"
       ]
     }
-  },
-  "required": [
-    "id",
-    "iban",
-    "bank",
-    "in_the_name_of",
-    "bic",
-    "archived"
-  ]
+  }
 }

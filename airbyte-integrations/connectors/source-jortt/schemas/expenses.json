@@ -42,19 +42,22 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "delivery_period": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "delivery_period_end": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "vat_type": {
       "type": [
@@ -66,7 +69,8 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date-time"
     },
     "total_amount_incl_vat": {
       "type": [
@@ -75,16 +79,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "grand_total_vat_amount": {
       "type": [
@@ -93,16 +99,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "vat_line_items": {
       "type": [
@@ -122,15 +130,18 @@
             ],
             "properties": {
               "value": {
-                "type": "number"
+                "type": [
+                  "null",
+                  "number"
+                ]
               },
               "category": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "value"
-            ]
+            }
           },
           "vat_amount": {
             "type": [
@@ -139,22 +150,20 @@
             ],
             "properties": {
               "amount": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "currency": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "amount",
-              "currency"
-            ]
+            }
           }
-        },
-        "required": [
-          "vat",
-          "vat_amount"
-        ]
+        }
       }
     },
     "label_ids": {
@@ -163,7 +172,10 @@
         "array"
       ],
       "items": {
-        "type": "string"
+        "type": [
+          "null",
+          "string"
+        ]
       }
     },
     "_links": {
@@ -185,16 +197,18 @@
               ],
               "properties": {
                 "href": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "type": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
-              },
-              "required": [
-                "href",
-                "type"
-              ]
+              }
             },
             "sources": {
               "type": [
@@ -203,45 +217,22 @@
               ],
               "properties": {
                 "href": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "type": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
-              },
-              "required": [
-                "href",
-                "type"
-              ]
+              }
             }
-          },
-          "required": [
-            "ledger_accounts",
-            "sources"
-          ]
+          }
         }
-      },
-      "required": [
-        "payment_methods"
-      ]
+      }
     }
-  },
-  "required": [
-    "id",
-    "expense_number",
-    "description",
-    "expense_type",
-    "ledger_account_id",
-    "ledger_account_name",
-    "vat_date",
-    "delivery_period",
-    "delivery_period_end",
-    "vat_type",
-    "approved_at",
-    "total_amount_incl_vat",
-    "grand_total_vat_amount",
-    "vat_line_items",
-    "label_ids",
-    "_links"
-  ]
+  }
 }

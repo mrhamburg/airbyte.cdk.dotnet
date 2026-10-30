@@ -96,7 +96,8 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "citizen_service_number": {
       "type": [
@@ -134,7 +135,10 @@
         "array"
       ],
       "items": {
-        "type": "string"
+        "type": [
+          "null",
+          "string"
+        ]
       }
     },
     "email_salutation": {
@@ -233,45 +237,5 @@
         "integer"
       ]
     }
-  },
-  "required": [
-    "id",
-    "is_private",
-    "customer_name",
-    "address_street",
-    "address_postal_code",
-    "address_city",
-    "address_country_code",
-    "address_country_name",
-    "address_extra_information",
-    "shift_vat",
-    "vat_number",
-    "coc_number",
-    "initials",
-    "first_name",
-    "last_name",
-    "date_of_birth",
-    "citizen_service_number",
-    "attn",
-    "phonenumber",
-    "website",
-    "email",
-    "cc_emails",
-    "email_salutation",
-    "additional_information",
-    "payment_term",
-    "invoice_language",
-    "payment_method_invoice",
-    "reference",
-    "mollie_direct_debit_status",
-    "mollie_customer_id",
-    "mollie_mandate_id",
-    "default_ledger_account_id",
-    "archived",
-    "default_label_id",
-    "default_discount_description",
-    "default_discount_percentage",
-    "peppol_scheme_code",
-    "peppol_identifier"
-  ]
+  }
 }

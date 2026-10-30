@@ -1,0 +1,42 @@
+{
+  "id": "2c1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10",
+  "expense_number": "2026-0007",
+  "description": "Hosting January",
+  "expense_type": "cost",
+  "ledger_account_id": "61a5b600-16bc-013d-3d2d-42742b204134",
+  "ledger_account_name": "47300 Hosting",
+  "vat_date": "2026-01-20",
+  "delivery_period": "2026-01-01",
+  "delivery_period_end": "2026-01-31",
+  "vat_type": "standard",
+  "approved_at": "2026-01-20T12:00:00.000+01:00",
+  "total_amount_incl_vat": {
+    "amount": "121.00",
+    "currency": "EUR"
+  },
+  "grand_total_vat_amount": {
+    "amount": "21.00",
+    "currency": "EUR"
+  },
+  "vat_line_items": [
+    {
+      "vat": {
+        "value": 0.21,
+        "category": null
+      },
+      "vat_amount": {
+        "amount": "21.00",
+        "currency": "EUR"
+      }
+    }
+  ],
+  "label_ids": [
+    "4a1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10"
+  ],
+  "_links": {
+    "self": {
+      "href": "https://api.jortt.nl/v3/expenses/id/2c1e",
+      "type": "application/json"
+    }
+  }
+}

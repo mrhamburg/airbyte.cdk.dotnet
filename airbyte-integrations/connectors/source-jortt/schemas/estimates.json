@@ -42,7 +42,8 @@
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "total": {
       "type": [
@@ -51,16 +52,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "total_incl_vat": {
       "type": [
@@ -69,16 +72,18 @@
       ],
       "properties": {
         "amount": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "currency": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ]
+      }
     },
     "net_amounts": {
       "type": [
@@ -182,7 +187,10 @@
         ],
         "properties": {
           "description": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "vat": {
             "type": [
@@ -191,18 +199,26 @@
             ],
             "properties": {
               "value": {
-                "type": "number"
+                "type": [
+                  "null",
+                  "number"
+                ]
               },
               "category": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "value"
-            ]
+            }
           },
           "quantity": {
-            "type": "string"
+            "type": [
+              "null",
+              "string",
+              "number",
+              "integer"
+            ]
           },
           "amount": {
             "type": [
@@ -211,16 +227,18 @@
             ],
             "properties": {
               "amount": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "currency": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "amount",
-              "currency"
-            ]
+            }
           },
           "total_amount_ex_vat": {
             "type": [
@@ -229,25 +247,20 @@
             ],
             "properties": {
               "amount": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "currency": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
-            },
-            "required": [
-              "amount",
-              "currency"
-            ]
+            }
           }
-        },
-        "required": [
-          "description",
-          "vat",
-          "quantity",
-          "amount",
-          "total_amount_ex_vat"
-        ]
+        }
       }
     },
     "discounts": {
@@ -262,23 +275,26 @@
         ],
         "properties": {
           "description": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "percentage": {
-            "type": "integer"
+            "type": [
+              "null",
+              "integer"
+            ]
           }
-        },
-        "required": [
-          "description",
-          "percentage"
-        ]
+        }
       }
     },
     "sent_or_modified_on": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date"
     },
     "attachments": {
       "type": [
@@ -292,47 +308,19 @@
         ],
         "properties": {
           "id": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "name": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
+        }
       }
     }
-  },
-  "required": [
-    "id",
-    "estimate_status",
-    "acceptance_status",
-    "customer_id",
-    "tradename_id",
-    "estimate_number",
-    "valid_until",
-    "total",
-    "total_incl_vat",
-    "net_amounts",
-    "introduction",
-    "remarks",
-    "reference",
-    "customer_company_name",
-    "customer_attn",
-    "customer_address_street",
-    "customer_address_city",
-    "customer_address_postal_code",
-    "customer_address_country_code",
-    "customer_address_country_name",
-    "customer_address_extra_information",
-    "customer_vat_shifted",
-    "customer_vat_number",
-    "language",
-    "line_items",
-    "discounts",
-    "sent_or_modified_on",
-    "attachments"
-  ]
+  }
 }

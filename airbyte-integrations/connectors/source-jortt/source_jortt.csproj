@@ -13,34 +13,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="schemas\bank_accounts.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\customers.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\estimates.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\expenses.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\invoices.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\ledger_accounts_balance.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\ledger_accounts_cost.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\ledger_accounts_income.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\organizations.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="schemas\receipts.json">
+    <InternalsVisibleTo Include="source_jortt.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="source_jortt.Tests\**" />
+    <None Remove="source_jortt.Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="schemas\**\*.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="spec.json">
