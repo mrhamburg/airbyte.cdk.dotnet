@@ -1,0 +1,16 @@
+connector:
+  module: Program
+
+# Scenarios run by tests/Airbyte.Cdk.IntegrationTests. Every record a stream emits is validated against
+# the schema the connector advertises in `discover`; a field the schema does not declare fails the run.
+tests:
+  - name: full refresh
+    limit: 50
+    streams:
+      - name: ip
+    # For a stream that needs credentials, declare the secrets the scenario needs. The harness resolves
+    # each value and merges it into the config under the given property name; when a secret is missing the
+    # scenario is reported as skipped instead of passed.
+    #
+    # secrets:
+    #   api_key: {{connectorname}}_api_key
