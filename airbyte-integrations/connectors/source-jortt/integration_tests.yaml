@@ -1,0 +1,34 @@
+connector:
+  module: Jortt
+
+# Credentials are not provisioned yet, so these scenarios are reported as skipped (`::warning::`) instead of
+# silently passing. Once AIRBYTE_INTEGRATION_SECRETS_JSON contains these keys, main starts enforcing them.
+secrets:
+  client_id: JORTT_CLIENT_ID
+  client_secret: JORTT_CLIENT_SECRET
+
+tests:
+  - name: full refresh
+    config:
+      start_date: "2026-01-01"
+    limit: 25
+    streams:
+      - name: organizations
+      - name: customers
+      - name: invoices
+      - name: estimates
+      - name: receipts
+      - name: bank_accounts
+      - name: ledger_accounts_cost
+      - name: ledger_accounts_income
+      - name: ledger_accounts_balance
+
+  - name: expenses incremental
+    config:
+      start_date: "2026-09-01"
+    streams:
+      - name: expenses
+        sync_mode: incremental
+        state:
+          expenses:
+            vat_date: "2026-09-01"

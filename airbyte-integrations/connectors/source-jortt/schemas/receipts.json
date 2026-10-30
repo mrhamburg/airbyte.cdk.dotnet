@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "file_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "file_size": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "expense_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "in_inbox": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "created_at": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "receipt_value": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "invoice_number": {
+          "type": "string"
+        },
+        "invoice_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "vat_type": {
+          "type": "string"
+        },
+        "amount_incl_vat": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "amount": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ]
+        },
+        "amount_excl_vat": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "amount": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ]
+        },
+        "iban_codes": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "vat_numbers": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "coc_numbers": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "description",
+        "invoice_number",
+        "invoice_date",
+        "vat_type",
+        "amount_incl_vat",
+        "amount_excl_vat",
+        "iban_codes",
+        "vat_numbers",
+        "coc_numbers"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "description",
+    "file_type",
+    "file_size",
+    "expense_id",
+    "in_inbox",
+    "created_at",
+    "receipt_value"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "streams": [
+    { "stream": { "name": "organizations", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "customers", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "invoices", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "estimates", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    {
+      "stream": {
+        "name": "expenses",
+        "json_schema": {},
+        "supported_sync_modes": ["full_refresh", "incremental"],
+        "source_defined_cursor": true,
+        "default_cursor_field": ["vat_date"]
+      },
+      "sync_mode": "incremental",
+      "destination_sync_mode": "append",
+      "cursor_field": ["vat_date"]
+    },
+    { "stream": { "name": "receipts", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "bank_accounts", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "ledger_accounts_cost", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "ledger_accounts_income", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "ledger_accounts_balance", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" }
+  ]
+}

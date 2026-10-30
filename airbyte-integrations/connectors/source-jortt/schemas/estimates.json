@@ -1,0 +1,338 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "estimate_status": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "acceptance_status": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "tradename_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "estimate_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "valid_until": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "total": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ]
+    },
+    "total_incl_vat": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ]
+    },
+    "net_amounts": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "introduction": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "remarks": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "reference": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_company_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_attn": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_address_street": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_address_city": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_address_postal_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_address_country_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_address_country_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_address_extra_information": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "customer_vat_shifted": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "customer_vat_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "language": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "line_items": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "vat": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "category": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "amount": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "amount": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "currency"
+            ]
+          },
+          "total_amount_ex_vat": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "amount": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "currency"
+            ]
+          }
+        },
+        "required": [
+          "description",
+          "vat",
+          "quantity",
+          "amount",
+          "total_amount_ex_vat"
+        ]
+      }
+    },
+    "discounts": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "percentage": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "description",
+          "percentage"
+        ]
+      }
+    },
+    "sent_or_modified_on": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "attachments": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "estimate_status",
+    "acceptance_status",
+    "customer_id",
+    "tradename_id",
+    "estimate_number",
+    "valid_until",
+    "total",
+    "total_incl_vat",
+    "net_amounts",
+    "introduction",
+    "remarks",
+    "reference",
+    "customer_company_name",
+    "customer_attn",
+    "customer_address_street",
+    "customer_address_city",
+    "customer_address_postal_code",
+    "customer_address_country_code",
+    "customer_address_country_name",
+    "customer_address_extra_information",
+    "customer_vat_shifted",
+    "customer_vat_number",
+    "language",
+    "line_items",
+    "discounts",
+    "sent_or_modified_on",
+    "attachments"
+  ]
+}

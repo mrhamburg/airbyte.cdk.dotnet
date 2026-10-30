@@ -1,0 +1,277 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "is_private": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "customer_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_street": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_postal_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_city": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_country_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_country_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_extra_information": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "shift_vat": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "vat_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "coc_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "initials": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "first_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "last_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "date_of_birth": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "citizen_service_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "attn": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "phonenumber": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "website": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "email": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "cc_emails": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "email_salutation": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "additional_information": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "payment_term": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "invoice_language": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "payment_method_invoice": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "reference": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "mollie_direct_debit_status": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "mollie_customer_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "mollie_mandate_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "default_ledger_account_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "archived": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "default_label_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "default_discount_description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "default_discount_percentage": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "peppol_scheme_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "peppol_identifier": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "is_private",
+    "customer_name",
+    "address_street",
+    "address_postal_code",
+    "address_city",
+    "address_country_code",
+    "address_country_name",
+    "address_extra_information",
+    "shift_vat",
+    "vat_number",
+    "coc_number",
+    "initials",
+    "first_name",
+    "last_name",
+    "date_of_birth",
+    "citizen_service_number",
+    "attn",
+    "phonenumber",
+    "website",
+    "email",
+    "cc_emails",
+    "email_salutation",
+    "additional_information",
+    "payment_term",
+    "invoice_language",
+    "payment_method_invoice",
+    "reference",
+    "mollie_direct_debit_status",
+    "mollie_customer_id",
+    "mollie_mandate_id",
+    "default_ledger_account_id",
+    "archived",
+    "default_label_id",
+    "default_discount_description",
+    "default_discount_percentage",
+    "peppol_scheme_code",
+    "peppol_identifier"
+  ]
+}
