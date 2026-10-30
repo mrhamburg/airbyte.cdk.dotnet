@@ -14,6 +14,7 @@
     <PackageVersion Include="JsonSchema.Net" Version="9.5.0" />
     <PackageVersion Include="Polly" Version="8.9.0" />
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
 
     <!-- Test packages -->
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />

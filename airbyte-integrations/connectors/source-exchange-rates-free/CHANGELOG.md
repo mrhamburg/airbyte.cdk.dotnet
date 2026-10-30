@@ -8,3 +8,6 @@ Corrected entrypoint, due to airbyte [specifications](https://airbyte.io/blog/ex
 
 ## 0.0.3
 Replaced the retired exchangerate.host free endpoint with the Frankfurter API, updated schemas, and fixed the sample catalog/state to use the connector's actual streams. Updated to Airbyte.Cdk 0.0.8 and the current NuGet dependency set (including draft-07 JSON schemas).
+
+## 0.0.4
+Added live integration test scenarios (`integration_tests.yaml`). No connector behaviour changed.

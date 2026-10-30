@@ -1,0 +1,18 @@
+connector:
+  # module is optional: the harness reads ENV AIRBYTE_IMPL_MODULE from this connector's Dockerfile.
+  # Set it here only when it must differ from the runtime contract.
+
+# Scenarios run by tests/Airbyte.Cdk.IntegrationTests. Every record a stream emits is validated against
+# the schema the connector advertises in `discover`; a field the schema does not declare fails the run.
+tests:
+  - name: full refresh
+    limit: 50
+    streams:
+      - name: ip
+
+# A connector that needs credentials declares them once, here; the harness merges each value into the
+# config of every scenario under the given property name, and reports a scenario as skipped when a secret
+# is unavailable (which fails on main, where --no-skip is used).
+#
+# secrets:
+#   api_key: MY_CONNECTOR_API_KEY

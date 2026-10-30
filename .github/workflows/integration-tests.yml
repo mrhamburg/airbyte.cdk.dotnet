@@ -1,0 +1,129 @@
+name: Connector Integration Tests
+
+on:
+  pull_request:
+    paths:
+      - 'airbyte-integrations/connectors/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'airbyte-integrations/connectors/**'
+  workflow_dispatch:
+    inputs:
+      connector:
+        description: 'Connector name or directory, for example source-exchange-rates-free'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connector-integration-${{ github.ref }}
+  # A pull request only competes with itself; a push to main must finish, because its connectors are the
+  # ones whose post-merge state we care about.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changed:
+    name: Discover changed connectors
+    runs-on: ubuntu-latest
+    outputs:
+      connectors: ${{ steps.list.outputs.connectors }}
+      has_connectors: ${{ steps.list.outputs.has_connectors }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build harness
+        run: dotnet build tests/Airbyte.Cdk.IntegrationTests -c Release
+
+      - name: Determine changed files
+        shell: bash
+        env:
+          INPUT_CONNECTOR: ${{ inputs.connector }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ -n "$INPUT_CONNECTOR" ]; then
+            connector="$INPUT_CONNECTOR"
+            case "$connector" in
+              airbyte-integrations/connectors/*) ;;
+              *) connector="airbyte-integrations/connectors/$connector" ;;
+            esac
+            echo "$connector/integration_tests.yaml" > "$RUNNER_TEMP/changed.txt"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
+          else
+            base="$BEFORE_SHA"
+            if [ -z "$base" ] || ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+              base="HEAD~1"
+            fi
+            git diff --name-only --diff-filter=d "$base" "$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
+          fi
+          echo "Changed files:"
+          cat "$RUNNER_TEMP/changed.txt"
+
+      - name: Map changes to connectors
+        id: list
+        shell: bash
+        run: |
+          # --no-build keeps compiler and analyzer warnings out of stdout, which would otherwise corrupt
+          # the JSON this step publishes as the build matrix.
+          connectors=$(dotnet run --no-build -c Release --project tests/Airbyte.Cdk.IntegrationTests -- \
+            list-changed --changed-files "$RUNNER_TEMP/changed.txt" --json)
+          echo "connectors=$connectors" >> "$GITHUB_OUTPUT"
+          if [ "$connectors" = "[]" ]; then
+            echo "has_connectors=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_connectors=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Connectors to test: $connectors"
+
+  integration:
+    name: ${{ matrix.connector }}
+    needs: changed
+    if: needs.changed.outputs.has_connectors == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        connector: ${{ fromJson(needs.changed.outputs.connectors) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Run integration tests
+        shell: bash
+        env:
+          CONNECTOR: ${{ matrix.connector }}
+          EVENT_NAME: ${{ github.event_name }}
+          # One repository secret holding a JSON object of connector credentials, for example
+          # {"SOURCE_EXAMPLE_API_KEY": "..."} — see README, Integration tests.
+          AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
+        run: |
+          # On main every declared secret is expected to exist: a skip there would look green while
+          # proving nothing.
+          extra=""
+          if [ "$EVENT_NAME" = "push" ]; then
+            extra="--no-skip"
+          fi
+          dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- run --connector "$CONNECTOR" $extra

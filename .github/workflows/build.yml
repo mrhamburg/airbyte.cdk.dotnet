@@ -4,6 +4,7 @@ on:
     paths: 
       - 'Airbyte.Cdk/**'
       - 'Airbyte.Cdk.Tests/**'
+      - 'tests/**'
 
 jobs:
   build-dotnet-cdk:

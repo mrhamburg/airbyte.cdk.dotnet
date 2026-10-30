@@ -12,12 +12,14 @@ The Airbyte .NET CDK: a framework for building Airbyte source and destination co
 |------|---------|
 | `Airbyte.Cdk/` | CDK library, CLI entrypoint, models, and connector generator (`OutputType=Exe`, targets `net10.0`) |
 | `Airbyte.Cdk.Tests/` | xUnit test project for the CDK |
+| `tests/Airbyte.Cdk.IntegrationTests/` | Console app that runs a connector against its live API and validates records against its schema |
+| `tests/Airbyte.Cdk.IntegrationTests.Tests/` | xUnit tests for the integration test harness |
 | `airbyte-integrations/connectors/` | Concrete connectors (e.g. `source-exchange-rates-free`) |
 | `airbyte-integrations/connector-templates/` | Handlebars (`.hbs`) templates used by `dotnet run init` |
 | `Dockerfile` | Builds/tests the CDK and publishes the NuGet package (multi-stage) |
 | `.github/workflows/` | CI for the CDK and for connector image builds/releases |
 
-There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk` and `Airbyte.Cdk.Tests`. Connector directories have their own solution/project files and reference the published `Airbyte.Cdk` NuGet package, not a `ProjectReference`.
+There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk`, `Airbyte.Cdk.Tests`, and the two projects under `tests/`. Connector directories have their own solution/project files and reference the published `Airbyte.Cdk` NuGet package, not a `ProjectReference`.
 
 ## Prerequisites and commands
 
@@ -66,13 +68,15 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 2. Implement `CheckConnection` and `Streams` in the generated `Program`/connector class. Build HTTP streams from `UrlBase.HttpStream()` and configure parsing, paging, auth, cursor fields, and retries fluently.
 3. Add `spec.json` and `schemas/<stream>.json`. Ensure the `.csproj` copies `spec.json` and `schemas/**` to the output directory (the generated project already does this).
 4. Set the Docker runtime contract in the connector `Dockerfile`: `AIRBYTE_IMPL_PATH` must point at the built `.dll`, and `AIRBYTE_IMPL_MODULE` must match the `Connector` subclass name.
-5. Add the connector to the table in `README.md` and bump the version in the connector's `CHANGELOG.md` (SemVer). The release workflow reads the highest version from that file and refuses to overwrite an existing image tag.
+5. Declare live scenarios in `integration_tests.yaml` (streams, optional secrets, optional state). `dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- run --connector <path>` builds the connector and validates every record against the stream schema.
+6. Add the connector to the table in `README.md` and bump the version in the connector's `CHANGELOG.md` (SemVer). The release workflow reads the highest version from that file and refuses to overwrite an existing image tag.
 
 ## Release and CI
 
 - CDK NuGet publishing is driven by `.github/workflows/release.yml` on a published GitHub release: the job packs `Airbyte.Cdk` with `-p:Version=<release tag>` and pushes it to nuget.org. Authentication is [NuGet trusted publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing) — `NuGet/login@v1` exchanges the GitHub OIDC token for a short-lived key, so no NuGet API key is stored. The job therefore needs `id-token: write`, the `release` environment (secret `NUGET_USER` = nuget.org profile name), and a matching policy on nuget.org. The `Dockerfile` only builds/tests and never receives a credential.
 - Connector images are built/published by `.github/workflows/build-connector.yml` and `release-connector.yml`, which invoke `dotnet run publish -b` from `Airbyte.Cdk`. That command derives changed connectors from `git diff HEAD HEAD~1` and the version from `CHANGELOG.md`.
-- CI paths are narrow: CDK changes trigger `build.yml` (`Airbyte.Cdk/**`, `Airbyte.Cdk.Tests/**`); connector changes trigger `build-connector.yml` (`airbyte-integrations/connectors/**`).
+- CI paths are narrow: CDK changes trigger `build.yml` (`Airbyte.Cdk/**`, `Airbyte.Cdk.Tests/**`); connector changes trigger `build-connector.yml` (`airbyte-integrations/connectors/**`) and `integration-tests.yml`, which runs only the connectors touched by the change.
+- Connector integration tests live in `tests/Airbyte.Cdk.IntegrationTests`. It builds a connector and drives it through `check`/`discover`/`read`, so it never references the connector project and always exercises the `Airbyte.Cdk` version the connector restores from nuget.org.
 - `.github/workflows/pr-agent.yml` runs PR-Agent against OpenRouter on every pull request — advisory review only, not a merge gate.
 
 ### AI pull request review

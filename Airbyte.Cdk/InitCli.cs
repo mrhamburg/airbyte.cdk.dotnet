@@ -73,6 +73,7 @@ namespace Airbyte.Cdk
                         AddDockerFile(dir, connectorname);
                         AddSchemasFolder(dir);
                         AddAndReplaceDefaultFile(dir, connectorname);
+                        AddIntegrationTestSpec(dir, connectorname);
                         await TryAndBuildResult(dir, connectorname);
                     });
 
@@ -198,6 +199,27 @@ namespace Airbyte.Cdk
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
                 throw new Exception("Could not create changelog file");
+        }
+
+        private static void AddIntegrationTestSpec(DirectoryInfo dir, string connectorname)
+        {
+            var source = Path.Combine(ConnectorTemplateFolder(dir), "integration_tests.yaml.hbs");
+            var target = Path.Combine(dir.FullName, "integration_tests.yaml");
+            string step = $"Adding integration test declaration...";
+            ToConsole(Progress, step);
+            if (!File.Exists(source))
+                throw new Exception("Could not find file" + source);
+
+            var template = Handlebars.Compile(File.ReadAllText(source));
+            File.WriteAllText(target, template(new
+            {
+                connectorname
+            }));
+
+            if (File.Exists(target))
+                ToConsole(Progress, step, Emoji.Known.CheckMark);
+            else
+                throw new Exception("Could not create integration test declaration");
         }
 
         private static void AddAndReplaceDefaultFile(DirectoryInfo dir, string connectorname)
