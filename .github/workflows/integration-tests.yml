@@ -42,7 +42,12 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ inputs.connector }}" ]; then
-            echo "${{ inputs.connector }}/integration_tests.yaml" > "$RUNNER_TEMP/changed.txt"
+            connector="${{ inputs.connector }}"
+            case "$connector" in
+              airbyte-integrations/connectors/*) ;;
+              *) connector="airbyte-integrations/connectors/$connector" ;;
+            esac
+            echo "$connector/integration_tests.yaml" > "$RUNNER_TEMP/changed.txt"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             git diff --name-only --diff-filter=d \
               "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" > "$RUNNER_TEMP/changed.txt"
@@ -56,11 +61,16 @@ jobs:
           echo "Changed files:"
           cat "$RUNNER_TEMP/changed.txt"
 
+      - name: Build harness
+        run: dotnet build tests/Airbyte.Cdk.IntegrationTests -c Release
+
       - name: Map changes to connectors
         id: list
         shell: bash
         run: |
-          connectors=$(dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- \
+          # --no-build keeps compiler/analyzer warnings out of stdout, which would otherwise corrupt the
+          # JSON this step publishes as the matrix.
+          connectors=$(dotnet run --no-build -c Release --project tests/Airbyte.Cdk.IntegrationTests -- \
             list-changed --changed-files "$RUNNER_TEMP/changed.txt" --json)
           echo "connectors=$connectors" >> "$GITHUB_OUTPUT"
           if [ "$connectors" = "[]" ]; then
