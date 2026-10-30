@@ -159,11 +159,12 @@ tests:
   - name: full refresh
     config:
       start_date: "2026-10-01"
-    limit: 50                  # stop the connector after 50 records
+      retries: 3               # unquoted scalars keep their type; quote anything that should stay a string
+    limit: 50                  # per stream: the connector is stopped once every listed stream has 50 records
     streams:
       - name: latest
       - name: orders
-        sync_mode: incremental
+        sync_mode: incremental # rejected when discover does not advertise incremental for the stream
         state:                 # optional starting state, passed to the connector as-is
           orders: { cursor: "2026-10-01" }
         min_records: 1         # default 1; use 0 for a stream that may legitimately be empty
@@ -179,12 +180,18 @@ dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- \
 Schemas are checked strictly: a record field the stream's schema does not declare fails the run, so schema
 drift is reported instead of silently accepted. Typed maps (an object whose schema only declares
 `additionalProperties`, such as a currency table) stay permissive, because a new key there is data rather
-than drift.
+than drift. Schemas composed with `allOf`/`anyOf`/`oneOf` or `$ref` are left open, because closing one
+branch would reject the fields declared by its siblings.
+
+A scenario with `limit` stops the connector once **each** listed stream has produced that many records, so a
+chatty stream cannot starve the ones after it.
 
 Secrets are resolved through the `ISecretSource` seam. This repository ships the environment-backed
 implementation, so a secret key is an environment variable name; the SecretsManager PostgreSQL provider
 plugs into the same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as
-passed, and the workflow passes `--no-skip` on `main` so a missing secret fails the build there.
+passed, and the workflow passes `--no-skip` on `main` so a missing secret fails the build there. To supply a
+credential in CI, add a repository secret and expose it as an environment variable of the same name in
+`.github/workflows/integration-tests.yml`.
 
 `.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
 a push to `main`.

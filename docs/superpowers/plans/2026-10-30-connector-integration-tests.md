@@ -92,7 +92,11 @@
 
 **Interfaces:** `JsonSchema StrictSchema.Build(JsonElement discoveredSchema)`; `IReadOnlyList<string> RecordValidator.Validate(JsonSchema schema, JsonElement record)`.
 
-- [ ] Tests: extra envelope field fails; extra key inside `additionalProperties` map passes; nested `items` enforced; wrong type fails; `patternProperties` untouched; drafts other than 4/6/7/2019-09/2020-12 rejected with a readable message; valid record passes.
+- [ ] Tests: extra envelope field fails; extra key inside `additionalProperties` map passes; nested `items` enforced; wrong type fails; `patternProperties` untouched; `anyOf`/`oneOf` alternatives and `allOf` + `$ref` compositions still validate; unsupported dialects rejected with a readable message; valid record passes.
+
+**Ruling (implementation):** strict injection is skipped for `$ref` targets, `allOf`-composed objects and
+`allOf`/`anyOf`/`oneOf` branches, and JsonSchema.Net 9.x dropped draft-04, so dialect 4 is rejected rather
+than normalized. Cost if wrong: an undeclared field inside a composed schema is not detected as drift.
 - [ ] Implement; PASS; commit.
 
 ## Task 5: Catalog building and orchestration
