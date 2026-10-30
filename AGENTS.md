@@ -46,7 +46,7 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 - `Connector` is the root abstraction. Sources derive from `Sources/AbstractSource.cs`; destinations derive from `Destinations/AbstractDestination.cs`.
 - `AbstractSource.Streams(JsonElement config)` constructs the available streams. `AbstractSource.Read` matches the configured catalog to those streams and delegates to each `Stream.ReadRecords`.
 - `Sources/Streams/Stream.cs` is transport-agnostic. `HttpStream` adds HTTP request/pagination/retry behavior; `FluentStreamBuilder` (`Sources/Utils/StreamBuilder.cs`) configures an `HttpStream` through callbacks and produces a `GenericStream`.
-- `Models/` contains the Airbyte protocol DTOs and enums (`AirbyteMessage`, `AirbyteCatalog`, `SyncMode`, etc.).
+- `Models/` contains the Airbyte protocol DTOs and enums (`AirbyteMessage`, `AirbyteCatalog`, `SyncMode`, etc.) targeting protocol **0.19.0** over STDIO/JSON. Sources emit per-stream `STREAM` state and accept legacy stream maps, `STREAM`, `GLOBAL`, and `AirbyteMessage` envelopes. Socket/PROTOBUF transport is not implemented.
 - `Sources/Utils/` contains schema loading, catalog helpers, casing extensions, and JSON helpers. `ResourceSchemaLoader` resolves `schemas/<stream-name>.json` from the output directory.
 
 ## Coding conventions
@@ -97,3 +97,4 @@ key settings stay host-controlled there.
 - Docker images pin `mcr.microsoft.com/dotnet/sdk:10.0` and `runtime:10.0`.
 - Some test files are empty placeholders (e.g. `TestHttp.cs`, `TestStreamsCore.cs`). Do not assume they contain coverage.
 - Avoid changing `Airbyte.Cdk/Airbyte.Cdk.nuspec` paths or icon names without verifying the package output, since the package is published from a Docker build context.
+- `Connector.Spec()` defaults a missing `protocol_version` to `0.19.0`; connector `spec.json` files should declare it explicitly.

@@ -6,6 +6,12 @@ namespace Airbyte.Cdk.Models
 {
     public class ConnectorSpecification
     {
+        /// <summary>
+        /// The Airbyte Protocol version supported by the connector. Protocol versioning uses SemVer.
+        /// </summary>
+        [JsonPropertyName("protocol_version")]
+        public string? ProtocolVersion { get; set; }
+
         [JsonPropertyName("documentationUrl")]
         public string? DocumentationUrl { get; set; }
 

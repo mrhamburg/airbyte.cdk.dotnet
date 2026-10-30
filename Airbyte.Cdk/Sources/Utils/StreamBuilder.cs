@@ -234,6 +234,11 @@ namespace Airbyte.Cdk.Sources.Utils
         public FluentStreamBuilder SourceDefinedCursor(bool value) => AddProperty(value, nameof(SourceDefinedCursor));
 
         /// <summary>
+        /// Optional Source-defined namespace for this stream.
+        /// </summary>
+        public FluentStreamBuilder Namespace(string value) => AddProperty(value, nameof(Namespace));
+
+        /// <summary>
         /// Use this variable to define page size for API http requests with pagination support
         /// </summary>
         public FluentStreamBuilder PageSize(int? value) => AddProperty(value, nameof(PageSize));
@@ -353,6 +358,11 @@ namespace Airbyte.Cdk.Sources.Utils
         public override bool SourceDefinedCursor
         {
             get => TryGetProperty(nameof(SourceDefinedCursor), out bool value) ? value : base.SourceDefinedCursor;
+        }
+
+        public override string? Namespace
+        {
+            get => TryGetProperty(nameof(Namespace), out string value) ? value : base.Namespace;
         }
 
         public override int? PageSize

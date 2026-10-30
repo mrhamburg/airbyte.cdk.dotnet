@@ -4,6 +4,8 @@
     {
         append,
         overwrite,
-        append_dedup
+        append_dedup,
+        update,
+        soft_delete
     }
 }

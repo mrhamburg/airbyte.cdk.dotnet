@@ -15,6 +15,7 @@ namespace Airbyte.Cdk.Sources.Utils
                 stream.SourceDefinedCursor = false;
                 stream.SupportedSyncModes = new[] { SyncMode.full_refresh };
                 stream.DefaultCursorField = null;
+                stream.IsResumable = false;
             }
 
             return coercedCatalog;
