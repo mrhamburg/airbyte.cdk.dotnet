@@ -1,0 +1,13 @@
+[
+  {
+    "type": "STREAM",
+    "stream": {
+      "stream_descriptor": {
+        "name": "historical"
+      },
+      "stream_state": {
+        "USD": "2021-05-18"
+      }
+    }
+  }
+]

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Text.Json;
 using Airbyte.Cdk.Models;
 
@@ -29,7 +30,12 @@ namespace Airbyte.Cdk
             if (!File.Exists(filepath))
                 throw new FileNotFoundException("Unable to find spec.json");
             var rawspec = ReadConfig(filepath);
-            return JsonSerializer.Deserialize<ConnectorSpecification>(rawspec.GetRawText());
+            var spec = JsonSerializer.Deserialize<ConnectorSpecification>(rawspec.GetRawText(),
+                AirbyteProtocolJson.Options)
+                ?? throw new InvalidOperationException("Unable to parse spec.json");
+
+            spec.ProtocolVersion ??= AirbyteProtocolVersion.Latest;
+            return spec;
         }
 
         public static void WriteConfig(JsonElement config, string configpath) => File.WriteAllText(configpath, config.GetRawText());

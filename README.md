@@ -32,6 +32,12 @@ Component | Type |Code | Installation | Version
 Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
 Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/source-exchange-rates-free` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-exchange-rates-free?sort=semver&style=flat)
 
+## Protocol compatibility
+
+The CDK targets the Airbyte protocol **v0.19.0** over the STDIO/JSON transport. Sources emit per-stream `STREAM` state messages (under `state.stream.stream_descriptor` and `state.stream.stream_state`) and include `sourceStats.recordCount`. On input, the `--state` file may contain a legacy stream-name map, a single `STREAM`/`GLOBAL`/`LEGACY` state message, an `AirbyteMessage` envelope, or a list of state messages. The socket/PROTOBUF transport is not implemented yet.
+
+Connector specifications should declare `protocol_version`; `Connector.Spec()` defaults it to `0.19.0` when it is absent.
+
 ## Concepts & Documentation
 This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
 
@@ -65,7 +71,7 @@ Several new pieces are essential to understand how incrementality works with the
 * `AirbyteStateMessage`
 * `Stream.GetUpdatedState`
 
-The `AirbyteStateMessage` is sent based on the `StateCheckpointInterval` setting of a stream object. Every N number of requests will result in sending out an `AirbyteStateMessage`. In the example below, this is every 25th request for the `symbols` stream.
+The `AirbyteStateMessage` is sent based on the `StateCheckpointInterval` setting of a stream object. Every N number of requests will result in sending out an `AirbyteStateMessage`. In the example below, this is every 25th request for the `symbols` stream. State is emitted as a per-stream `STREAM` message, not the legacy `{"state": {"data": ...}}` shape, and a terminal state is emitted for full refresh streams as well.
 
 The `CursorField` refers to the field in the stream's output records used to determine the "recency" or ordering of records. An example is a `date` field in an API, as shown in the example below.
 
