@@ -50,7 +50,23 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
         }
 
         [Fact]
-        public async Task Test_SuppressedState_DoesNotDropRecordCount()
+        public async Task Test_SuppressedFinalState_StillReportsCount()
+        {
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var stream = new FakeHttpStream(1, "{\"id\":1}", "{\"id\":1}");
+            stream.UpdatedState = _ => new { id = 1 }.AsJsonElement();
+
+            await stream.ReadRecords(new AirbyteLogger(_ => { }), SyncMode.incremental, channel.Writer,
+                "{}".AsJsonElement());
+
+            var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).Select(x => x.State).ToArray();
+            states.Length.ShouldBe(2);
+            states[0].SourceStats.RecordCount.ShouldBe(1);
+            states[1].SourceStats.RecordCount.ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task Test_DuplicateStateWithPendingRecords_IsEmitted()
         {
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
             var updateCount = 0;
@@ -61,24 +77,10 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
                 "{}".AsJsonElement());
 
             var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).Select(x => x.State).ToArray();
-            states.Length.ShouldBe(2);
+            states.Length.ShouldBe(3);
             states[0].SourceStats.RecordCount.ShouldBe(1);
-            states[1].SourceStats.RecordCount.ShouldBe(2);
-        }
-
-        [Fact]
-        public async Task Test_FirstRecord_EmitsRunningStatus()
-        {
-            var channel = Channel.CreateUnbounded<AirbyteMessage>();
-            var log = new List<AirbyteMessage>();
-            var stream = new FakeHttpStream(null, "{\"id\":1}");
-
-            await stream.ReadRecords(new AirbyteLogger(log.Add), SyncMode.incremental, channel.Writer,
-                "{}".AsJsonElement());
-
-            log.Any(x => x.Type == MessageType.TRACE &&
-                         x.Trace!.Type == AirbyteTraceType.STREAM_STATUS &&
-                         x.Trace!.StreamStatus!.Status == AirbyteStreamStatus.RUNNING).ShouldBeTrue();
+            states[1].SourceStats.RecordCount.ShouldBe(1);
+            states[2].SourceStats.RecordCount.ShouldBe(1);
         }
 
         private static async Task<List<AirbyteMessage>> ReadAll(Channel<AirbyteMessage> channel)

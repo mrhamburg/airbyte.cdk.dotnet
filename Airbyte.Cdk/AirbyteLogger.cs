@@ -8,6 +8,12 @@ namespace Airbyte.Cdk
 {
     public class AirbyteLogger
     {
+        /// <summary>
+        /// Exception.Data key used to avoid emitting a second, generic trace for an error
+        /// that already produced a stream-scoped trace.
+        /// </summary>
+        public const string TraceEmittedDataKey = "AirbyteTraceEmitted";
+
         private readonly Action<AirbyteMessage> _sink;
 
         public AirbyteLogger() : this(message => AirbyteEntrypoint.ToConsole(message))

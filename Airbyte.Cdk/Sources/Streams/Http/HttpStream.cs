@@ -281,10 +281,6 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                     recordsSinceState++;
                     lastitem = item;
 
-                    if (recordcount == 1)
-                        Logger.TraceStreamStatus(new StreamDescriptor { Name = Name, Namespace = Namespace },
-                            AirbyteStreamStatus.RUNNING);
-
                     //Check record limit
                     if (Limitreached()) break;
 

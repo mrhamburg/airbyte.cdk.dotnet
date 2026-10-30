@@ -173,10 +173,23 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var emitter = new StateEmitter(channel.Writer);
             var descriptor = new StreamDescriptor { Name = "users" };
 
+            await emitter.EmitAsync(descriptor, "{\"id\":1}".AsJsonElement(), 0);
+            await emitter.EmitAsync(descriptor, "{\"id\":1}".AsJsonElement(), 0);
+
+            channel.Reader.Count.ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task Test_StateEmitter_EmitsSameStateWithPendingCount()
+        {
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var emitter = new StateEmitter(channel.Writer);
+            var descriptor = new StreamDescriptor { Name = "users" };
+
             await emitter.EmitAsync(descriptor, "{\"id\":1}".AsJsonElement(), 1);
             await emitter.EmitAsync(descriptor, "{\"id\":1}".AsJsonElement(), 1);
 
-            channel.Reader.Count.ShouldBe(1);
+            channel.Reader.Count.ShouldBe(2);
         }
 
         [Fact]

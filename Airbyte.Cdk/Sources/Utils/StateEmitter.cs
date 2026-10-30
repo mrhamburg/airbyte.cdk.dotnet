@@ -16,6 +16,7 @@ namespace Airbyte.Cdk.Sources.Utils
     {
         private readonly ChannelWriter<AirbyteMessage> _channel;
         private readonly Dictionary<string, string> _lastEmitted = new();
+        private readonly object _sync = new();
 
         public StateEmitter(ChannelWriter<AirbyteMessage> channel) => _channel = channel;
 
@@ -23,22 +24,38 @@ namespace Airbyte.Cdk.Sources.Utils
         {
             var key = Key(descriptor);
             var stateJson = state?.GetRawText() ?? "null";
-            if (_lastEmitted.TryGetValue(key, out var previous) && previous == stateJson)
-                return false;
+
+            lock (_sync)
+            {
+                // A pending record count is meaningful even when the state blob is unchanged; it is
+                // how the platform learns how many records the last checkpoint covered.
+                if (recordCount == 0 &&
+                    _lastEmitted.TryGetValue(key, out var previous) &&
+                    previous == stateJson)
+                    return false;
+
+                _lastEmitted[key] = stateJson;
+            }
 
             var message = StateMessageFactory.Create(descriptor, state, recordCount);
             await _channel.WriteAsync(new AirbyteMessage { Type = MessageType.STATE, State = message });
-            _lastEmitted[key] = stateJson;
             return true;
         }
 
         /// <summary>
         /// Records a state message written directly by a custom stream.
         /// </summary>
-        public void MarkEmitted(StreamDescriptor descriptor) =>
-            _lastEmitted[Key(descriptor)] = "\u0000observed";
+        public void MarkEmitted(StreamDescriptor descriptor)
+        {
+            lock (_sync)
+                _lastEmitted[Key(descriptor)] = "\u0000observed";
+        }
 
-        public bool HasEmitted(StreamDescriptor descriptor) => _lastEmitted.ContainsKey(Key(descriptor));
+        public bool HasEmitted(StreamDescriptor descriptor)
+        {
+            lock (_sync)
+                return _lastEmitted.ContainsKey(Key(descriptor));
+        }
 
         private static string Key(StreamDescriptor descriptor) =>
             descriptor.Name + "\u0000" + (descriptor.Namespace ?? string.Empty);

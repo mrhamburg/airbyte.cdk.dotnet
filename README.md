@@ -43,6 +43,7 @@ Connector specifications should declare `protocol_version`; `Connector.Spec()` d
 - Sources now emit per-stream `STREAM` state instead of legacy `{"state":{"data":...}}` messages. Legacy state files are still accepted on input.
 - The state passed to a source can now be a JSON array of per-stream state messages. `AbstractSource.State` remains a `JsonElement`, but callers must not assume it is an object.
 - Destinations must flush pending records before returning from `Destination.Write` when the message is a `STATE`; the CDK echoes that state immediately after `Write` returns.
+- Do not mix legacy `data` state and per-stream `STREAM` state within one source/sync; pick one representation.
 - Connector package pins should move to the next published CDK version before a connector image is rebuilt with these changes.
 
 ## Concepts & Documentation

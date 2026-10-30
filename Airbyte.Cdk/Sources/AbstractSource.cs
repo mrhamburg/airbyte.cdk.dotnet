@@ -102,9 +102,10 @@ namespace Airbyte.Cdk.Sources
             var trackingChannel = new StateTrackingChannelWriter(channel, stateEmitter);
             Channel = trackingChannel;
 
-            // Route logs and traces through the same channel as records/state so they cannot print out of order.
-            logger = new AirbyteLogger(message => trackingChannel.TryWrite(message));
+            // The caller owns the logger. The entry point supplies a channel-backed logger so logs and
+            // traces stay ordered with records/state; direct hosts may supply their own sink.
             Logger = logger;
+            trackingChannel.Logger = logger;
 
             var stateManager = new ConnectorStateManager(StateReader.Parse(state));
 
@@ -135,7 +136,7 @@ namespace Airbyte.Cdk.Sources
                             Name = streamInstance.Name,
                             Namespace = streamInstance.Namespace
                         });
-                    e.Data["AirbyteTraceEmitted"] = true;
+                    e.Data[AirbyteLogger.TraceEmittedDataKey] = true;
                     throw;
                 }
             }

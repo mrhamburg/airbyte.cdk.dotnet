@@ -46,8 +46,8 @@ namespace Airbyte.Cdk.Tests.Sources
             var source = new StateEmissionSource();
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
 
-            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
-                Catalog("users", SyncMode.full_refresh, "public"), "{}".AsJsonElement());
+            await source.Read(new AirbyteLogger(message => channel.Writer.TryWrite(message)), channel.Writer,
+                "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh, "public"), "{}".AsJsonElement());
             channel.Writer.Complete();
 
             var statuses = (await ReadAll(channel))
@@ -65,7 +65,8 @@ namespace Airbyte.Cdk.Tests.Sources
             var source = new FailingSource();
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
 
-            await Should.ThrowAsync<InvalidOperationException>(() => source.Read(new AirbyteLogger(_ => { }),
+            await Should.ThrowAsync<InvalidOperationException>(() => source.Read(
+                new AirbyteLogger(message => channel.Writer.TryWrite(message)),
                 channel.Writer, "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement()));
             channel.Writer.Complete();
 
@@ -83,8 +84,8 @@ namespace Airbyte.Cdk.Tests.Sources
             var source = new OrderedSource();
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
 
-            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
-                Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement());
+            await source.Read(new AirbyteLogger(message => channel.Writer.TryWrite(message)), channel.Writer,
+                "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement());
             channel.Writer.Complete();
 
             var messages = await ReadAll(channel);
@@ -97,6 +98,19 @@ namespace Airbyte.Cdk.Tests.Sources
             record.ShouldBeGreaterThan(started);
             state.ShouldBeGreaterThan(record);
             complete.ShouldBeGreaterThan(state);
+        }
+
+        [Fact]
+        public async Task Test_ReadEmitsRunningForCustomStream()
+        {
+            var source = new OrderedSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+
+            await source.Read(new AirbyteLogger(message => channel.Writer.TryWrite(message)), channel.Writer,
+                "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement());
+            channel.Writer.Complete();
+
+            (await ReadAll(channel)).Any(x => IsStatus(x, AirbyteStreamStatus.RUNNING)).ShouldBeTrue();
         }
 
         [Fact]

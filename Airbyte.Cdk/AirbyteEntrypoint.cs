@@ -72,7 +72,7 @@ namespace Airbyte.Cdk
             }
             catch (Exception e)
             {
-                if (!e.Data.Contains("AirbyteTraceEmitted"))
+                if (!e.Data.Contains(AirbyteLogger.TraceEmittedDataKey))
                     Logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
                         e.StackTrace, AirbyteFailureType.system_error);
                 Logger.Fatal($"Exception ({e.GetType()}): {e.Message}");
@@ -138,12 +138,15 @@ namespace Airbyte.Cdk
                                 var state = GetState(source, readOptions);
                                 var config = GetConfig(spec);
                                 var catalog = GetCatalog();
-                                await source.Read(Logger, writer, config, catalog, state);
+
+                                // Keep source logs/traces ordered with records and state.
+                                var sourceLogger = new AirbyteLogger(message => writer.TryWrite(message));
+                                await source.Read(sourceLogger, writer, config, catalog, state);
                             }
                             catch (Exception e)
                             {
                                 Logger.Exception(e);
-                                if (!e.Data.Contains("AirbyteTraceEmitted"))
+                                if (!e.Data.Contains(AirbyteLogger.TraceEmittedDataKey))
                                     Logger.TraceError("The connector failed",
                                         $"{e.GetType().Name}: {e.Message}", e.StackTrace,
                                         AirbyteFailureType.system_error);
