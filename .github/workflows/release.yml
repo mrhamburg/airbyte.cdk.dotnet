@@ -66,9 +66,13 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
+      # The temporary key is passed through the environment rather than interpolated
+      # into the script, so it never appears in the rendered `run:` command.
       - name: Push to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: >
           dotnet nuget push "./artifacts/*.nupkg"
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --api-key "$NUGET_API_KEY"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
