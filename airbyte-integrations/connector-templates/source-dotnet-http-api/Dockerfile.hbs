@@ -7,6 +7,8 @@ WORKDIR $WORKDIR
 
 COPY . ./
 
+WORKDIR $WORKDIR/airbyte-integrations/connectors/source-{{connectorname}}
+
 RUN dotnet test
 RUN dotnet build -c Release -o output
 
@@ -16,7 +18,7 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
 ENV WORKDIR=/airbyte/integration_code
 WORKDIR $WORKDIR
 
-COPY --from=build /airbyte/build/output .
+COPY --from=build /airbyte/build/airbyte-integrations/connectors/source-{{connectorname}}/output .
 
 ENV AIRBYTE_IMPL_PATH="/airbyte/integration_code/{{connectorname}}.dll"
 ENV AIRBYTE_IMPL_MODULE="Program"

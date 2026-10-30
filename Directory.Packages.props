@@ -4,23 +4,22 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Source packages -->
-    <PackageVersion Include="Airbyte.Cdk" Version="0.0.2-preview" />
-    <PackageVersion Include="CliWrap" Version="3.3.3" />
-    <PackageVersion Include="CommandLineParser" Version="2.8.0" />
-    <PackageVersion Include="Flurl.Http" Version="3.2.0" />
-    <PackageVersion Include="Handlebars.Net" Version="2.0.10" />
+    <PackageVersion Include="Airbyte.Cdk" Version="0.0.6" />
+    <PackageVersion Include="CliWrap" Version="3.10.5" />
+    <PackageVersion Include="CommandLineParser" Version="2.9.1" />
+    <PackageVersion Include="Flurl.Http" Version="4.0.2" />
+    <PackageVersion Include="Handlebars.Net" Version="2.4.3" />
     <PackageVersion Include="JsonCons.JsonPath" Version="1.1.0" />
-    <PackageVersion Include="JsonSchema.Net" Version="1.12.0" />
-    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageVersion Include="Polly" Version="7.2.2" />
-    <PackageVersion Include="Spectre.Console" Version="0.43.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.5.0" />
+    <PackageVersion Include="Polly" Version="8.9.0" />
+    <PackageVersion Include="Spectre.Console" Version="0.57.2" />
 
     <!-- Test packages -->
-    <PackageVersion Include="coverlet.collector" Version="3.1.0" />
-    <PackageVersion Include="FluentAssertions" Version="6.3.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
-    <PackageVersion Include="Moq" Version="4.16.1" />
-    <PackageVersion Include="xunit" Version="2.4.1" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.3" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="FluentAssertions" Version="8.11.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="Moq" Version="4.21.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
   </ItemGroup>
 </Project>

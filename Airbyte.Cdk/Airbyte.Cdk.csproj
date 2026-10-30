@@ -27,7 +27,6 @@
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="JsonCons.JsonPath" />
     <PackageReference Include="JsonSchema.Net" />
-    <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="Polly" />
     <PackageReference Include="Spectre.Console" />
   </ItemGroup>

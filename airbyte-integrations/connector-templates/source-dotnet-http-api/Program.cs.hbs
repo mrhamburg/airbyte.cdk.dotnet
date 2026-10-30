@@ -23,7 +23,8 @@ namespace {{connectorname}}
             {
                 return UrlBase.AppendPathSegment("ip")
                     .GetAsync()
-                    .Result.GetJsonAsync().Result.success;
+                    .Result.GetJsonAsync<JsonElement>()
+                    .Result.GetProperty("success").GetBoolean();
             }
             catch (Exception e)
             {

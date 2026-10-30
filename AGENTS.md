@@ -56,6 +56,7 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 - Tests use xUnit with FluentAssertions and Moq. Name tests `Test_<Behavior>` and place them under the matching namespace/folder in `Airbyte.Cdk.Tests`.
 - The fluent builder is immutable: each method returns a new `FluentStreamBuilder`. Add new builder options as `AddProperty`/`AddFunc` entries and expose them on `GenericStream` with the matching `TryGetProperty`/`TryGetMethod` fallback pattern.
 - Package versions are centralized in `Directory.Packages.props` (Central Package Management). Add a `PackageVersion` there instead of a `Version` attribute on `PackageReference`.
+- Connector Docker images must be built from the repository root so that file is in the build context: `docker build -f airbyte-integrations/connectors/<connector>/Dockerfile -t <tag> .`.
 - There is no `.editorconfig` or formatter configuration. Do not introduce new formatting/linting tooling as part of an unrelated change.
 - Keep new XML doc comments consistent with the existing prose in `Stream.cs` and `StreamBuilder.cs`.
 

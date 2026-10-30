@@ -123,7 +123,7 @@ Once ready, check the README.md file in your connector directory for instruction
 
 * Iterate on the code locally
 * Run tests via `dotnet test`
-* Try to build the connector using docker `docker build .`
+* Try to build the connector using docker from the repository root: `docker build -f airbyte-integrations/connectors/<connector>/Dockerfile .`
 
 #### Testing
 

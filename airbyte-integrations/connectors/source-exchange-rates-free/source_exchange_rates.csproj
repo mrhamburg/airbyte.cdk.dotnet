@@ -10,7 +10,6 @@
   <ItemGroup>
     <PackageReference Include="Airbyte.Cdk" />
     <PackageReference Include="Flurl.Http" />
-    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
   <ItemGroup>
