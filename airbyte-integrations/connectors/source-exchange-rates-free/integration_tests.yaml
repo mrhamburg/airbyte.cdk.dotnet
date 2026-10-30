@@ -1,0 +1,24 @@
+connector:
+  module: ExchangeRates
+
+tests:
+  - name: full refresh
+    config:
+      start_date: "2026-10-01"
+      base: USD
+    limit: 50
+    streams:
+      - name: symbols
+      - name: latest
+
+  - name: incremental from state
+    config:
+      start_date: "2026-10-01"
+      base: USD,EUR
+    limit: 5
+    streams:
+      - name: historical
+        sync_mode: incremental
+        state:
+          historical:
+            USD: "2026-10-20"
