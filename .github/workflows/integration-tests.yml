@@ -116,15 +116,17 @@ jobs:
         env:
           CONNECTOR: ${{ matrix.connector }}
           EVENT_NAME: ${{ github.event_name }}
-          # One repository secret holding a JSON object of connector credentials, for example
-          # {"SOURCE_EXAMPLE_API_KEY": "..."} — see README, Integration tests.
+          # A PostgreSQL secret store wins when it is configured; every connection detail comes from the
+          # environment, so nothing lands in the repository. Otherwise a JSON object can supply the same keys.
+          SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ secrets.SECRETS_POSTGRESQL_CONNECTION_STRING }}
+          SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY }}
           AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
         run: |
           # On main a skipped scenario is a failure, because a skip there looks green while proving nothing.
-          # That only holds once a secret store is configured: before the first AIRBYTE_INTEGRATION_SECRETS_JSON
-          # exists every credential is missing, and enforcing it would make every credentialed connector red.
+          # That only holds once a secret store is configured: before the first credentials exist every key is
+          # missing, and enforcing it would make every credentialed connector red.
           extra=""
-          if [ "$EVENT_NAME" = "push" ] && [ -n "$AIRBYTE_INTEGRATION_SECRETS_JSON" ]; then
+          if [ "$EVENT_NAME" = "push" ] && [ -n "$SECRETS_POSTGRESQL_CONNECTION_STRING$AIRBYTE_INTEGRATION_SECRETS_JSON" ]; then
             extra="--no-skip"
           fi
           dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- run --connector "$CONNECTOR" $extra

@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="mrhamburg.SecretsManager" />
+    <PackageReference Include="mrhamburg.SecretsManager.PostgreSql" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
