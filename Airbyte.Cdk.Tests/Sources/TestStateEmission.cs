@@ -33,9 +33,9 @@ namespace Airbyte.Cdk.Tests.Sources
 
             var stateMessages = messages.Where(x => x.Type == MessageType.STATE).ToArray();
             stateMessages.Length.ShouldBe(1);
-            stateMessages[0].State.Type.ShouldBe(AirbyteStateType.STREAM);
-            stateMessages[0].State.Stream.StreamDescriptor.Name.ShouldBe("users");
-            stateMessages[0].State.Stream.StreamState.Value.ValueKind.ShouldBe(JsonValueKind.Object);
+            stateMessages[0].State!.Type.ShouldBe(AirbyteStateType.STREAM);
+            stateMessages[0].State!.Stream!.StreamDescriptor.Name.ShouldBe("users");
+            stateMessages[0].State!.Stream!.StreamState!.Value.ValueKind.ShouldBe(JsonValueKind.Object);
         }
 
         [Fact]
@@ -73,7 +73,7 @@ namespace Airbyte.Cdk.Tests.Sources
 
             public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
             {
-                exc = null;
+                exc = null!;
                 return true;
             }
 
@@ -90,7 +90,7 @@ namespace Airbyte.Cdk.Tests.Sources
 
             public override Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
                 ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
-                string[] cursorfield = null, Dictionary<string, object> streamslice = null)
+                string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
             {
                 ReceivedState = streamstate;
                 return Task.FromResult(0L);

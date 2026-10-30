@@ -86,8 +86,8 @@ namespace Airbyte.Cdk.Sources.Streams
         public abstract Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode, ChannelWriter<AirbyteMessage> streamchannel,
             JsonElement streamstate,
             long? recordlimit = null,
-            string[] cursorfield = null,
-            Dictionary<string, object> streamslice = null);
+            string[]? cursorfield = null,
+            Dictionary<string, object>? streamslice = null);
 
         /// <summary>
         /// The default implementation of this method looks for a JSONSchema file with the same name as this stream's "name" property.

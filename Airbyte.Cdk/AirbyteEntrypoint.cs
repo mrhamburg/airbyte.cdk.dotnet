@@ -3,10 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.Unicode;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Airbyte.Cdk.Destinations;
@@ -76,6 +73,7 @@ namespace Airbyte.Cdk
             catch (Exception e)
             {
                 Logger.Fatal($"Exception ({e.GetType()}): {e.Message}");
+                Environment.ExitCode = 1;
             }
         }
 
@@ -143,10 +141,12 @@ namespace Airbyte.Cdk
                             {
                                 Logger.Exception(e);
                                 Logger.Fatal("Could not process data due to exception: " + e.Message);
+                                Environment.ExitCode = 1;
                             }
-
-                            //Set to complete!
-                            writer.Complete();
+                            finally
+                            {
+                                writer.Complete();
+                            }
                         }),
                         Task.Run(async () =>
                         {
@@ -159,24 +159,43 @@ namespace Airbyte.Cdk
                     break;
                 case "write":
                     Channel<AirbyteMessage> writerChannel = Channel.CreateUnbounded<AirbyteMessage>();
+                    var config = GetConfig(spec);
+                    var catalog = GetCatalog();
                     var writetasks = new[]
                     {
                         Task.Run(async () =>
                         {
                             var writer = writerChannel.Writer;
-                            while (true) // Loop forever, no state end message?
+                            try
                             {
-                                var text = await Console.In.ReadLineAsync();
-                                if (TryGetAirbyteMessage(text, out var msg))
-                                    await writer.WriteAsync(msg);
+                                while (true)
+                                {
+                                    var text = await Console.In.ReadLineAsync();
+                                    if (text == null)
+                                        break;
+
+                                    if (AirbyteProtocolReader.TryParseMessage(text, out var msg))
+                                        await writer.WriteAsync(msg!);
+                                    else
+                                        Logger.Warn("Dropping input that is not a valid AirbyteMessage");
+                                }
+                            }
+                            finally
+                            {
+                                writer.Complete();
                             }
                         }),
                         Task.Run(async () =>
                         {
                             var destination = GetDestination();
                             await foreach (var msg in writerChannel.Reader.ReadAllAsync())
-                                await destination.Write(Logger, GetConfig(spec),
-                                    JsonSerializer.Deserialize<ConfiguredAirbyteCatalog>(Options.Catalog), msg);
+                            {
+                                await destination.Write(Logger, config, catalog, msg);
+
+                                // Destinations must return state in the order it was received.
+                                if (msg.Type == Type.STATE)
+                                    ToConsole(msg);
+                            }
                         })
                     };
 
@@ -185,22 +204,6 @@ namespace Airbyte.Cdk
                 default:
                     throw new NotImplementedException($"Unexpected command: {Options.Command}");
             }
-        }
-
-        private static bool TryGetAirbyteMessage(string input, out AirbyteMessage msg)
-        {
-            msg = null;
-            try
-            {
-                msg = JsonSerializer.Deserialize<AirbyteMessage>(input);
-                return true;
-            }
-            catch
-            {
-                //TODO: do some logging?
-            }
-
-            return false;
         }
 
         private static JsonElement GetConfig(ConnectorSpecification spec)
@@ -225,18 +228,11 @@ namespace Airbyte.Cdk
 
         private static ConfiguredAirbyteCatalog GetCatalog()
         {
-            if (TryGetPath(Options.Catalog, out var filepath))
-            {
-                Logger.Info($"Found catalog at location: {filepath}");
-                var contents = File.ReadAllText(filepath);
-                //Logger.Debug($"Catalog file contents: {contents}");
-                return JsonSerializer.Deserialize<ConfiguredAirbyteCatalog>(contents,
-                    new JsonSerializerOptions
-                    {
-                        Converters = { new JsonStringEnumConverter() }
-                    });
-            }
-            else throw new FileNotFoundException("Cannot find catalog file: " + filepath);
+            if (!TryGetPath(Options.Catalog, out var filepath))
+                throw new FileNotFoundException("Cannot find catalog file: " + Options.Catalog);
+
+            Logger.Info($"Found catalog at location: {filepath}");
+            return AirbyteProtocolReader.ReadCatalog(filepath);
         }
 
         private static JsonElement GetState(Source source, ReadOptions readoptions)
@@ -267,13 +263,7 @@ namespace Airbyte.Cdk
         }
 
         public static void ToConsole<T>(T item) where T : AirbyteMessage =>
-            Console.WriteLine(Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(item, new JsonSerializerOptions
-            {
-                WriteIndented = false,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                Converters = { new JsonStringEnumConverter() },
-                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
-            })));
+            Console.WriteLine(JsonSerializer.Serialize(item, AirbyteProtocolJson.Options));
 
     }
 }
