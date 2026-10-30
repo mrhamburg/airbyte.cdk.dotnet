@@ -31,6 +31,7 @@ Component | Type |Code | Installation | Version
 ----------|------|-----|------|--------
 Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
 Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/source-exchange-rates-free` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-exchange-rates-free?sort=semver&style=flat)
+Jortt | Source | [source-jortt](airbyte-integrations/connectors/source-jortt) | `docker pull airbytedotnet/source-jortt` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-jortt?sort=semver&style=flat)
 
 ## Protocol compatibility
 

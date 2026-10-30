@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ledger_account_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "parent_ledger_account_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "selectable": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    }
+  },
+  "required": [
+    "ledger_account_id",
+    "parent_ledger_account_id",
+    "name",
+    "selectable"
+  ]
+}

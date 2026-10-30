@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "iban": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "bank": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "in_the_name_of": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "bic": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "archived": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "iban",
+    "bank",
+    "in_the_name_of",
+    "bic",
+    "archived"
+  ]
+}

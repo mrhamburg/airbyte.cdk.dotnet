@@ -1,0 +1,29 @@
+# Build and test implementation
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+ARG BUILD_VERSION="0.0.1"
+ENV WORKDIR=/airbyte/build
+WORKDIR $WORKDIR
+
+COPY . ./
+
+WORKDIR $WORKDIR/airbyte-integrations/connectors/source-jortt
+
+RUN dotnet test
+RUN dotnet build -c Release -o output
+
+# Run implementation
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+
+ENV WORKDIR=/airbyte/integration_code
+WORKDIR $WORKDIR
+
+COPY --from=build /airbyte/build/airbyte-integrations/connectors/source-jortt/output .
+
+ENV AIRBYTE_IMPL_PATH="/airbyte/integration_code/source_jortt.dll"
+ENV AIRBYTE_IMPL_MODULE="Jortt"
+ENV AIRBYTE_ENTRYPOINT "dotnet /airbyte/integration_code/source_jortt.dll read --command"
+ENTRYPOINT ["dotnet", "/airbyte/integration_code/source_jortt.dll", "read", "--command"]
+
+LABEL io.airbyte.version=$BUILD_VERSION
+LABEL io.airbyte.name=airbytedotnet/source-jortt
