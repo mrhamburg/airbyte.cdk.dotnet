@@ -9,17 +9,20 @@
 
   <ItemGroup>
     <PackageReference Include="Airbyte.Cdk" />
-    <PackageReference Include="Flurl.Http" />
+    <!-- Airbyte.Cdk 0.0.6 is built against Flurl.Http 3.2.x; using the repo's 4.x pin causes a runtime Method not found. -->
+    <PackageReference Include="Flurl.Http" VersionOverride="3.2.0" />
+    <!-- Flurl 3.2.x pulls Newtonsoft.Json 12.x; use the patched release. -->
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="schemas\historical.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="schemas\symbols.json">
+    <None Update="schemas\latest.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="schemas\vat_rates.json">
+    <None Update="schemas\symbols.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="spec.json">

@@ -16,17 +16,19 @@ namespace source_exchange_rates
     {
         public static async Task Main(string[] args) => await AirbyteEntrypoint.Main(args);
 
-        public string UrlBase => "https://api.exchangerate.host";
+        public string UrlBase => "https://api.frankfurter.dev/v1";
 
         public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
         {
             exc = null;
             try
             {
-                return UrlBase.AppendPathSegment("latest")
+                var response = UrlBase.AppendPathSegment("latest")
+                    .SetQueryParam("base", "USD")
                     .GetAsync()
-                    .Result.GetJsonAsync<JsonElement>()
-                    .Result.GetProperty("success").GetBoolean();
+                    .Result;
+
+                return response.StatusCode == 200;
             }
             catch (Exception e)
             {
@@ -38,82 +40,94 @@ namespace source_exchange_rates
 
         public override Stream[] Streams(JsonElement config)
         {
-            var baseimpl = UrlBase.HttpStream().ParseResponseObject("$");
-            var baseimpl_symbols = baseimpl
-                //.CacheResultsForStream("historical", "$.symbols[*].code", (jsondocument, _) => jsondocument.ToList()) TODO: cannot handle dependencies... yet
-                .Create("symbols");
-            var vatrates = baseimpl.Create("vat_rates");
+            var baseimpl = UrlBase.HttpStream()
+                .ParseResponseObject("$")
+                .MaxRetries(3)
+                .ShouldRetry(exc => exc.StatusCode == 429 || (exc.StatusCode >= 500 && exc.StatusCode < 600))
+                .BackoffTime((retryCount, _) => TimeSpan.FromSeconds(Math.Max(5, retryCount * 5)));
 
-            DateTime? _lastDateTime = null;
-            string _currentsymbol = "";
-            string[] _configuredsymbols = config.TryGetProperty("base", out var symbols)
-                ? symbols.GetString().Split(",").Select(x => x.Replace(" ", "").ToUpper()).ToArray()
+            var configuredSymbols = config.TryGetProperty("base", out var baseElement)
+                ? (baseElement.GetString() ?? string.Empty)
+                    .Split(",")
+                    .Select(x => x.Replace(" ", "").ToUpper())
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToArray()
                 : Array.Empty<string>();
-            Dictionary<string, DateTime> _currentstate = new Dictionary<string, DateTime>();
+            var baseCurrency = configuredSymbols.FirstOrDefault() ?? "EUR";
 
-            var incrementalimpl = baseimpl
+            var symbols = baseimpl
+                .Path((_, _, _) => "currencies")
+                .Create("symbols");
+
+            var latest = baseimpl
+                .Path((_, _, _) => "latest")
+                .RequestParams((_, _, _) => new Dictionary<string, object> { { "base", baseCurrency } })
+                .Create("latest");
+
+            DateTime? lastDateTime = null;
+            var currentState = new Dictionary<string, DateTime>();
+
+            var historical = baseimpl
                 .CursorField(new[] { "date" })
-                .BackoffTime(((i, _) => TimeSpan.FromMinutes(i * 10)))
-                .GetUpdatedState((_, _) => _currentstate.AsJsonElement())
+                .BackoffTime((i, _) => TimeSpan.FromSeconds(Math.Max(5, i * 5)))
+                .GetUpdatedState((_, _) => currentState.AsJsonElement())
                 .NextPageToken((request, _) =>
                 {
-                    DateTime date = DateTime.Parse(request.Url.PathSegments[0]);
-                    var symbol = request.Url.QueryParams.FirstOrDefault("base").ToString();
+                    var lastSegment = request.Url.PathSegments.LastOrDefault();
+                    if (lastSegment == null || !DateTime.TryParse(lastSegment, out var date))
+                        return null;
+
+                    var symbol = request.Url.QueryParams.FirstOrDefault("base")?.ToString() ?? baseCurrency;
                     if (date >= DateTime.Today.AddDays(-1))
                     {
-                        var symbols = _configuredsymbols.Length > 0
-                            ? _configuredsymbols.ToList()
+                        var symbolsToSync = configuredSymbols.Length > 0
+                            ? configuredSymbols.ToList()
                             : new List<string> { "EUR" };
-                        int symbolnr = symbols.FindIndex(x => x == symbol) + 1;
-                        if (symbolnr == symbols.Count)
+                        var symbolIndex = symbolsToSync.FindIndex(x => x == symbol) + 1;
+                        if (symbolIndex >= symbolsToSync.Count)
                             return null;
-                        symbol = symbols[symbolnr];
-                        _currentsymbol = symbol;
-                        _lastDateTime = null;
+
+                        symbol = symbolsToSync[symbolIndex];
+                        lastDateTime = null;
                     }
                     else
-                        _currentstate[symbol] = date;
+                    {
+                        currentState[symbol] = date;
+                    }
 
                     return new Dictionary<string, object> { { "symbol", symbol } };
                 })
                 .Path((state, _, nextpagetoken) =>
                 {
-                    var inputstate = state.ToType<Dictionary<string, DateTime>>();
-                    if (inputstate.Count > 0 && _currentstate.Count == 0)
-                        _currentstate = inputstate;
+                    var inputState = state.ToType<Dictionary<string, DateTime>>();
+                    if (inputState != null && inputState.Count > 0 && currentState.Count == 0)
+                        currentState = inputState;
 
-                    if (nextpagetoken != null && _currentstate.ContainsKey(nextpagetoken["symbol"].ToString()))
+                    if (nextpagetoken != null &&
+                        currentState.ContainsKey(nextpagetoken["symbol"].ToString()))
                     {
-                        DateTime dt = _currentstate[nextpagetoken["symbol"].ToString()].AddDays(1);
-                        if (_lastDateTime.HasValue && _lastDateTime >= dt)
-                            dt = _lastDateTime.Value.AddDays(1);
+                        var date = currentState[nextpagetoken["symbol"].ToString()].AddDays(1);
+                        if (lastDateTime.HasValue && lastDateTime >= date)
+                            date = lastDateTime.Value.AddDays(1);
 
-                        _lastDateTime = dt;
-                        return dt.ToString("yyyy-MM-dd");
+                        lastDateTime = date;
+                        return date.ToString("yyyy-MM-dd");
                     }
-                    else if (nextpagetoken == null && _currentstate.Count > 0)
-                        return _currentstate.Min(x => x.Value).ToString("yyyy-MM-dd");
-                    else
-                        return config.TryGetProperty("start_date", out var startdate) ? startdate.GetString() : "2008-01-01";
+
+                    if (nextpagetoken == null && currentState.Count > 0)
+                        return currentState.Min(x => x.Value).ToString("yyyy-MM-dd");
+
+                    return config.TryGetProperty("start_date", out var startDate)
+                        ? startDate.GetString()
+                        : "2008-01-01";
                 })
                 .RequestParams((_, _, nextpagetoken) => new Dictionary<string, object>
                 {
-                    {
-                        "base", nextpagetoken != null
-                        ? nextpagetoken["symbol"]
-                        : _configuredsymbols.Length > 0
-                            ? _configuredsymbols[0]
-                            : "EUR"
-                    }
+                    { "base", nextpagetoken != null ? nextpagetoken["symbol"] : baseCurrency }
                 })
                 .Create("historical");
 
-            return new Stream[]
-            {
-                baseimpl_symbols,
-                vatrates,
-                incrementalimpl
-            };
+            return new Stream[] { symbols, latest, historical };
         }
     }
 }
