@@ -183,15 +183,20 @@ drift is reported instead of silently accepted. Typed maps (an object whose sche
 than drift. Schemas composed with `allOf`/`anyOf`/`oneOf` or `$ref` are left open, because closing one
 branch would reject the fields declared by its siblings.
 
-A scenario with `limit` stops the connector once **each** listed stream has produced that many records, so a
-chatty stream cannot starve the ones after it.
+A scenario with `limit` stops the connector once **each** listed stream has produced that many records, and keeps
+at most that many records per stream for validation. Streams are read one after another, so the first stream is
+still fetched in full until the later ones reach the cap; the retained slice keeps memory bounded regardless.
 
-Secrets are resolved through the `ISecretSource` seam. This repository ships the environment-backed
-implementation, so a secret key is an environment variable name; the SecretsManager PostgreSQL provider
-plugs into the same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as
-passed, and the workflow passes `--no-skip` on `main` so a missing secret fails the build there. To supply a
-credential in CI, add a repository secret and expose it as an environment variable of the same name in
-`.github/workflows/integration-tests.yml`.
+An `incremental` scenario must also emit at least one `STATE` message, so a connector that degrades to a full
+refresh cannot pass quietly.
+
+Secrets are resolved through the `ISecretSource` seam. Two implementations ship: environment variables (a secret
+key is the variable name) and a JSON object supplied through `AIRBYTE_INTEGRATION_SECRETS_JSON`, which lets CI pass
+every connector credential through one repository secret. The SecretsManager PostgreSQL provider plugs into the
+same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as passed; the workflow
+passes `--no-skip` on `main`, so a missing secret fails the build there. Secret values are masked in error output,
+and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in which case the secret
+values in it are masked.
 
 `.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
 a push to `main`.

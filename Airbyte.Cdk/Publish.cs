@@ -88,7 +88,8 @@ namespace Airbyte.Cdk
             // Only version headings count. Release notes mention other versions (for example a dependency
             // upgrade), and scraping those makes the release workflow try to reuse an existing image tag.
             var versions = Regex
-                .Matches(File.ReadAllText(changelog), @"^\s*#{2,}\s+v?(?<version>\d+(?:\.\d+){1,3})\s*$",
+                .Matches(File.ReadAllText(changelog),
+                    @"^\s*#{1,6}\s+\[?v?(?<version>\d+(?:\.\d+){1,3})\]?(?=$|[\s(–—-])",
                     RegexOptions.Multiline)
                 .Select(x => Version.TryParse(x.Groups["version"].Value, out var parsed) ? parsed : null)
                 .Where(x => x != null)

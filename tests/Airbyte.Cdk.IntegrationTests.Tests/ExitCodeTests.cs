@@ -7,10 +7,14 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
 {
     public class ExitCodeTests
     {
-        private static ConnectorResult Result(Status status) => new(
+        private static ConnectorResult Result(params Status[] statuses) => new(
             "airbyte-integrations/connectors/source-example",
-            status,
-            new[] { new TestResult("case", status, System.Array.Empty<StreamResult>(), System.Array.Empty<string>()) },
+            statuses.Contains(Status.Failed)
+                ? Status.Failed
+                : statuses.All(x => x == Status.Skipped) ? Status.Skipped : Status.Passed,
+            statuses.Select((status, index) =>
+                    new TestResult($"case-{index}", status, System.Array.Empty<StreamResult>(), System.Array.Empty<string>()))
+                .ToList(),
             System.Array.Empty<string>());
 
         [Fact]
@@ -35,6 +39,18 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         public void Test_Map_ReturnsZero_WhenSkippedAndSkipsAllowed()
         {
             ExitCodes.Map(Result(Status.Skipped), noSkip: false).ShouldBe(0);
+        }
+
+        [Fact]
+        public void Test_Map_ReturnsOne_WhenOneScenarioIsSkippedAndNoSkip()
+        {
+            ExitCodes.Map(Result(Status.Passed, Status.Skipped), noSkip: true).ShouldBe(1);
+        }
+
+        [Fact]
+        public void Test_Map_ReturnsZero_WhenOneScenarioIsSkippedAndSkipsAllowed()
+        {
+            ExitCodes.Map(Result(Status.Passed, Status.Skipped), noSkip: false).ShouldBe(0);
         }
 
         [Fact]

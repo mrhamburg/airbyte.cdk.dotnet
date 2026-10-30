@@ -56,9 +56,14 @@ namespace Airbyte.Cdk.IntegrationTests
 
             var projectFile = ConnectorLocator.ResolveProjectFile(directory, root.Connector?.Project);
 
-            var secrets = (root.Secrets ?? new Dictionary<string, string>())
-                .Where(x => !string.IsNullOrWhiteSpace(x.Key) && !string.IsNullOrWhiteSpace(x.Value))
-                .ToDictionary(x => x.Key, x => x.Value);
+            var secrets = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var secret in root.Secrets ?? new Dictionary<string, string>())
+            {
+                if (string.IsNullOrWhiteSpace(secret.Key) || string.IsNullOrWhiteSpace(secret.Value))
+                    throw new ConnectorSpecException(
+                        $"{specPath}: secrets entries need a config property name and a secret key, got '{secret.Key}'.");
+                secrets[secret.Key.Trim()] = secret.Value.Trim();
+            }
 
             if (root.Tests == null || root.Tests.Count == 0)
                 throw new ConnectorSpecException($"{specPath}: declare at least one test case.");
@@ -77,6 +82,9 @@ namespace Airbyte.Cdk.IntegrationTests
 
             if (test.Limit is <= 0)
                 throw new ConnectorSpecException($"{location}: limit must be greater than zero.");
+
+            if (test.TimeoutSeconds is <= 0)
+                throw new ConnectorSpecException($"{location}: timeout_seconds must be greater than zero.");
 
             if (test.Streams == null || test.Streams.Count == 0)
                 throw new ConnectorSpecException($"{location} declares no streams.");
@@ -98,10 +106,16 @@ namespace Airbyte.Cdk.IntegrationTests
                 if (minRecords < 0)
                     throw new ConnectorSpecException($"{location}: min_records cannot be negative.");
 
-                if (streams.Any(x => x.Name == stream.Name))
-                    throw new ConnectorSpecException($"{location} lists stream '{stream.Name}' twice.");
+                var streamName = stream.Name!.Trim();
+                if (streams.Any(x => x.Name == streamName))
+                    throw new ConnectorSpecException($"'{location}' lists stream '{streamName}' twice.");
 
-                streams.Add(new StreamSpec(stream.Name!.Trim(), syncMode,
+                if (test.Limit.HasValue && minRecords > test.Limit.Value)
+                    throw new ConnectorSpecException(
+                        $"{location}: stream '{streamName}' requires {minRecords} records but limit is {test.Limit.Value}, " +
+                        "so the scenario can never pass.");
+
+                streams.Add(new StreamSpec(streamName, syncMode,
                     stream.State == null ? null : YamlJson.ToJsonElement(stream.State), minRecords,
                     stream.CursorField?.ToArray()));
             }

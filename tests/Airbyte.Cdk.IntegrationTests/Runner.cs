@@ -6,8 +6,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
-using Json.Schema;
 using System.Threading.Tasks;
+using Json.Schema;
 
 namespace Airbyte.Cdk.IntegrationTests
 {
@@ -51,12 +51,15 @@ namespace Airbyte.Cdk.IntegrationTests
             if (result.IsSpecError)
                 return 2;
 
-            return result.Status switch
-            {
-                Status.Passed => 0,
-                Status.Skipped => noSkip ? 1 : 0,
-                _ => 1
-            };
+            if (result.Status == Status.Failed)
+                return 1;
+
+            // A partly skipped connector still proved nothing for the skipped scenarios, so --no-skip has to
+            // fail it even when the remaining scenarios passed.
+            if (noSkip && result.Tests.Any(x => x.Status == Status.Skipped))
+                return 1;
+
+            return 0;
         }
     }
 
@@ -130,27 +133,47 @@ namespace Airbyte.Cdk.IntegrationTests
             Directory.CreateDirectory(testDirectory);
 
             var config = BuildConfig(test);
+            var secretValues = new List<string>();
 
             var missingSecrets = new List<string>();
             foreach (var secret in spec.Secrets)
             {
                 var value = await _secrets.GetAsync(secret.Value, cancellationToken);
                 if (string.IsNullOrEmpty(value))
+                {
                     missingSecrets.Add($"{secret.Key} ({secret.Value})");
+                }
                 else
+                {
+                    secretValues.Add(value);
                     config[secret.Key] = value;
+                }
             }
 
             if (missingSecrets.Count > 0)
             {
                 var reason = "missing secrets: " + string.Join(", ", missingSecrets);
-                return new TestResult(test.Name, Status.Skipped, Array.Empty<StreamResult>(),
-                    new[] { reason }, reason);
+                return Redact(new TestResult(test.Name, Status.Skipped, Array.Empty<StreamResult>(),
+                    new[] { reason }, reason), secretValues);
             }
 
             var configPath = Path.Combine(testDirectory, "config.json");
             File.WriteAllText(configPath, config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
+            try
+            {
+                return Redact(await RunScenariosAsync(process, test, configPath, testDirectory, cancellationToken),
+                    secretValues);
+            }
+            finally
+            {
+                ReleaseConfig(configPath, config, secretValues);
+            }
+        }
+
+        private async Task<TestResult> RunScenariosAsync(ConnectorProcess process, TestCaseSpec test, string configPath,
+            string testDirectory, CancellationToken cancellationToken)
+        {
             var timeout = TimeSpan.FromSeconds(test.TimeoutSeconds);
             var errors = new List<string>();
 
@@ -208,6 +231,13 @@ namespace Airbyte.Cdk.IntegrationTests
             foreach (var trace in errorTraces)
                 errors.Add("connector emitted an error trace: " + trace.GetRawText());
 
+            // A capped run is killed before the connector can emit its terminal state, so the assertion only
+            // applies to runs that were allowed to finish.
+            if (!read.StoppedEarly
+                && test.Streams.Any(x => x.SyncMode == "incremental")
+                && !read.Messages.Any(x => MessageParser.TypeOf(x) == "STATE"))
+                errors.Add("incremental read emitted no STATE message.");
+
             var streamResults = new List<StreamResult>();
             foreach (var stream in test.Streams)
                 streamResults.Add(ValidateStream(discovered, stream, read.Messages));
@@ -215,8 +245,7 @@ namespace Airbyte.Cdk.IntegrationTests
             if (streamResults.Any(x => x.Status == Status.Failed))
                 errors.Add("one or more streams did not match their schema.");
 
-            var status = errors.Count == 0 ? Status.Passed : Status.Failed;
-            return new TestResult(test.Name, status, streamResults, errors);
+            return new TestResult(test.Name, errors.Count == 0 ? Status.Passed : Status.Failed, streamResults, errors);
         }
 
         private static StreamResult ValidateStream(JsonElement discovered, StreamSpec spec, IReadOnlyList<JsonElement> messages)
@@ -251,9 +280,13 @@ namespace Airbyte.Cdk.IntegrationTests
             var errors = new List<string>();
             for (var index = 0; index < records.Count; index++)
             {
-                var data = records[index].GetProperty("data");
-                var violations = RecordValidator.Validate(schemaValidator, data);
-                foreach (var violation in violations)
+                if (!records[index].TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object)
+                {
+                    errors.Add($"record {index} ({spec.Name}) has no data object.");
+                    continue;
+                }
+
+                foreach (var violation in RecordValidator.Validate(schemaValidator, data))
                     errors.Add($"record {index} ({spec.Name}) {violation}");
             }
 
@@ -283,6 +316,47 @@ namespace Airbyte.Cdk.IntegrationTests
             var path = Path.Combine(testDirectory, "state.json");
             File.WriteAllText(path, state.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return path;
+        }
+
+        /// <summary>
+        /// The rendered config holds credentials, so it survives a run only when artifacts are requested, and
+        /// then with the secret values masked.
+        /// </summary>
+        private void ReleaseConfig(string configPath, JsonObject config, IReadOnlyList<string> secretValues)
+        {
+            try
+            {
+                if (!_options.KeepArtifacts)
+                {
+                    File.Delete(configPath);
+                    return;
+                }
+
+                foreach (var key in config.Select(x => x.Key).ToList())
+                    if (config[key] is JsonValue value && value.TryGetValue<string>(out var text)
+                                                        && secretValues.Contains(text))
+                        config[key] = Redaction.Placeholder;
+
+                File.WriteAllText(configPath, config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (IOException)
+            {
+                // Artifact hygiene must not fail the run.
+            }
+        }
+
+        private static TestResult Redact(TestResult result, IReadOnlyList<string> secretValues)
+        {
+            if (secretValues.Count == 0)
+                return result;
+
+            return result with
+            {
+                Errors = result.Errors.Select(x => Redaction.Apply(x, secretValues)).ToList(),
+                Streams = result.Streams
+                    .Select(x => x with { Errors = x.Errors.Select(e => Redaction.Apply(e, secretValues)).ToList() })
+                    .ToList()
+            };
         }
 
         private static bool Succeeded(JsonElement connectionStatus)

@@ -14,8 +14,7 @@ tests:
   - name: incremental from state
     config:
       start_date: "2026-10-01"
-      base: USD,EUR
-    limit: 5
+      base: USD
     streams:
       - name: historical
         sync_mode: incremental

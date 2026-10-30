@@ -140,15 +140,20 @@ namespace Airbyte.Cdk.IntegrationTests
                         continue;
                     }
 
-                    messages.Add(message);
-
-                    if (!recordsPerStream.HasValue || streams == null || streams.Count == 0)
+                    if (!recordsPerStream.HasValue || streams == null || streams.Count == 0
+                        || !TryRecordStream(message, out var streamName))
+                    {
+                        messages.Add(message);
                         continue;
+                    }
 
-                    if (!TryRecordStream(message, out var streamName))
-                        continue;
-
+                    // Keep counting every record so the run ends only when every stream reached the cap, but
+                    // retain only the capped number: a chatty first stream would otherwise hold an unbounded
+                    // number of records in memory while the later streams catch up.
                     counts[streamName] = counts.TryGetValue(streamName, out var seen) ? seen + 1 : 1;
+                    if (counts[streamName] <= recordsPerStream.Value)
+                        messages.Add(message);
+
                     if (!streams.All(x => counts.TryGetValue(x, out var count) && count >= recordsPerStream.Value))
                         continue;
 

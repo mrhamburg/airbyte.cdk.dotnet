@@ -167,6 +167,77 @@ tests:
         }
 
         [Fact]
+        public void Test_Load_RejectsNonPositiveTimeout()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+tests:
+  - name: slow
+    timeout_seconds: 0
+    streams:
+      - name: symbols
+");
+
+            Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+        }
+
+        [Fact]
+        public void Test_Load_RejectsMinRecordsAboveLimit()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+tests:
+  - name: impossible
+    limit: 5
+    streams:
+      - name: symbols
+        min_records: 10
+");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+            error.Message.ShouldContain("can never pass");
+        }
+
+        [Fact]
+        public void Test_Load_RejectsBlankSecretEntries()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+secrets:
+  apikey: ""  ""
+tests:
+  - name: with secrets
+    streams:
+      - name: symbols
+");
+
+            Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+        }
+
+        [Fact]
+        public void Test_Load_RejectsDuplicateStreamNamesAfterTrimming()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+tests:
+  - name: dupes
+    streams:
+      - name: symbols
+      - name: "" symbols ""
+");
+
+            Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+        }
+
+        [Fact]
         public void Test_Load_AcceptsSecretMapping()
         {
             using var connector = new TempConnector()

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -127,7 +128,7 @@ namespace Airbyte.Cdk.IntegrationTests
 
             if (asJson)
             {
-                Console.WriteLine("[" + string.Join(",", connectors.Select(x => $"\"{x}\"")) + "]");
+                Console.WriteLine(JsonSerializer.Serialize(connectors));
             }
             else
             {

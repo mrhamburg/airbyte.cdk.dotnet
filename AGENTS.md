@@ -19,7 +19,7 @@ The Airbyte .NET CDK: a framework for building Airbyte source and destination co
 | `Dockerfile` | Builds/tests the CDK and publishes the NuGet package (multi-stage) |
 | `.github/workflows/` | CI for the CDK and for connector image builds/releases |
 
-There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk` and `Airbyte.Cdk.Tests`. Connector directories have their own solution/project files and reference the published `Airbyte.Cdk` NuGet package, not a `ProjectReference`.
+There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk`, `Airbyte.Cdk.Tests`, and the two projects under `tests/`. Connector directories have their own solution/project files and reference the published `Airbyte.Cdk` NuGet package, not a `ProjectReference`.
 
 ## Prerequisites and commands
 
