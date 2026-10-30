@@ -143,6 +143,52 @@ Once ready, check the README.md file in your connector directory for instruction
 
 All tests are located in the `*.Tests` directory where your connector is created. Run `dotnet test` to run them.
 
+#### Integration tests
+
+Every connector declares one or more live scenarios in `integration_tests.yaml` next to its project file.
+`tests/Airbyte.Cdk.IntegrationTests` builds the connector, runs `check`, then `discover`, then `read`, and
+validates every emitted record against the JSON schema the connector advertises for that stream. It is a
+black-box client: it speaks the Airbyte JSONL protocol and never references the connector assembly.
+
+```yaml
+connector:
+  module: ExchangeRates        # optional; defaults to ENV AIRBYTE_IMPL_MODULE in the Dockerfile
+secrets:                       # optional; config property name -> secret key
+  api_key: SOURCE_EXAMPLE_API_KEY
+tests:
+  - name: full refresh
+    config:
+      start_date: "2026-10-01"
+    limit: 50                  # stop the connector after 50 records
+    streams:
+      - name: latest
+      - name: orders
+        sync_mode: incremental
+        state:                 # optional starting state, passed to the connector as-is
+          orders: { cursor: "2026-10-01" }
+        min_records: 1         # default 1; use 0 for a stream that may legitimately be empty
+```
+
+Run a connector locally:
+
+```bash
+dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- \
+  run --connector airbyte-integrations/connectors/source-exchange-rates-free
+```
+
+Schemas are checked strictly: a record field the stream's schema does not declare fails the run, so schema
+drift is reported instead of silently accepted. Typed maps (an object whose schema only declares
+`additionalProperties`, such as a currency table) stay permissive, because a new key there is data rather
+than drift.
+
+Secrets are resolved through the `ISecretSource` seam. This repository ships the environment-backed
+implementation, so a secret key is an environment variable name; the SecretsManager PostgreSQL provider
+plugs into the same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as
+passed, and the workflow passes `--no-skip` on `main` so a missing secret fails the build there.
+
+`.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
+a push to `main`.
+
 #### Publishing a new version of a connector
 
 1. Open a PR
