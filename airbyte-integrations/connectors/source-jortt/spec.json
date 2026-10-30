@@ -1,0 +1,50 @@
+{
+  "documentationUrl": "https://developer.jortt.nl/",
+  "protocol_version": "0.19.0",
+  "connectionSpecification": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Jortt Source Spec",
+    "type": "object",
+    "required": ["client_id", "client_secret"],
+    "additionalProperties": false,
+    "properties": {
+      "client_id": {
+        "type": "string",
+        "title": "Client ID",
+        "description": "Client ID of the Jortt OAuth application, registered under Settings > API in your Jortt administration.",
+        "airbyte_secret": true
+      },
+      "client_secret": {
+        "type": "string",
+        "title": "Client Secret",
+        "description": "Client secret of the Jortt OAuth application.",
+        "airbyte_secret": true
+      },
+      "organization_id": {
+        "type": "string",
+        "title": "Organization ID",
+        "description": "Administration to read. Required when the credentials may act on more than one administration; the check fails and lists the available IDs when it is omitted in that case."
+      },
+      "start_date": {
+        "type": "string",
+        "title": "Start date",
+        "description": "Optional lower bound for the expenses stream. Leave empty to read the full history; when set, expenses with an earlier VAT date are not read, on full refresh as well as on the first incremental run.",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+        "examples": ["2020-01-01"]
+      },
+      "lookback_days": {
+        "type": "integer",
+        "title": "Lookback days",
+        "description": "How many days before the incremental cursor the expenses filter starts. Expenses booked late carry an old VAT date, so a window wider than zero is needed to pick them up.",
+        "minimum": 0,
+        "default": 7
+      },
+      "scopes": {
+        "type": "string",
+        "title": "Scopes",
+        "description": "OAuth scopes to request. Leave empty to use the read-only scopes the source needs.",
+        "default": "customers:read invoices:read estimates:read expenses:read organizations:read reconciling:read"
+      }
+    }
+  }
+}

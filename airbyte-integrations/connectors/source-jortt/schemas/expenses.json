@@ -1,0 +1,238 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "expense_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "expense_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "ledger_account_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "ledger_account_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "vat_date": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date"
+    },
+    "delivery_period": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date"
+    },
+    "delivery_period_end": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date"
+    },
+    "vat_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "approved_at": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "total_amount_incl_vat": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "amount": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "grand_total_vat_amount": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "amount": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "vat_line_items": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "vat": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "value": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "category": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          },
+          "vat_amount": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "amount": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "label_ids": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "string"
+        ]
+      }
+    },
+    "_links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "payment_methods": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "ledger_accounts": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "href": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "type": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
+            },
+            "sources": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "href": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "type": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

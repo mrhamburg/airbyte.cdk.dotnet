@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ApplicationIcon />
+    <OutputType>Exe</OutputType>
+    <StartupObject />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Airbyte.Cdk" />
+    <PackageReference Include="Flurl.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="source_jortt.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="source_jortt.Tests\**" />
+    <None Remove="source_jortt.Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="schemas\**\*.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="spec.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
