@@ -74,6 +74,12 @@ namespace Airbyte.Cdk.IntegrationTests
 
         public static ISecretSource Create()
         {
+            // A configured PostgreSQL store wins: it is the one place credentials are expected to live in CI.
+            var connectionString =
+                Environment.GetEnvironmentVariable(SecretsManagerSecretSource.ConnectionStringVariable);
+            if (!string.IsNullOrWhiteSpace(connectionString))
+                return new SecretsManagerSecretSource(SecretsManagerSecretSource.BuildFromEnvironment);
+
             var json = Environment.GetEnvironmentVariable(JsonSecretsVariable);
             return string.IsNullOrWhiteSpace(json) ? new EnvSecretSource() : new JsonSecretSource(json!);
         }

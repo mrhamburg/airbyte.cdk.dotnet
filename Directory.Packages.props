@@ -12,6 +12,8 @@
     <PackageVersion Include="JsonCons.JsonPath" Version="1.1.0" />
     <PackageVersion Include="JsonPointer.Net" Version="7.0.4" />
     <PackageVersion Include="JsonSchema.Net" Version="9.5.0" />
+    <PackageVersion Include="mrhamburg.SecretsManager" Version="0.0.1" />
+    <PackageVersion Include="mrhamburg.SecretsManager.PostgreSql" Version="0.0.1" />
     <PackageVersion Include="Polly" Version="8.9.0" />
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
