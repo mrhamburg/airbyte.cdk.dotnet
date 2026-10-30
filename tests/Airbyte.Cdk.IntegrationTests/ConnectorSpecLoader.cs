@@ -33,6 +33,8 @@ namespace Airbyte.Cdk.IntegrationTests
 
             var deserializer = new DeserializerBuilder()
                 .WithNamingConvention(UnderscoredNamingConvention.Instance)
+                .WithAttemptingUnquotedStringTypeDeserialization()
+                .WithDuplicateKeyChecking()
                 .Build();
 
             YamlRoot root;
@@ -72,6 +74,9 @@ namespace Airbyte.Cdk.IntegrationTests
         {
             var name = string.IsNullOrWhiteSpace(test.Name) ? $"test-{index + 1}" : test.Name!.Trim();
             var location = $"{specPath}: test '{name}'";
+
+            if (test.Limit is <= 0)
+                throw new ConnectorSpecException($"{location}: limit must be greater than zero.");
 
             if (test.Streams == null || test.Streams.Count == 0)
                 throw new ConnectorSpecException($"{location} declares no streams.");

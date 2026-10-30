@@ -198,7 +198,7 @@ namespace Airbyte.Cdk.IntegrationTests
             var statePath = WriteState(test, testDirectory);
 
             var read = await process.RunAsync("read", configPath, catalogPath, statePath, timeout, cancellationToken,
-                test.Limit);
+                test.Streams.Select(x => x.Name).ToList(), test.Limit);
             if (read.TimedOut)
                 return Failed(test, errors.Append($"read timed out after {test.TimeoutSeconds}s.").ToList());
             if (!read.StoppedEarly && read.ExitCode != 0)
@@ -234,12 +234,16 @@ namespace Airbyte.Cdk.IntegrationTests
                 return new StreamResult(spec.Name, Status.Failed, records.Count,
                     new[] { $"expected at least {spec.MinRecords} record(s) but the connector emitted {records.Count}." });
 
+            if (!schema.TryGetProperty("json_schema", out var schemaElement))
+                return new StreamResult(spec.Name, Status.Failed, records.Count,
+                    new[] { "discover did not report a json_schema for this stream." });
+
             JsonSchema schemaValidator;
             try
             {
-                schemaValidator = StrictSchema.Build(schema.GetProperty("json_schema"));
+                schemaValidator = StrictSchema.Build(schemaElement);
             }
-            catch (ConnectorSpecException e)
+            catch (Exception e)
             {
                 return new StreamResult(spec.Name, Status.Failed, records.Count, new[] { e.Message });
             }

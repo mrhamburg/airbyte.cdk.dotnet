@@ -40,6 +40,7 @@ namespace Airbyte.Cdk.IntegrationTests
 
                     if (stream.SyncMode == "incremental")
                     {
+                        EnsureIncrementalSupported(match, stream.Name);
                         writer.WritePropertyName("cursor_field");
                         writer.WriteStartArray();
                         foreach (var field in stream.CursorField ?? DefaultCursorField(match, stream.Name))
@@ -64,6 +65,23 @@ namespace Airbyte.Cdk.IntegrationTests
 
         private static string? NameOf(JsonElement stream) =>
             stream.TryGetProperty("name", out var name) ? name.GetString() : null;
+
+        /// <summary>
+        /// The CDK silently downgrades an incremental configured stream to a full refresh when the stream does
+        /// not support it, which would make an incremental scenario assert nothing.
+        /// </summary>
+        private static void EnsureIncrementalSupported(JsonElement stream, string name)
+        {
+            var modes = stream.TryGetProperty("supported_sync_modes", out var supported)
+                        && supported.ValueKind == JsonValueKind.Array
+                ? supported.EnumerateArray().Select(x => x.GetString()).Where(x => x != null).ToList()
+                : new List<string?>();
+
+            if (!modes.Contains("incremental"))
+                throw new ConnectorSpecException(
+                    $"Stream '{name}' does not support incremental sync. Discover reported: " +
+                    string.Join(", ", modes) + ".");
+        }
 
         private static string[] DefaultCursorField(JsonElement stream, string name)
         {

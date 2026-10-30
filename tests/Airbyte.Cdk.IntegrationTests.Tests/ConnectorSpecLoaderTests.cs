@@ -1,5 +1,6 @@
 #nullable enable
 using System.Linq;
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 
@@ -100,6 +101,67 @@ tests:
                 .WithDockerfile("ExchangeRates")
                 .WithProject()
                 .WithSpec("tests: []\n");
+
+            Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+        }
+
+        [Fact]
+        public void Test_Load_KeepsUnquotedScalarTypes()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+tests:
+  - name: typed config
+    config:
+      retries: 3
+      enabled: true
+      ratio: 1.5
+      base: ""USD""
+    streams:
+      - name: symbols
+");
+
+            var config = ConnectorSpecLoader.Load(connector.Root).Tests[0].Config;
+
+            config.GetProperty("retries").ValueKind.ShouldBe(JsonValueKind.Number);
+            config.GetProperty("enabled").ValueKind.ShouldBe(JsonValueKind.True);
+            config.GetProperty("ratio").ValueKind.ShouldBe(JsonValueKind.Number);
+            config.GetProperty("base").ValueKind.ShouldBe(JsonValueKind.String);
+        }
+
+        [Fact]
+        public void Test_Load_RejectsNonPositiveLimit()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+tests:
+  - name: capped
+    limit: 0
+    streams:
+      - name: symbols
+");
+
+            Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+        }
+
+        [Fact]
+        public void Test_Load_RejectsDuplicateKeys()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(@"
+tests:
+  - name: capped
+    limit: 5
+    limit: 7
+    streams:
+      - name: symbols
+");
 
             Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
         }

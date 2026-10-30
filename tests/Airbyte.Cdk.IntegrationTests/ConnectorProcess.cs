@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -52,7 +53,8 @@ namespace Airbyte.Cdk.IntegrationTests
                 {
                     "build", _projectFile, "-c", "Release", "-o", _buildOutput, "--nologo", "-v", "quiet"
                 },
-                TimeSpan.FromMinutes(10), parseMessages: false, recordLimit: null, cancellationToken);
+                TimeSpan.FromMinutes(10), parseMessages: false, streams: null, recordsPerStream: null,
+                cancellationToken);
 
             _assemblyPath = AssemblyPath;
             if (outcome.ExitCode == 0 && !File.Exists(_assemblyPath))
@@ -63,8 +65,14 @@ namespace Airbyte.Cdk.IntegrationTests
             return outcome;
         }
 
+        /// <summary>
+        /// Runs one Airbyte command. When <paramref name="recordsPerStream"/> is set, the process is stopped once
+        /// every stream in <paramref name="streams"/> has produced that many records, because connectors reject
+        /// the CDK's own record limit whenever their spec forbids unknown config properties.
+        /// </summary>
         public Task<ProcessOutcome> RunAsync(string command, string? configPath, string? catalogPath,
-            string? statePath, TimeSpan timeout, CancellationToken cancellationToken, int? recordLimit = null)
+            string? statePath, TimeSpan timeout, CancellationToken cancellationToken,
+            IReadOnlyCollection<string>? streams = null, int? recordsPerStream = null)
         {
             var arguments = new List<string> { AssemblyPath, "read", "--command", command };
             if (!string.IsNullOrWhiteSpace(configPath))
@@ -85,11 +93,13 @@ namespace Airbyte.Cdk.IntegrationTests
                 arguments.Add(statePath!);
             }
 
-            return ExecuteAsync("dotnet", arguments, timeout, parseMessages: true, recordLimit, cancellationToken);
+            return ExecuteAsync("dotnet", arguments, timeout, parseMessages: true, streams, recordsPerStream,
+                cancellationToken);
         }
 
         private async Task<ProcessOutcome> ExecuteAsync(string fileName, IReadOnlyList<string> arguments,
-            TimeSpan timeout, bool parseMessages, int? recordLimit, CancellationToken cancellationToken)
+            TimeSpan timeout, bool parseMessages, IReadOnlyCollection<string>? streams, int? recordsPerStream,
+            CancellationToken cancellationToken)
         {
             var startInfo = new ProcessStartInfo(fileName)
             {
@@ -113,11 +123,11 @@ namespace Airbyte.Cdk.IntegrationTests
 
             var messages = new List<JsonElement>();
             var raw = new StringBuilder();
-            var standardError = process.StandardError.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync(timeoutSource.Token);
 
             var readTask = Task.Run(async () =>
             {
-                var records = 0;
+                var counts = new Dictionary<string, int>(StringComparer.Ordinal);
                 while (true)
                 {
                     var line = await process.StandardOutput.ReadLineAsync(timeoutSource.Token);
@@ -132,15 +142,18 @@ namespace Airbyte.Cdk.IntegrationTests
 
                     messages.Add(message);
 
-                    if (recordLimit.HasValue && MessageParser.TypeOf(message) == "RECORD")
-                    {
-                        records++;
-                        if (records >= recordLimit.Value)
-                        {
-                            TryKill(process);
-                            return true;
-                        }
-                    }
+                    if (!recordsPerStream.HasValue || streams == null || streams.Count == 0)
+                        continue;
+
+                    if (!TryRecordStream(message, out var streamName))
+                        continue;
+
+                    counts[streamName] = counts.TryGetValue(streamName, out var seen) ? seen + 1 : 1;
+                    if (!streams.All(x => counts.TryGetValue(x, out var count) && count >= recordsPerStream.Value))
+                        continue;
+
+                    TryKill(process);
+                    return true;
                 }
             }, timeoutSource.Token);
 
@@ -165,12 +178,48 @@ namespace Airbyte.Cdk.IntegrationTests
                 // The reader is cancelled together with the process.
             }
 
-            var errors = await standardError;
+            var errors = string.Empty;
+            try
+            {
+                errors = await standardError;
+            }
+            catch (OperationCanceledException)
+            {
+                // Stderr is best effort after a kill.
+            }
+
             if (!string.IsNullOrWhiteSpace(errors))
                 raw.AppendLine(errors.TrimEnd());
 
-            var exitCode = timedOut ? -1 : process.ExitCode;
+            var exitCode = -1;
+            if (!timedOut)
+            {
+                try
+                {
+                    await process.WaitForExitAsync(CancellationToken.None);
+                    exitCode = process.ExitCode;
+                }
+                catch (InvalidOperationException)
+                {
+                    // The process handle is already released; the outcome stays a failure.
+                }
+            }
+
             return new ProcessOutcome(exitCode, messages, raw.ToString().TrimEnd(), timedOut, stoppedEarly);
+        }
+
+        private static bool TryRecordStream(JsonElement message, out string streamName)
+        {
+            streamName = string.Empty;
+            if (MessageParser.TypeOf(message) != "RECORD"
+                || !message.TryGetProperty("record", out var record)
+                || record.ValueKind != JsonValueKind.Object
+                || !record.TryGetProperty("stream", out var stream)
+                || stream.ValueKind != JsonValueKind.String)
+                return false;
+
+            streamName = stream.GetString()!;
+            return true;
         }
 
         private static void TryKill(Process process)

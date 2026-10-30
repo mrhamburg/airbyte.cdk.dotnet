@@ -64,6 +64,16 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         }
 
         [Fact]
+        public void Test_Build_ThrowsWhenStreamDoesNotSupportIncremental()
+        {
+            var error = Should.Throw<ConnectorSpecException>(() =>
+                CatalogBuilder.Build(Catalog(), new[] { new StreamSpec("symbols", "incremental") }));
+
+            error.Message.ShouldContain("incremental");
+            error.Message.ShouldContain("symbols");
+        }
+
+        [Fact]
         public void Test_Build_ThrowsForUnknownStream()
         {
             var error = Should.Throw<ConnectorSpecException>(() =>

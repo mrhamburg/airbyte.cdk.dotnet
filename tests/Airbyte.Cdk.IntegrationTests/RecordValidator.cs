@@ -17,6 +17,8 @@ namespace Airbyte.Cdk.IntegrationTests
         public static IReadOnlyList<string> Validate(JsonSchema schema, JsonElement record)
         {
             var results = schema.Evaluate(record, new EvaluationOptions { OutputFormat = OutputFormat.List });
+            if (results.IsValid)
+                return Array.Empty<string>();
 
             var errors = new List<string>();
             foreach (var detail in results.Details ?? new List<EvaluationResults>())

@@ -27,7 +27,7 @@ namespace Airbyte.Cdk.IntegrationTests
             "https://json-schema.org/draft/2020-12/schema"
         };
 
-        private static readonly string[] NestedArrays = { "allOf", "anyOf", "oneOf", "prefixItems" };
+        private static readonly string[] NestedArrays = { "allOf", "anyOf", "oneOf" };
 
         private static readonly string[] DefinitionContainers = { "$defs", "definitions" };
 
@@ -62,11 +62,16 @@ namespace Airbyte.Cdk.IntegrationTests
                     $"Unsupported JSON Schema dialect '{value}'. Declare one of draft-06, draft-07, 2019-09 or 2020-12.");
         }
 
-        private static void ApplyStrict(JsonObject schema)
+        private static void ApplyStrict(JsonObject schema, bool compositionBranch = false)
         {
+            // Composition splits one instance across several schemas: closing each branch would reject the
+            // fields declared by its siblings, turning a valid record into a failure. A $ref target has the
+            // same problem, because siblings are merged onto the referenced schema.
+            var isComposed = compositionBranch || schema.ContainsKey("$ref") || schema.ContainsKey("allOf");
+
             if (schema["properties"] is JsonObject properties)
             {
-                if (!schema.ContainsKey("additionalProperties") && !schema.ContainsKey("patternProperties"))
+                if (!isComposed && !schema.ContainsKey("additionalProperties") && !schema.ContainsKey("patternProperties"))
                     schema["additionalProperties"] = false;
 
                 foreach (var property in properties)
@@ -81,11 +86,16 @@ namespace Airbyte.Cdk.IntegrationTests
                     if (item is JsonObject nestedItem)
                         ApplyStrict(nestedItem);
 
+            if (schema["prefixItems"] is JsonArray prefixItems)
+                foreach (var item in prefixItems)
+                    if (item is JsonObject nestedItem)
+                        ApplyStrict(nestedItem);
+
             foreach (var keyword in NestedArrays)
                 if (schema[keyword] is JsonArray alternatives)
                     foreach (var alternative in alternatives)
                         if (alternative is JsonObject nestedAlternative)
-                            ApplyStrict(nestedAlternative);
+                            ApplyStrict(nestedAlternative, compositionBranch: true);
 
             if (schema["additionalProperties"] is JsonObject additional)
                 ApplyStrict(additional);
@@ -94,7 +104,7 @@ namespace Airbyte.Cdk.IntegrationTests
                 if (schema[container] is JsonObject definitions)
                     foreach (var definition in definitions)
                         if (definition.Value is JsonObject nestedDefinition)
-                            ApplyStrict(nestedDefinition);
+                            ApplyStrict(nestedDefinition, compositionBranch: true);
         }
     }
 }

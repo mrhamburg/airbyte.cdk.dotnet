@@ -72,7 +72,17 @@ namespace Airbyte.Cdk.IntegrationTests
             var results = new List<ConnectorResult>();
 
             foreach (var connector in connectors)
-                results.Add(await runner.RunAsync(connector, CancellationToken.None));
+            {
+                try
+                {
+                    results.Add(await runner.RunAsync(connector, CancellationToken.None));
+                }
+                catch (Exception e)
+                {
+                    results.Add(new ConnectorResult(Path.GetFullPath(connector), Status.Failed,
+                        Array.Empty<TestResult>(), new[] { $"harness error: {e.GetType().Name}: {e.Message}" }));
+                }
+            }
 
             Report(results, options);
 
