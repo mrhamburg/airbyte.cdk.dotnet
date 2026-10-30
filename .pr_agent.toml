@@ -1,0 +1,10 @@
+# PR-Agent configuration — model selection only.
+# No secrets live here. The OpenRouter key is injected as the OPENROUTER_API_KEY
+# repository secret (workflow env: OPENROUTER__KEY) and never committed.
+#
+# Endpoint, key and the LiteLLM provider settings are host-controlled and are
+# ignored if set here, so a contributor cannot redirect the API key via a PR.
+[config]
+model = "openrouter/anthropic/claude-sonnet-5"
+fallback_models = ["openrouter/deepseek/deepseek-chat"]
+custom_model_max_tokens = 20000

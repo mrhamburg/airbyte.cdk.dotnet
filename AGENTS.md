@@ -73,6 +73,22 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 - CDK NuGet publishing is driven by `.github/workflows/release.yml` through the `Dockerfile` `publish` stage with `BUILD_VERSION` and `NUGET_APIKEY`.
 - Connector images are built/published by `.github/workflows/build-connector.yml` and `release-connector.yml`, which invoke `dotnet run publish -b` from `Airbyte.Cdk`. That command derives changed connectors from `git diff HEAD HEAD~1` and the version from `CHANGELOG.md`.
 - CI paths are narrow: CDK changes trigger `build.yml` (`Airbyte.Cdk/**`, `Airbyte.Cdk.Tests/**`); connector changes trigger `build-connector.yml` (`airbyte-integrations/connectors/**`).
+- `.github/workflows/pr-agent.yml` runs PR-Agent against OpenRouter on every pull request — advisory review only, not a merge gate.
+
+### AI pull request review
+
+`pr-agent.yml` runs [PR-Agent](https://github.com/The-PR-Agent/pr-agent) against OpenRouter on every
+pull request. It is **advisory only** — it posts comments and never blocks a merge, so it is not a
+required status check.
+
+It triggers on `pull_request_target`, not `pull_request`: fork pull requests get a read-only
+`GITHUB_TOKEN` and no secrets, so a `pull_request` job can neither call the model nor comment.
+PR-Agent reads the PR through the GitHub API and the workflow deliberately has no `actions/checkout`
+step, so no contributor-controlled code or configuration runs with the key.
+
+The OpenRouter key is the `OPENROUTER_API_KEY` repository secret (injected as `OPENROUTER__KEY`) and is
+never committed. Model selection lives in `.pr_agent.toml`, which contains no secrets; endpoint and
+key settings stay host-controlled there.
 
 ## Gotchas for agents
 
