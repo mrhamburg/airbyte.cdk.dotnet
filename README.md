@@ -193,10 +193,11 @@ refresh cannot pass quietly.
 Secrets are resolved through the `ISecretSource` seam. Two implementations ship: environment variables (a secret
 key is the variable name) and a JSON object supplied through `AIRBYTE_INTEGRATION_SECRETS_JSON`, which lets CI pass
 every connector credential through one repository secret. The SecretsManager PostgreSQL provider plugs into the
-same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as passed; the workflow
-passes `--no-skip` on `main`, so a missing secret fails the build there. Secret values are masked in error output,
-and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in which case the secret
-values in it are masked.
+same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as passed; once
+`AIRBYTE_INTEGRATION_SECRETS_JSON` is configured the workflow passes `--no-skip` on `main`, so a missing credential
+then fails the build instead of looking green. Secret values are masked in error output, and the rendered
+`config.json` is deleted after a run unless `--keep-artifacts` is set, in which case the secret values in it are
+masked.
 
 `.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
 a push to `main`.

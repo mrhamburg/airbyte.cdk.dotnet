@@ -120,10 +120,11 @@ jobs:
           # {"SOURCE_EXAMPLE_API_KEY": "..."} — see README, Integration tests.
           AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
         run: |
-          # On main every declared secret is expected to exist: a skip there would look green while
-          # proving nothing.
+          # On main a skipped scenario is a failure, because a skip there looks green while proving nothing.
+          # That only holds once a secret store is configured: before the first AIRBYTE_INTEGRATION_SECRETS_JSON
+          # exists every credential is missing, and enforcing it would make every credentialed connector red.
           extra=""
-          if [ "$EVENT_NAME" = "push" ]; then
+          if [ "$EVENT_NAME" = "push" ] && [ -n "$AIRBYTE_INTEGRATION_SECRETS_JSON" ]; then
             extra="--no-skip"
           fi
           dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- run --connector "$CONNECTOR" $extra
