@@ -9,7 +9,7 @@ COPY . ./
 
 WORKDIR $WORKDIR/airbyte-integrations/connectors/source-jortt
 
-RUN dotnet test
+RUN dotnet test source_jortt.sln
 RUN dotnet build -c Release -o output
 
 # Run implementation

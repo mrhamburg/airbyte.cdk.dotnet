@@ -3,14 +3,14 @@ connector:
 
 # Credentials are not provisioned yet, so these scenarios are reported as skipped (`::warning::`) instead of
 # silently passing. Once AIRBYTE_INTEGRATION_SECRETS_JSON contains these keys, main starts enforcing them.
+# organization_id is intentionally not mapped: it is only required when the credentials can act on more than
+# one administration, and the harness skips a scenario when any declared secret is missing.
 secrets:
   client_id: JORTT_CLIENT_ID
   client_secret: JORTT_CLIENT_SECRET
 
 tests:
   - name: full refresh
-    config:
-      start_date: "2026-01-01"
     limit: 25
     streams:
       - name: organizations
@@ -22,6 +22,11 @@ tests:
       - name: ledger_accounts_cost
       - name: ledger_accounts_income
       - name: ledger_accounts_balance
+
+  - name: expenses full refresh
+    limit: 25
+    streams:
+      - name: expenses
 
   - name: expenses incremental
     config:

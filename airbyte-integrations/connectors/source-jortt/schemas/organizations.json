@@ -32,12 +32,5 @@
         "string"
       ]
     }
-  },
-  "required": [
-    "id",
-    "company_name",
-    "street",
-    "city",
-    "postal_code"
-  ]
+  }
 }

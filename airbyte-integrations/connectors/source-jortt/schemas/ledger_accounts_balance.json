@@ -26,11 +26,5 @@
         "boolean"
       ]
     }
-  },
-  "required": [
-    "ledger_account_id",
-    "parent_ledger_account_id",
-    "name",
-    "selectable"
-  ]
+  }
 }
