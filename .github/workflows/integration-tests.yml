@@ -1,0 +1,112 @@
+name: Connector Integration Tests
+
+on:
+  pull_request:
+    paths:
+      - 'airbyte-integrations/connectors/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'airbyte-integrations/connectors/**'
+  workflow_dispatch:
+    inputs:
+      connector:
+        description: 'Connector directory to test (defaults to every changed connector)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connector-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changed:
+    name: Discover changed connectors
+    runs-on: ubuntu-latest
+    outputs:
+      connectors: ${{ steps.list.outputs.connectors }}
+      has_connectors: ${{ steps.list.outputs.has_connectors }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Determine changed files
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.connector }}" ]; then
+            echo "${{ inputs.connector }}/integration_tests.yaml" > "$RUNNER_TEMP/changed.txt"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --name-only --diff-filter=d \
+              "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" > "$RUNNER_TEMP/changed.txt"
+          else
+            base="${{ github.event.before }}"
+            if [ -z "$base" ] || ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+              base="HEAD~1"
+            fi
+            git diff --name-only --diff-filter=d "$base" "${{ github.sha }}" > "$RUNNER_TEMP/changed.txt"
+          fi
+          echo "Changed files:"
+          cat "$RUNNER_TEMP/changed.txt"
+
+      - name: Map changes to connectors
+        id: list
+        shell: bash
+        run: |
+          connectors=$(dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- \
+            list-changed --changed-files "$RUNNER_TEMP/changed.txt" --json)
+          echo "connectors=$connectors" >> "$GITHUB_OUTPUT"
+          if [ "$connectors" = "[]" ]; then
+            echo "has_connectors=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_connectors=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Connectors to test: $connectors"
+
+  integration:
+    name: ${{ matrix.connector }}
+    needs: changed
+    if: needs.changed.outputs.has_connectors == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        connector: ${{ fromJson(needs.changed.outputs.connectors) }}
+    env:
+      # Reserved for the SecretsManager PostgreSQL adapter. Until it is wired, the harness reads
+      # secrets from environment variables instead, so these are inert.
+      SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ secrets.SECRETS_POSTGRESQL_CONNECTION_STRING }}
+      SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Run integration tests
+        shell: bash
+        run: |
+          # On main every declared secret is expected to exist: a skip there would look green while
+          # proving nothing.
+          extra=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            extra="--no-skip"
+          fi
+          dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- \
+            run --connector "${{ matrix.connector }}" $extra
