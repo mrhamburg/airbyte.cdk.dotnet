@@ -30,5 +30,17 @@ namespace Airbyte.Cdk.Models
         /// </summary>
         [JsonPropertyName("namespace")]
         public string? Namespace { get; set; }
+
+        /// <summary>
+        /// Information about this record added mid-sync
+        /// </summary>
+        [JsonPropertyName("meta")]
+        public AirbyteRecordMessageMeta? Meta { get; set; }
+
+        /// <summary>
+        /// An internal facing reference to the file described by the record if applicable.
+        /// </summary>
+        [JsonPropertyName("file_reference")]
+        public AirbyteRecordMessageFileReference? FileReference { get; set; }
     }
 }

@@ -40,5 +40,23 @@ namespace Airbyte.Cdk.Models
         /// </summary>
         [JsonPropertyName("state")]
         public AirbyteStateMessage? State { get; set; }
+
+        /// <summary>
+        /// trace message: a message to communicate information about the status and performance of a connector
+        /// </summary>
+        [JsonPropertyName("trace")]
+        public AirbyteTraceMessage? Trace { get; set; }
+
+        /// <summary>
+        /// connector config message: a message to communicate an updated configuration from a connector that should be persisted
+        /// </summary>
+        [JsonPropertyName("control")]
+        public AirbyteControlMessage? Control { get; set; }
+
+        /// <summary>
+        /// destination catalog message: the catalog
+        /// </summary>
+        [JsonPropertyName("destination_catalog")]
+        public DestinationCatalog? DestinationCatalog { get; set; }
     }
 }

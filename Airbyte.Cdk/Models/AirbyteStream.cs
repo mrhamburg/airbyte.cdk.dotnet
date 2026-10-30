@@ -46,5 +46,17 @@ namespace Airbyte.Cdk.Models
         /// </summary>
         [JsonPropertyName("namespace")]
         public string? Namespace { get; set; }
+
+        /// <summary>
+        /// If the stream is resumable or not. Should be set to true if the stream supports incremental.
+        /// </summary>
+        [JsonPropertyName("is_resumable")]
+        public bool? IsResumable { get; set; }
+
+        /// <summary>
+        /// This stream describes a stream of files and their metadata.
+        /// </summary>
+        [JsonPropertyName("is_file_based")]
+        public bool? IsFileBased { get; set; }
     }
 }

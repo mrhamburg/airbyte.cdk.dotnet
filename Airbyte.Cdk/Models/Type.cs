@@ -7,6 +7,9 @@
         LOG,
         SPEC,
         CONNECTION_STATUS,
-        CATALOG
+        CATALOG,
+        TRACE,
+        CONTROL,
+        DESTINATION_CATALOG
     }
 }
