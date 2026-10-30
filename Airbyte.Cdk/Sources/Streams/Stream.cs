@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -30,7 +31,7 @@ namespace Airbyte.Cdk.Sources.Streams
         /// <summary>
         /// Logger instance, for sending log messages as per Airbyte protocol
         /// </summary>
-        public AirbyteLogger Logger { get; protected set; }
+        public AirbyteLogger Logger { get; protected set; } = null!;
 
         /// <summary>
         /// If true, this stream supports incremental updates
@@ -58,6 +59,26 @@ namespace Airbyte.Cdk.Sources.Streams
         /// An internal name, which can deviate from the default classname
         /// </summary>
         protected string _givenName = string.Empty;
+
+        /// <summary>
+        /// Optional Source-defined namespace for this stream.
+        /// </summary>
+        public virtual string? Namespace => null;
+
+        /// <summary>
+        /// If the stream is resumable. Defaults to whether the stream supports incremental syncs.
+        /// </summary>
+        public virtual bool IsResumable => SupportsIncremental;
+
+        /// <summary>
+        /// True when this stream describes a stream of files and their metadata.
+        /// </summary>
+        public virtual bool IsFileBased => false;
+
+        /// <summary>
+        /// Emits per-stream state messages for this stream. Set by the owning source before reading.
+        /// </summary>
+        public StateEmitter? StateEmitter { get; internal set; }
 
         /// <summary>
         /// This method should be overridden by subclasses to read records based on the inputs
@@ -92,7 +113,15 @@ namespace Airbyte.Cdk.Sources.Streams
         /// </summary>
         public virtual AirbyteStream AsAirbyteStream()
         {
-            var stream = new AirbyteStream { Name = Name, JsonSchema = GetJsonSchema().AsJsonElement(), SupportedSyncModes = new[] { SyncMode.full_refresh } };
+            var stream = new AirbyteStream
+            {
+                Name = Name,
+                Namespace = Namespace,
+                JsonSchema = GetJsonSchema().AsJsonElement(),
+                SupportedSyncModes = new[] { SyncMode.full_refresh },
+                IsResumable = IsResumable,
+                IsFileBased = IsFileBased
+            };
 
             if (SupportsIncremental)
             {

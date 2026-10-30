@@ -244,19 +244,20 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         {
             SyncMode = syncMode;
             Logger = logger;
+            StateEmitter ??= new StateEmitter(streamchannel);
             bool paginationcompleted = false;
             Dictionary<string, object> nextpagetoken = null;
             long recordcount = 0;
+            long recordsSinceState = 0;
             bool Limitreached() => recordlimit.HasValue && recordcount >= recordlimit.Value;
 
             async Task UpdateState(JsonElement lastrecord)
             {
                 var updatedstate = GetUpdatedState(streamstate, lastrecord);
                 Logger.Info($"Setting state of {Name} stream to {updatedstate.GetRawText()}");
-                await streamchannel.WriteAsync(new AirbyteMessage
-                {
-                    Type = Type.STATE, State = new AirbyteStateMessage {Data = updatedstate}
-                });
+                await StateEmitter.EmitAsync(new StreamDescriptor { Name = Name, Namespace = Namespace },
+                    updatedstate, recordsSinceState);
+                recordsSinceState = 0;
                 streamstate = updatedstate;
             }
 
@@ -273,8 +274,9 @@ namespace Airbyte.Cdk.Sources.Streams.Http
 
                 foreach (var item in ParseResponse(result.response, streamstate, streamslice, nextpagetoken))
                 {
-                    await streamchannel.WriteAsync(AbstractSource.AsAirbyteMessage(Name, item));
+                    await streamchannel.WriteAsync(AbstractSource.AsAirbyteMessage(Name, Namespace, item));
                     recordcount++;
+                    recordsSinceState++;
 
                     //Check record limit
                     if (Limitreached()) break;
@@ -289,7 +291,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
 
                 nextpagetoken = NextPageToken(result.request, result.response);
                 paginationcompleted = (nextpagetoken == null || nextpagetoken.Count == 0) || Limitreached();
-                if (paginationcompleted && SyncMode == SyncMode.incremental) await UpdateState(_lastitem);
+                if (paginationcompleted) await UpdateState(_lastitem);
             }
 
             return recordcount;

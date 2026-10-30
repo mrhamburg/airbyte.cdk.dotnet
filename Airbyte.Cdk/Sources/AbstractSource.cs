@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -17,15 +18,15 @@ namespace Airbyte.Cdk.Sources
     /// </summary>
     public abstract class AbstractSource : Source
     {
-        protected AirbyteLogger Logger { get; private set; }
+        protected AirbyteLogger Logger { get; private set; } = null!;
 
-        protected ChannelWriter<AirbyteMessage> Channel { get; private set; }
+        protected ChannelWriter<AirbyteMessage> Channel { get; private set; } = null!;
 
         protected JsonElement Config { get; private set; }
 
         protected JsonElement State { get; private set; }
 
-        protected ConfiguredAirbyteCatalog Catalog { get; private set; }
+        protected ConfiguredAirbyteCatalog Catalog { get; private set; } = null!;
 
         /// <summary>
         /// Check if a connection can be established
@@ -97,18 +98,25 @@ namespace Airbyte.Cdk.Sources
             Catalog = catalog;
             State = state;
 
+            var stateManager = new ConnectorStateManager(StateReader.Parse(state));
+            var stateEmitter = new StateEmitter(channel);
+
             logger.Info($"Starting syncing {Name}");
             var streamsInstances = Streams(config);
             foreach (var configuredStream in catalog.Streams)
             {
-                var streamInstance = streamsInstances.FirstOrDefault(x => x.Name == configuredStream.Stream.Name);
+                if (configuredStream.Stream == null)
+                    throw new Exception("The configured catalog contains a stream without a stream definition");
+
+                var streamInstance = streamsInstances.FirstOrDefault(x =>
+                    x.Name == configuredStream.Stream.Name && x.Namespace == configuredStream.Stream.Namespace);
                 if (streamInstance == null)
                     throw new Exception(
                         $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {streamsInstances.Select(x => x.Name)}");
 
                 try
                 {
-                    await ReadStream(logger, streamInstance, configuredStream);
+                    await ReadStream(logger, streamInstance, configuredStream, stateManager, stateEmitter);
                 }
                 catch (Exception e)
                 {
@@ -119,8 +127,15 @@ namespace Airbyte.Cdk.Sources
             }
         }
 
-        private async Task ReadStream(AirbyteLogger logger, Stream streaminstance, ConfiguredAirbyteStream configuredstream)
+        private async Task ReadStream(AirbyteLogger logger, Stream streaminstance, ConfiguredAirbyteStream configuredstream,
+            ConnectorStateManager stateManager, StateEmitter stateEmitter)
         {
+            var descriptor = new StreamDescriptor
+            {
+                Name = streaminstance.Name,
+                Namespace = streaminstance.Namespace
+            };
+
             if (Config.TryGetProperty("_page_size", out var pagesizeElement) &&
                 streaminstance is HttpStream stream && pagesizeElement.TryGetInt32(out int pagesize))
             {
@@ -128,23 +143,32 @@ namespace Airbyte.Cdk.Sources
                 stream.PageSize = pagesize;
             }
 
-            long recordcount;
             long? recordlimit = Config.TryGetProperty("_limit", out var limitElement) && limitElement.TryGetInt64(out var limit) ? limit : null;
             Logger.Info($"Syncing stream: {streaminstance.Name}");
 
-            var streamname = configuredstream.Stream.Name;
-            if (State.TryGetProperty(streamname, out var stateElement))
-                Logger.Info($"Setting state of {streamname} stream to {stateElement}");
-            else
-                stateElement = "{}".AsJsonElement();
+            var streamname = configuredstream.Stream!.Name;
+            var stateElement = stateManager.GetStreamState(streaminstance.Name, streaminstance.Namespace);
+            Logger.Info($"Setting state of {streamname} stream to {stateElement.GetRawText()}");
 
-            if (configuredstream.SyncMode == SyncMode.incremental && streaminstance.SupportsIncremental)
-                recordcount = await ReadIncremental(logger, streaminstance, configuredstream, stateElement, recordlimit);
-            else
-                recordcount = await streaminstance.ReadRecords(logger, SyncMode.full_refresh, Channel, stateElement, recordlimit,
-                    configuredstream.CursorField, null);
+            streaminstance.StateEmitter = stateEmitter;
 
-            Logger.Info($"Read {recordcount} records from {streaminstance.Name} stream");
+            try
+            {
+                long recordcount;
+                if (configuredstream.SyncMode == SyncMode.incremental && streaminstance.SupportsIncremental)
+                    recordcount = await ReadIncremental(logger, streaminstance, configuredstream, stateElement, recordlimit);
+                else
+                    recordcount = await streaminstance.ReadRecords(logger, SyncMode.full_refresh, Channel, stateElement, recordlimit,
+                        configuredstream.CursorField, null);
+
+                Logger.Info($"Read {recordcount} records from {streaminstance.Name} stream");
+            }
+            finally
+            {
+                // Every stream must emit a terminal state, including full refresh streams that produce no records.
+                if (!stateEmitter.HasEmitted(descriptor))
+                    await stateEmitter.EmitAsync(descriptor, stateElement, 0);
+            }
         }
 
         private async Task<long> ReadIncremental(AirbyteLogger logger, Stream streaminstance, ConfiguredAirbyteStream configuredstream, JsonElement stateElement, long? recordlimit = null)
@@ -153,14 +177,15 @@ namespace Airbyte.Cdk.Sources
             return await streaminstance.ReadRecords(logger, SyncMode.incremental, Channel, stateElement, recordlimit, null, slices);
         }
 
-        public static AirbyteMessage AsAirbyteMessage(string streamname, JsonElement data) => new()
+        public static AirbyteMessage AsAirbyteMessage(string streamname, string? namespaceName, JsonElement data) => new()
         {
             Type = Type.RECORD,
             Record = new()
             {
                 EmittedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 Data = data,
-                Stream = streamname
+                Stream = streamname,
+                Namespace = namespaceName
             }
         };
     }
