@@ -1,0 +1,39 @@
+name: PR Agent
+
+# pull_request would be the obvious trigger, but fork pull requests get a read-only GITHUB_TOKEN and
+# no secrets, so the review fails with "Resource not accessible by integration" and can never call
+# the model. pull_request_target runs in the base repository's context instead.
+#
+# PR-Agent fetches the diff through the GitHub API, so this workflow has no actions/checkout step: no
+# contributor-controlled code or configuration is executed with the OpenRouter key.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+concurrency:
+  group: pr-agent-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pr_agent_job:
+    # Skip bot-authored PRs (Dependabot, Renovate) so they do not spend model budget.
+    if: github.event.sender.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pull request comments are issue comments, so issues: write is required in addition to
+      # pull-requests: write. Without it, publishing the review fails with a 403.
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Run PR-Agent review
+        # Pinned to v0.49.0: a floating ref would let upstream change the action under us, and
+        # SonarCloud (githubactions:S7637) requires third-party actions to be pinned to a full SHA.
+        uses: the-pr-agent/pr-agent@efdde4afe14aa401a3889012c7f3e9ef3081a430 # v0.49.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
