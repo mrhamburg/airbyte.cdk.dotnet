@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CliWrap;
 using Spectre.Console;
@@ -84,26 +85,25 @@ namespace Airbyte.Cdk
                 return string.Empty;
             }
 
-            var contents = File.ReadAllText(changelog)
-                .Replace("\n", " ")
-                .Replace(Environment.NewLine, " ")
-                .Replace("#", " ")
-                .Replace("\r", " ")
-                .Replace("v", " ");
-            List<Version> _versions = new List<Version>();
-            foreach (var v in contents.Split(" "))
-                if (Version.TryParse(v, out var ver))
-                    _versions.Add(ver);
+            // Only version headings count. Release notes mention other versions (for example a dependency
+            // upgrade), and scraping those makes the release workflow try to reuse an existing image tag.
+            var versions = Regex
+                .Matches(File.ReadAllText(changelog), @"^\s*#{2,}\s+v?(?<version>\d+(?:\.\d+){1,3})\s*$",
+                    RegexOptions.Multiline)
+                .Select(x => Version.TryParse(x.Groups["version"].Value, out var parsed) ? parsed : null)
+                .Where(x => x != null)
+                .Select(x => x!)
+                .ToList();
 
-            if (_versions.Count == 0)
+            if (versions.Count == 0)
             {
-                ToConsole(Error, "Could not find any semver versions");
+                ToConsole(Error, "Could not find any semver headings");
                 return string.Empty;
             }
-            
-            _versions.Sort();
-            _versions.Reverse();
-            var version = _versions.First().ToString();
+
+            versions.Sort();
+            versions.Reverse();
+            var version = versions.First().ToString();
             ToConsole(Check, $"Found connector version {version}");
 
             return version;
