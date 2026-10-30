@@ -4,4 +4,7 @@
 Initial release, using dotnet CDK
 
 ## 0.0.2
-Corrected entrypoint, due to airbyte [specifications](https://airbyte.io/blog/extending-docker-images-on-kubernetes) for kubernetes 
+Corrected entrypoint, due to airbyte [specifications](https://airbyte.io/blog/extending-docker-images-on-kubernetes) for kubernetes
+
+## 0.0.3
+Replaced the retired exchangerate.host free endpoint with the Frankfurter API, updated schemas, and fixed the sample catalog/state to use the connector's actual streams. Updated to Airbyte.Cdk 0.0.8 and the current NuGet dependency set (including draft-07 JSON schemas).

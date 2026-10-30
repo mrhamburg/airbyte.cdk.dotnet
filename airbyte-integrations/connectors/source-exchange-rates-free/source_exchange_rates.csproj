@@ -10,16 +10,17 @@
   <ItemGroup>
     <PackageReference Include="Airbyte.Cdk" />
     <PackageReference Include="Flurl.Http" />
+    <PackageReference Include="JsonPointer.Net" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="schemas\historical.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="schemas\symbols.json">
+    <None Update="schemas\latest.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="schemas\vat_rates.json">
+    <None Update="schemas\symbols.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="spec.json">
