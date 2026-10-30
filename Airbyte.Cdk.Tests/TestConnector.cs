@@ -8,6 +8,12 @@ using Xunit;
 
 namespace Airbyte.Cdk.Tests
 {
+    [CollectionDefinition("Environment", DisableParallelization = true)]
+    public class EnvironmentCollection
+    {
+    }
+
+    [Collection("Environment")]
     public class TestConnector
     {
         [Fact]

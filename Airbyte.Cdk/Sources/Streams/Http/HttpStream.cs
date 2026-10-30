@@ -158,7 +158,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// <summary>
         /// Process and send the request to the endpoint as set by the urlbase, includes all configuration as set in this stream
         /// </summary>
-        public async Task<(IFlurlRequest, IFlurlResponse)> Send(string path, Dictionary<string, object> headers = null,
+        public virtual async Task<(IFlurlRequest, IFlurlResponse)> Send(string path, Dictionary<string, object> headers = null,
             Dictionary<string, object> parameters = null, string json = "", string data = "")
         {
             //Create initial request object
@@ -249,6 +249,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
             Dictionary<string, object> nextpagetoken = null;
             long recordcount = 0;
             long recordsSinceState = 0;
+            JsonElement lastitem = "{}".AsJsonElement();
             bool Limitreached() => recordlimit.HasValue && recordcount >= recordlimit.Value;
 
             async Task UpdateState(JsonElement lastrecord)
@@ -270,13 +271,13 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                 var requestBodyData = RequestBodyData(streamstate, streamslice, nextpagetoken);
                 (IFlurlRequest request, IFlurlResponse response) result = await Send(path, requestheaders, parameters,
                     requestjson, requestBodyData);
-                JsonElement _lastitem = "{}".AsJsonElement();
 
                 foreach (var item in ParseResponse(result.response, streamstate, streamslice, nextpagetoken))
                 {
                     await streamchannel.WriteAsync(AbstractSource.AsAirbyteMessage(Name, Namespace, item));
                     recordcount++;
                     recordsSinceState++;
+                    lastitem = item;
 
                     //Check record limit
                     if (Limitreached()) break;
@@ -285,13 +286,11 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                     if (SyncMode == SyncMode.incremental && StateCheckpointInterval.HasValue &&
                         recordcount % StateCheckpointInterval == 0)
                         await UpdateState(item);
-
-                    _lastitem = item;
                 }
 
                 nextpagetoken = NextPageToken(result.request, result.response);
                 paginationcompleted = (nextpagetoken == null || nextpagetoken.Count == 0) || Limitreached();
-                if (paginationcompleted) await UpdateState(_lastitem);
+                if (paginationcompleted) await UpdateState(lastitem);
             }
 
             return recordcount;

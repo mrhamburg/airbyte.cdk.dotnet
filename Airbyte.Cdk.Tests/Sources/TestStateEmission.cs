@@ -21,9 +21,10 @@ namespace Airbyte.Cdk.Tests.Sources
         public async Task Test_FullRefreshRead_EmitsTerminalStreamState()
         {
             var source = new StateEmissionSource();
+            source.StreamInstance.RecordCount = 3;
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
 
-            await source.Read(new AirbyteLogger(), channel.Writer, "{}".AsJsonElement(),
+            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
                 Catalog("users", SyncMode.full_refresh, "public"), "{}".AsJsonElement());
             channel.Writer.Complete();
 
@@ -36,6 +37,7 @@ namespace Airbyte.Cdk.Tests.Sources
             stateMessages[0].State!.Type.ShouldBe(AirbyteStateType.STREAM);
             stateMessages[0].State!.Stream!.StreamDescriptor.Name.ShouldBe("users");
             stateMessages[0].State!.Stream!.StreamState!.Value.ValueKind.ShouldBe(JsonValueKind.Object);
+            stateMessages[0].State!.SourceStats!.RecordCount.ShouldBe(3);
         }
 
         [Fact]
@@ -72,6 +74,19 @@ namespace Airbyte.Cdk.Tests.Sources
             log.Count(x => x.Type == MessageType.TRACE &&
                            x.Trace!.Type == AirbyteTraceType.STREAM_STATUS &&
                            x.Trace!.StreamStatus!.Status == AirbyteStreamStatus.INCOMPLETE).ShouldBe(1);
+
+            channel.Reader.TryRead(out var terminalState).ShouldBeTrue();
+            terminalState.Type.ShouldBe(MessageType.STATE);
+            terminalState.State!.Stream!.StreamDescriptor.Name.ShouldBe("users");
+        }
+
+        [Fact]
+        public void Test_AsAirbyteMessage_BackwardCompatibleOverload()
+        {
+            var message = AbstractSource.AsAirbyteMessage("users", "{\"id\":1}".AsJsonElement());
+
+            message.Record!.Stream.ShouldBe("users");
+            message.Record.Namespace.ShouldBeNull();
         }
 
         [Fact]
@@ -119,6 +134,7 @@ namespace Airbyte.Cdk.Tests.Sources
         private class StateEmissionStream : Stream
         {
             public JsonElement ReceivedState { get; private set; }
+            public long RecordCount { get; set; }
 
             public StateEmissionStream() => _givenName = "users";
 
@@ -129,7 +145,7 @@ namespace Airbyte.Cdk.Tests.Sources
                 string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
             {
                 ReceivedState = streamstate;
-                return Task.FromResult(0L);
+                return Task.FromResult(RecordCount);
             }
         }
 

@@ -28,8 +28,8 @@ namespace Airbyte.Cdk.Models
         /// Legacy state data. Populated when <see cref="Type"/> is <see cref="AirbyteStateType.LEGACY"/>.
         /// </summary>
         [JsonPropertyName("data")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public JsonElement? Data { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public JsonElement Data { get; set; }
 
         [JsonPropertyName("sourceStats")]
         public AirbyteStateStats? SourceStats { get; set; }

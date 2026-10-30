@@ -120,14 +120,12 @@ namespace Airbyte.Cdk.Sources
                 }
                 catch (Exception e)
                 {
-                    logger.Exception(e);
                     logger.TraceError(e.Message, e.GetType().Name, e.StackTrace,
                         AirbyteFailureType.system_error, new StreamDescriptor
                         {
                             Name = streamInstance.Name,
                             Namespace = streamInstance.Namespace
                         });
-                    logger.Fatal($"Fatal exception occurred during ReadStream: {e.Message}");
                     throw;
                 }
             }
@@ -159,9 +157,9 @@ namespace Airbyte.Cdk.Sources
             streaminstance.StateEmitter = stateEmitter;
             logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.STARTED);
 
+            long recordcount = 0;
             try
             {
-                long recordcount;
                 if (configuredstream.SyncMode == SyncMode.incremental && streaminstance.SupportsIncremental)
                     recordcount = await ReadIncremental(logger, streaminstance, configuredstream, stateElement, recordlimit);
                 else
@@ -180,7 +178,7 @@ namespace Airbyte.Cdk.Sources
             {
                 // Every stream must emit a terminal state, including full refresh streams that produce no records.
                 if (!stateEmitter.HasEmitted(descriptor))
-                    await stateEmitter.EmitAsync(descriptor, stateElement, 0);
+                    await stateEmitter.EmitAsync(descriptor, stateElement, recordcount);
             }
         }
 
@@ -189,6 +187,9 @@ namespace Airbyte.Cdk.Sources
             var slices = streaminstance.StreamSlices(SyncMode.incremental, configuredstream.CursorField!, stateElement);
             return await streaminstance.ReadRecords(logger, SyncMode.incremental, Channel, stateElement, recordlimit, null!, slices);
         }
+
+        public static AirbyteMessage AsAirbyteMessage(string streamname, JsonElement data) =>
+            AsAirbyteMessage(streamname, null, data);
 
         public static AirbyteMessage AsAirbyteMessage(string streamname, string? namespaceName, JsonElement data) => new()
         {

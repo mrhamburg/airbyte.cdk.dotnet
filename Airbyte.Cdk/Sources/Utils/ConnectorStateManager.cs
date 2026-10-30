@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Airbyte.Cdk.Models;
 
@@ -42,7 +43,7 @@ namespace Airbyte.Cdk.Sources.Utils
                     break;
                 case AirbyteStateType.LEGACY:
                 default:
-                    if (message.Data.HasValue)
+                    if (message.Data.ValueKind != JsonValueKind.Undefined)
                         _legacyData = message.Data;
                     break;
             }
@@ -67,6 +68,13 @@ namespace Airbyte.Cdk.Sources.Utils
 
             if (ns != null && _streamStates.TryGetValue(new StreamKey(name, null), out state))
                 return state ?? "{}".AsJsonElement();
+
+            if (ns == null)
+            {
+                var namespaced = _streamStates.FirstOrDefault(x => x.Key.Name == name);
+                if (namespaced.Key.Name != null)
+                    return namespaced.Value ?? "{}".AsJsonElement();
+            }
 
             if (_legacyData.HasValue &&
                 _legacyData.Value.ValueKind == JsonValueKind.Object &&
@@ -100,7 +108,7 @@ namespace Airbyte.Cdk.Sources.Utils
                 Namespace = ns;
             }
 
-            private string Name { get; }
+            public string Name { get; }
             private string? Namespace { get; }
 
             public bool Equals(StreamKey other) =>

@@ -68,7 +68,7 @@ namespace Airbyte.Cdk
             Connector = instance;
             try
             {
-                Launch();
+                await Launch();
             }
             catch (Exception e)
             {
@@ -92,7 +92,7 @@ namespace Airbyte.Cdk
             return destination;
         }
 
-        private static void Launch()
+        private static async Task Launch()
         {
             var spec = Connector.Spec();
 
@@ -161,51 +161,39 @@ namespace Airbyte.Cdk
                     Task.WaitAll(readtasks);
                     break;
                 case "write":
-                    Channel<AirbyteMessage> writerChannel = Channel.CreateUnbounded<AirbyteMessage>();
+                    var destination = GetDestination();
                     var config = GetConfig(spec);
                     var catalog = GetCatalog();
-                    var writetasks = new[]
-                    {
-                        Task.Run(async () =>
-                        {
-                            var writer = writerChannel.Writer;
-                            try
-                            {
-                                while (true)
-                                {
-                                    var text = await Console.In.ReadLineAsync();
-                                    if (text == null)
-                                        break;
-
-                                    if (AirbyteProtocolReader.TryParseMessage(text, out var msg))
-                                        await writer.WriteAsync(msg!);
-                                    else
-                                        Logger.Warn("Dropping input that is not a valid AirbyteMessage");
-                                }
-                            }
-                            finally
-                            {
-                                writer.Complete();
-                            }
-                        }),
-                        Task.Run(async () =>
-                        {
-                            var destination = GetDestination();
-                            await foreach (var msg in writerChannel.Reader.ReadAllAsync())
-                            {
-                                await destination.Write(Logger, config, catalog, msg);
-
-                                // Destinations must return state in the order it was received.
-                                if (msg.Type == Type.STATE)
-                                    ToConsole(msg);
-                            }
-                        })
-                    };
-
-                    Task.WaitAll(writetasks);
+                    await RunWriteLoop(Console.In, Console.Out, Logger, destination, config, catalog);
                     break;
                 default:
                     throw new NotImplementedException($"Unexpected command: {Options.Command}");
+            }
+        }
+
+        /// <summary>
+        /// Consumes destination input line by line and returns state messages to the platform in the order received.
+        /// Processing is deliberately sequential so a destination failure cannot leave a producer blocked on stdin.
+        /// </summary>
+        public static async Task RunWriteLoop(TextReader input, TextWriter output, AirbyteLogger logger,
+            Destination destination, JsonElement config, ConfiguredAirbyteCatalog catalog)
+        {
+            while (true)
+            {
+                var text = await input.ReadLineAsync();
+                if (text == null)
+                    break;
+
+                if (!AirbyteProtocolReader.TryParseMessage(text, out var msg))
+                {
+                    logger.Warn("Dropping input that is not a valid AirbyteMessage");
+                    continue;
+                }
+
+                await destination.Write(logger, config, catalog, msg!);
+
+                if (msg!.Type == Type.STATE)
+                    ToConsole(msg, output);
             }
         }
 

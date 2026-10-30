@@ -37,10 +37,11 @@ namespace Airbyte.Cdk.Sources.Utils
             }
 
             // A state file may contain the full AirbyteMessage envelope.
-            if (TryGetString(state, "type", out var type) && type == "STATE" &&
-                state.TryGetProperty("state", out var innerState))
+            if (TryGetString(state, "type", out var type) && type == "STATE")
             {
-                ParseInto(innerState, result);
+                if (state.TryGetProperty("state", out var innerState))
+                    ParseInto(innerState, result);
+
                 return;
             }
 
@@ -77,17 +78,16 @@ namespace Airbyte.Cdk.Sources.Utils
 
         private static bool IsStateMessage(JsonElement state)
         {
-            if (state.TryGetProperty("stream", out _) ||
-                state.TryGetProperty("global", out _) ||
-                state.TryGetProperty("data", out _) ||
-                state.TryGetProperty("state_type", out _))
-                return true;
+            if (TryGetString(state, "state_type", out var stateType))
+                return IsStateType(stateType);
 
             if (!TryGetString(state, "type", out var type))
                 return false;
 
             return type is "STATE" or "GLOBAL" or "STREAM" or "LEGACY";
         }
+
+        private static bool IsStateType(string value) => value is "GLOBAL" or "STREAM" or "LEGACY";
 
         private static void InferType(AirbyteStateMessage message)
         {

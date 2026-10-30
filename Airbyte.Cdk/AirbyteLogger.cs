@@ -16,7 +16,9 @@ namespace Airbyte.Cdk
 
         public AirbyteLogger(Action<AirbyteMessage> sink) => _sink = sink;
 
-        public void Log(Level level, string message, string? stackTrace = null)
+        public void Log(Level level, string message) => Log(level, message, null);
+
+        public void Log(Level level, string message, string? stackTrace)
         {
             var logrecord = new AirbyteLogMessage {Level = level, Message = message, StackTrace = stackTrace};
             var logmessage = new AirbyteMessage {Type = Type.LOG, Log = logrecord};

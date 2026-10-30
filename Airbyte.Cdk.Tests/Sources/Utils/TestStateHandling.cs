@@ -71,6 +71,24 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             StateReader.Parse("{}".AsJsonElement()).ShouldBeEmpty();
         }
 
+        [Theory]
+        [InlineData("data")]
+        [InlineData("stream")]
+        [InlineData("global")]
+        public void Test_StateReader_TreatsReservedNamesAsLegacyStreams(string name)
+        {
+            var messages = StateReader.Parse(("{\"" + name + "\":{\"id\":1}}").AsJsonElement());
+
+            messages.Count.ShouldBe(1);
+            messages[0].Stream.StreamDescriptor.Name.ShouldBe(name);
+        }
+
+        [Fact]
+        public void Test_StateReader_IgnoresMalformedEnvelope()
+        {
+            StateReader.Parse("{\"type\":\"STATE\"}".AsJsonElement()).ShouldBeEmpty();
+        }
+
         [Fact]
         public void Test_StateManager_MapsStreamAndNamespace()
         {
@@ -79,8 +97,18 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var manager = new ConnectorStateManager(StateReader.Parse(json.AsJsonElement()));
 
             manager.GetStreamState("users", "public").GetProperty("id").GetInt32().ShouldBe(1);
-            manager.GetStreamState("users", null).ValueKind.ShouldBe(JsonValueKind.Object);
-            manager.GetStreamState("users", null).EnumerateObject().Any().ShouldBeFalse();
+            manager.GetStreamState("other", null).ValueKind.ShouldBe(JsonValueKind.Object);
+            manager.GetStreamState("other", null).EnumerateObject().Any().ShouldBeFalse();
+        }
+
+        [Fact]
+        public void Test_StateManager_FallsBackToNamespacedStateForUnnamespacedStream()
+        {
+            const string json =
+                "[{\"type\":\"STREAM\",\"stream\":{\"stream_descriptor\":{\"name\":\"users\",\"namespace\":\"public\"},\"stream_state\":{\"id\":1}}}]";
+            var manager = new ConnectorStateManager(StateReader.Parse(json.AsJsonElement()));
+
+            manager.GetStreamState("users", null).GetProperty("id").GetInt32().ShouldBe(1);
         }
 
         [Fact]
@@ -166,6 +194,26 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             message.Type.ShouldBe(MessageType.STATE);
             message.State.Type.ShouldBe(AirbyteStateType.STREAM);
             message.State.Stream.StreamState.ShouldBeNull();
+        }
+
+        [Fact]
+        public void Test_ResetState_SerializesExplicitNull()
+        {
+            var message = new AirbyteStateMessage
+            {
+                Type = AirbyteStateType.STREAM,
+                Stream = new AirbyteStreamState
+                {
+                    StreamDescriptor = new StreamDescriptor { Name = "users" },
+                    StreamState = null
+                }
+            };
+
+            var json = JsonSerializer.Serialize(message, AirbyteProtocolJson.Options);
+            using var document = JsonDocument.Parse(json);
+            var streamState = document.RootElement.GetProperty("stream").GetProperty("stream_state");
+
+            streamState.ValueKind.ShouldBe(JsonValueKind.Null);
         }
     }
 }
