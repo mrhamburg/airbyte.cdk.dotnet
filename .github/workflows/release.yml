@@ -1,7 +1,18 @@
-#TODO: version is not working
-# error: Source parameter was not specified.
-# see: https://github.com/mrhamburg/airbyte.cdk.dotnet/runs/4473155151?check_suite_focus=true
 name: Release Dotnet CDK
+
+# Publishes Airbyte.Cdk to nuget.org when a GitHub release is published.
+#
+# Authentication uses NuGet trusted publishing: the job exchanges a short-lived
+# GitHub OIDC token for a temporary nuget.org API key, so no long-lived NuGet
+# credential is stored in this repository.
+#
+# Required nuget.org trusted publishing policy (https://www.nuget.org/account/trustedpublishing):
+#   Repository Owner: mrhamburg
+#   Repository:       airbyte.cdk.dotnet
+#   Workflow File:    release.yml
+#   Environment:      release
+#
+# Required GitHub environment `release` secret: NUGET_USER (nuget.org profile name, not the email).
 on:
   release:
     types: [published]
@@ -9,20 +20,55 @@ on:
 jobs:
   publish-dotnet-cdk:
     runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # required so NuGet/login can request the OIDC token
+      contents: read
+
     steps:
-      - name: Checkout Airbyte
-        uses: actions/checkout@v2
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Build and test
-        id: docker_build
-        uses: docker/build-push-action@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          push: false
-          tags: local/dotnet-cdk:latest
-          context: .
-          build-args: |
-            NUGET_APIKEY=${{ secrets.NUGET_APIKEY }}
-            BUILD_VERSION=${{ github.event.release.tag_name }}
+          global-json-file: global.json
+
+      - name: Resolve version from release tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Release tag '$TAG' is not a valid SemVer version (expected e.g. 1.2.3 or 1.2.3-preview.1)."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing Airbyte.Cdk $VERSION"
+
+      - name: Test
+        run: dotnet test --nologo
+
+      # GeneratePackageOnBuild=true makes a plain `dotnet pack` fail with NU5026,
+      # so pack it explicitly and keep the package out of the test/build path.
+      - name: Pack
+        run: >
+          dotnet pack Airbyte.Cdk/Airbyte.Cdk.csproj
+          --configuration Release
+          --output ./artifacts
+          -p:Version=${{ steps.version.outputs.VERSION }}
+          -p:GeneratePackageOnBuild=false
+
+      - name: NuGet login (OIDC)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to nuget.org
+        run: >
+          dotnet nuget push "./artifacts/*.nupkg"
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

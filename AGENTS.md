@@ -70,7 +70,7 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 
 ## Release and CI
 
-- CDK NuGet publishing is driven by `.github/workflows/release.yml` through the `Dockerfile` `publish` stage with `BUILD_VERSION` and `NUGET_APIKEY`.
+- CDK NuGet publishing is driven by `.github/workflows/release.yml` on a published GitHub release: the job packs `Airbyte.Cdk` with `-p:Version=<release tag>` and pushes it to nuget.org. Authentication is [NuGet trusted publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing) — `NuGet/login@v1` exchanges the GitHub OIDC token for a short-lived key, so no NuGet API key is stored. The job therefore needs `id-token: write`, the `release` environment (secret `NUGET_USER` = nuget.org profile name), and a matching policy on nuget.org. The `Dockerfile` only builds/tests and never receives a credential.
 - Connector images are built/published by `.github/workflows/build-connector.yml` and `release-connector.yml`, which invoke `dotnet run publish -b` from `Airbyte.Cdk`. That command derives changed connectors from `git diff HEAD HEAD~1` and the version from `CHANGELOG.md`.
 - CI paths are narrow: CDK changes trigger `build.yml` (`Airbyte.Cdk/**`, `Airbyte.Cdk.Tests/**`); connector changes trigger `build-connector.yml` (`airbyte-integrations/connectors/**`).
 - `.github/workflows/pr-agent.yml` runs PR-Agent against OpenRouter on every pull request — advisory review only, not a merge gate.
@@ -92,7 +92,7 @@ key settings stay host-controlled there.
 
 ## Gotchas for agents
 
-- The CDK project is an executable and generates a package on build (`GeneratePackageOnBuild=true`); building it also produces a `.nupkg`.
+- The CDK project is an executable and generates a package on build (`GeneratePackageOnBuild=true`); building it also produces a `.nupkg`. Because of that, a bare `dotnet pack Airbyte.Cdk` fails with `NU5026` (missing `runtimeconfig.json`); pass `-p:GeneratePackageOnBuild=false` (what the release workflow does) or `dotnet build` first and then `dotnet pack --no-build`.
 - `AirbyteEntrypoint` reads `AIRBYTE_IMPL_PATH` before anything else; local connector runs therefore need the built DLL or must run through the connector project's own `Main`.
 - Docker images pin `mcr.microsoft.com/dotnet/sdk:10.0` and `runtime:10.0`.
 - Some test files are empty placeholders (e.g. `TestHttp.cs`, `TestStreamsCore.cs`). Do not assume they contain coverage.
