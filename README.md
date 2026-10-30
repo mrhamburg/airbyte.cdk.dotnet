@@ -38,6 +38,13 @@ The CDK targets the Airbyte protocol **v0.19.0** over the STDIO/JSON transport. 
 
 Connector specifications should declare `protocol_version`; `Connector.Spec()` defaults it to `0.19.0` when it is absent.
 
+### Migration notes
+
+- Sources now emit per-stream `STREAM` state instead of legacy `{"state":{"data":...}}` messages. Legacy state files are still accepted on input.
+- The state passed to a source can now be a JSON array of per-stream state messages. `AbstractSource.State` remains a `JsonElement`, but callers must not assume it is an object.
+- Destinations must flush pending records before returning from `Destination.Write` when the message is a `STATE`; the CDK echoes that state immediately after `Write` returns.
+- Connector package pins should move to the next published CDK version before a connector image is rebuilt with these changes.
+
 ## Concepts & Documentation
 This readme is a general introduction to the CDK. Readers should have basic familiarity with the [Airbyte Specification](https://docs.airbyte.io/architecture/airbyte-specification) before proceeding.
 

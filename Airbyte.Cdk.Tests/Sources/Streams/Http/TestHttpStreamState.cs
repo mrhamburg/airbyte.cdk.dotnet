@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -48,6 +49,38 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
             states[1].SourceStats.RecordCount.ShouldBe(1);
         }
 
+        [Fact]
+        public async Task Test_SuppressedState_DoesNotDropRecordCount()
+        {
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var updateCount = 0;
+            var stream = new FakeHttpStream(1, "{\"id\":1}", "{\"id\":1}", "{\"id\":2}");
+            stream.UpdatedState = _ => new { id = ++updateCount <= 2 ? 1 : 2 }.AsJsonElement();
+
+            await stream.ReadRecords(new AirbyteLogger(_ => { }), SyncMode.incremental, channel.Writer,
+                "{}".AsJsonElement());
+
+            var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).Select(x => x.State).ToArray();
+            states.Length.ShouldBe(2);
+            states[0].SourceStats.RecordCount.ShouldBe(1);
+            states[1].SourceStats.RecordCount.ShouldBe(2);
+        }
+
+        [Fact]
+        public async Task Test_FirstRecord_EmitsRunningStatus()
+        {
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+            var log = new List<AirbyteMessage>();
+            var stream = new FakeHttpStream(null, "{\"id\":1}");
+
+            await stream.ReadRecords(new AirbyteLogger(log.Add), SyncMode.incremental, channel.Writer,
+                "{}".AsJsonElement());
+
+            log.Any(x => x.Type == MessageType.TRACE &&
+                         x.Trace!.Type == AirbyteTraceType.STREAM_STATUS &&
+                         x.Trace!.StreamStatus!.Status == AirbyteStreamStatus.RUNNING).ShouldBeTrue();
+        }
+
         private static async Task<List<AirbyteMessage>> ReadAll(Channel<AirbyteMessage> channel)
         {
             channel.Writer.Complete();
@@ -77,7 +110,10 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
                 Dictionary<string, object> streamslice = null, Dictionary<string, object> nextpagetoken = null) =>
                 _records;
 
+            public Func<JsonElement, JsonElement> UpdatedState { get; set; }
+
             public override JsonElement GetUpdatedState(JsonElement currentstreamstate, JsonElement latestrecord) =>
+                UpdatedState?.Invoke(latestrecord) ??
                 new { id = latestrecord.GetProperty("id").GetInt32() }.AsJsonElement();
 
             public override Task<(IFlurlRequest, IFlurlResponse)> Send(string path,

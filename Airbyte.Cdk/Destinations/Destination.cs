@@ -13,6 +13,11 @@ namespace Airbyte.Cdk.Destinations
                 ? "".AsJsonElement()
                 : JsonDocument.Parse(File.ReadAllText(statepath)).RootElement.Clone();
 
+        /// <summary>
+        /// Writes a single input message. When <paramref name="msg"/> is a state message, the destination
+        /// must flush any pending records before returning; the CDK echoes the state message immediately
+        /// after this method returns.
+        /// </summary>
         public abstract Task Write(AirbyteLogger logger, JsonElement config,
             ConfiguredAirbyteCatalog catalog, AirbyteMessage msg);
     }

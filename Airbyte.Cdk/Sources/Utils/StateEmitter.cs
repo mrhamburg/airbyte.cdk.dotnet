@@ -15,7 +15,6 @@ namespace Airbyte.Cdk.Sources.Utils
     public class StateEmitter
     {
         private readonly ChannelWriter<AirbyteMessage> _channel;
-        private readonly ConnectorStateManager _stateManager = new(Array.Empty<AirbyteStateMessage>());
         private readonly Dictionary<string, string> _lastEmitted = new();
 
         public StateEmitter(ChannelWriter<AirbyteMessage> channel) => _channel = channel;
@@ -27,11 +26,17 @@ namespace Airbyte.Cdk.Sources.Utils
             if (_lastEmitted.TryGetValue(key, out var previous) && previous == stateJson)
                 return false;
 
-            var message = _stateManager.CreateStateMessage(descriptor, state, recordCount);
+            var message = StateMessageFactory.Create(descriptor, state, recordCount);
             await _channel.WriteAsync(new AirbyteMessage { Type = MessageType.STATE, State = message });
             _lastEmitted[key] = stateJson;
             return true;
         }
+
+        /// <summary>
+        /// Records a state message written directly by a custom stream.
+        /// </summary>
+        public void MarkEmitted(StreamDescriptor descriptor) =>
+            _lastEmitted[Key(descriptor)] = "\u0000observed";
 
         public bool HasEmitted(StreamDescriptor descriptor) => _lastEmitted.ContainsKey(Key(descriptor));
 

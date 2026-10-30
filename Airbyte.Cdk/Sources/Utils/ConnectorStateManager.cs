@@ -71,9 +71,11 @@ namespace Airbyte.Cdk.Sources.Utils
 
             if (ns == null)
             {
-                var namespaced = _streamStates.FirstOrDefault(x => x.Key.Name == name);
-                if (namespaced.Key.Name != null)
-                    return namespaced.Value ?? "{}".AsJsonElement();
+                // Only fall back to a namespaced entry when the name is unambiguous; otherwise
+                // two same-named streams from different namespaces could be cross-wired.
+                var namespaced = _streamStates.Where(x => x.Key.Name == name).ToArray();
+                if (namespaced.Length == 1)
+                    return namespaced[0].Value ?? "{}".AsJsonElement();
             }
 
             if (_legacyData.HasValue &&
@@ -85,16 +87,7 @@ namespace Airbyte.Cdk.Sources.Utils
         }
 
         public AirbyteStateMessage CreateStateMessage(StreamDescriptor descriptor, JsonElement? state,
-            long recordCount = 0) => new()
-        {
-            Type = AirbyteStateType.STREAM,
-            Stream = new AirbyteStreamState
-            {
-                StreamDescriptor = descriptor,
-                StreamState = state
-            },
-            SourceStats = new AirbyteStateStats { RecordCount = recordCount }
-        };
+            long recordCount = 0) => StateMessageFactory.Create(descriptor, state, recordCount);
 
         public AirbyteStateMessage CreateStateMessage(string name, string? ns, JsonElement? state,
             long recordCount = 0) => CreateStateMessage(

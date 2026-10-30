@@ -112,6 +112,16 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
         }
 
         [Fact]
+        public void Test_StateManager_DoesNotCrossWireAmbiguousNamespaces()
+        {
+            const string json =
+                "[{\"type\":\"STREAM\",\"stream\":{\"stream_descriptor\":{\"name\":\"users\",\"namespace\":\"a\"},\"stream_state\":{\"id\":1}}},{\"type\":\"STREAM\",\"stream\":{\"stream_descriptor\":{\"name\":\"users\",\"namespace\":\"b\"},\"stream_state\":{\"id\":2}}}]";
+            var manager = new ConnectorStateManager(StateReader.Parse(json.AsJsonElement()));
+
+            manager.GetStreamState("users", null).EnumerateObject().Any().ShouldBeFalse();
+        }
+
+        [Fact]
         public void Test_StateManager_RejectsGlobalSharedState()
         {
             var messages = StateReader.Parse(

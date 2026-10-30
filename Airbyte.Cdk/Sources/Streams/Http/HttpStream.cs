@@ -256,9 +256,11 @@ namespace Airbyte.Cdk.Sources.Streams.Http
             {
                 var updatedstate = GetUpdatedState(streamstate, lastrecord);
                 Logger.Info($"Setting state of {Name} stream to {updatedstate.GetRawText()}");
-                await StateEmitter.EmitAsync(new StreamDescriptor { Name = Name, Namespace = Namespace },
+                var emitted = await StateEmitter.EmitAsync(
+                    new StreamDescriptor { Name = Name, Namespace = Namespace },
                     updatedstate, recordsSinceState);
-                recordsSinceState = 0;
+                if (emitted)
+                    recordsSinceState = 0;
                 streamstate = updatedstate;
             }
 
@@ -278,6 +280,10 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                     recordcount++;
                     recordsSinceState++;
                     lastitem = item;
+
+                    if (recordcount == 1)
+                        Logger.TraceStreamStatus(new StreamDescriptor { Name = Name, Namespace = Namespace },
+                            AirbyteStreamStatus.RUNNING);
 
                     //Check record limit
                     if (Limitreached()) break;

@@ -98,8 +98,15 @@ namespace Airbyte.Cdk.Sources
             Catalog = catalog;
             State = state;
 
-            var stateManager = new ConnectorStateManager(StateReader.Parse(state));
             var stateEmitter = new StateEmitter(channel);
+            var trackingChannel = new StateTrackingChannelWriter(channel, stateEmitter);
+            Channel = trackingChannel;
+
+            // Route logs and traces through the same channel as records/state so they cannot print out of order.
+            logger = new AirbyteLogger(message => trackingChannel.TryWrite(message));
+            Logger = logger;
+
+            var stateManager = new ConnectorStateManager(StateReader.Parse(state));
 
             logger.Info($"Starting syncing {Name}");
             var streamsInstances = Streams(config);
@@ -109,10 +116,12 @@ namespace Airbyte.Cdk.Sources
                     throw new Exception("The configured catalog contains a stream without a stream definition");
 
                 var streamInstance = streamsInstances.FirstOrDefault(x =>
-                    x.Name == configuredStream.Stream.Name && x.Namespace == configuredStream.Stream.Namespace);
+                    x.Name == configuredStream.Stream.Name &&
+                    string.Equals(x.Namespace ?? string.Empty,
+                        configuredStream.Stream.Namespace ?? string.Empty, StringComparison.Ordinal));
                 if (streamInstance == null)
                     throw new Exception(
-                        $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {streamsInstances.Select(x => x.Name)}");
+                        $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {string.Join(", ", streamsInstances.Select(x => x.Name))}");
 
                 try
                 {
@@ -120,12 +129,13 @@ namespace Airbyte.Cdk.Sources
                 }
                 catch (Exception e)
                 {
-                    logger.TraceError(e.Message, e.GetType().Name, e.StackTrace,
-                        AirbyteFailureType.system_error, new StreamDescriptor
+                    logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
+                        e.StackTrace, AirbyteFailureType.system_error, new StreamDescriptor
                         {
                             Name = streamInstance.Name,
                             Namespace = streamInstance.Namespace
                         });
+                    e.Data["AirbyteTraceEmitted"] = true;
                     throw;
                 }
             }
@@ -155,16 +165,24 @@ namespace Airbyte.Cdk.Sources
             Logger.Info($"Setting state of {streamname} stream to {stateElement.GetRawText()}");
 
             streaminstance.StateEmitter = stateEmitter;
+            if (Channel is StateTrackingChannelWriter trackingChannel)
+                trackingChannel.CurrentDescriptor = descriptor;
+
             logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.STARTED);
 
-            long recordcount = 0;
             try
             {
+                long recordcount;
                 if (configuredstream.SyncMode == SyncMode.incremental && streaminstance.SupportsIncremental)
                     recordcount = await ReadIncremental(logger, streaminstance, configuredstream, stateElement, recordlimit);
                 else
                     recordcount = await streaminstance.ReadRecords(logger, SyncMode.full_refresh, Channel, stateElement, recordlimit,
                         configuredstream.CursorField!, null!);
+
+                // Only emit the fallback terminal state on success. A failed stream may already have emitted
+                // checkpoints, and emitting a stale state after a failure could move the cursor backwards.
+                if (!stateEmitter.HasEmitted(descriptor))
+                    await stateEmitter.EmitAsync(descriptor, stateElement, recordcount);
 
                 logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.COMPLETE);
                 Logger.Info($"Read {recordcount} records from {streaminstance.Name} stream");
@@ -173,12 +191,6 @@ namespace Airbyte.Cdk.Sources
             {
                 logger.TraceStreamStatus(descriptor, AirbyteStreamStatus.INCOMPLETE);
                 throw;
-            }
-            finally
-            {
-                // Every stream must emit a terminal state, including full refresh streams that produce no records.
-                if (!stateEmitter.HasEmitted(descriptor))
-                    await stateEmitter.EmitAsync(descriptor, stateElement, recordcount);
             }
         }
 

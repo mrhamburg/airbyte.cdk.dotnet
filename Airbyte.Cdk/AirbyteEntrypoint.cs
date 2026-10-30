@@ -72,7 +72,9 @@ namespace Airbyte.Cdk
             }
             catch (Exception e)
             {
-                Logger.TraceError(e.Message, e.GetType().Name, e.StackTrace, AirbyteFailureType.system_error);
+                if (!e.Data.Contains("AirbyteTraceEmitted"))
+                    Logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
+                        e.StackTrace, AirbyteFailureType.system_error);
                 Logger.Fatal($"Exception ({e.GetType()}): {e.Message}");
                 Environment.ExitCode = 1;
             }
@@ -141,8 +143,10 @@ namespace Airbyte.Cdk
                             catch (Exception e)
                             {
                                 Logger.Exception(e);
-                                Logger.TraceError(e.Message, e.GetType().Name, e.StackTrace,
-                                    AirbyteFailureType.system_error);
+                                if (!e.Data.Contains("AirbyteTraceEmitted"))
+                                    Logger.TraceError("The connector failed",
+                                        $"{e.GetType().Name}: {e.Message}", e.StackTrace,
+                                        AirbyteFailureType.system_error);
                                 Logger.Fatal("Could not process data due to exception: " + e.Message);
                                 Environment.ExitCode = 1;
                             }
@@ -161,11 +165,13 @@ namespace Airbyte.Cdk
                     Task.WaitAll(readtasks);
                     break;
                 case "write":
+                {
                     var destination = GetDestination();
                     var config = GetConfig(spec);
                     var catalog = GetCatalog();
                     await RunWriteLoop(Console.In, Console.Out, Logger, destination, config, catalog);
                     break;
+                }
                 default:
                     throw new NotImplementedException($"Unexpected command: {Options.Command}");
             }

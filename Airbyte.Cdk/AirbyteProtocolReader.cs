@@ -32,7 +32,7 @@ namespace Airbyte.Cdk
                     !Enum.IsDefined(typeof(MessageType), messageType))
                     return false;
 
-                message = JsonSerializer.Deserialize<AirbyteMessage>(line, AirbyteProtocolJson.Options);
+                message = document.RootElement.Deserialize<AirbyteMessage>(AirbyteProtocolJson.Options);
                 if (message == null || !HasPayload(message, messageType))
                 {
                     message = null;

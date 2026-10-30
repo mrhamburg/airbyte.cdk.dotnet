@@ -45,13 +45,12 @@ namespace Airbyte.Cdk.Tests.Sources
         {
             var source = new StateEmissionSource();
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
-            var log = new List<AirbyteMessage>();
-            var logger = new AirbyteLogger(log.Add);
 
-            await source.Read(logger, channel.Writer, "{}".AsJsonElement(),
+            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
                 Catalog("users", SyncMode.full_refresh, "public"), "{}".AsJsonElement());
+            channel.Writer.Complete();
 
-            var statuses = log
+            var statuses = (await ReadAll(channel))
                 .Where(x => x.Type == MessageType.TRACE && x.Trace!.Type == AirbyteTraceType.STREAM_STATUS)
                 .Select(x => x.Trace!.StreamStatus!.Status)
                 .ToArray();
@@ -65,19 +64,55 @@ namespace Airbyte.Cdk.Tests.Sources
         {
             var source = new FailingSource();
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
-            var log = new List<AirbyteMessage>();
-            var logger = new AirbyteLogger(log.Add);
 
-            await Should.ThrowAsync<InvalidOperationException>(() => source.Read(logger, channel.Writer,
-                "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement()));
+            await Should.ThrowAsync<InvalidOperationException>(() => source.Read(new AirbyteLogger(_ => { }),
+                channel.Writer, "{}".AsJsonElement(), Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement()));
+            channel.Writer.Complete();
 
-            log.Count(x => x.Type == MessageType.TRACE &&
-                           x.Trace!.Type == AirbyteTraceType.STREAM_STATUS &&
-                           x.Trace!.StreamStatus!.Status == AirbyteStreamStatus.INCOMPLETE).ShouldBe(1);
+            var messages = await ReadAll(channel);
 
-            channel.Reader.TryRead(out var terminalState).ShouldBeTrue();
-            terminalState.Type.ShouldBe(MessageType.STATE);
-            terminalState.State!.Stream!.StreamDescriptor.Name.ShouldBe("users");
+            messages.Count(x => x.Type == MessageType.TRACE &&
+                                x.Trace!.Type == AirbyteTraceType.STREAM_STATUS &&
+                                x.Trace!.StreamStatus!.Status == AirbyteStreamStatus.INCOMPLETE).ShouldBe(1);
+            messages.Any(x => x.Type == MessageType.STATE).ShouldBeFalse();
+        }
+
+        [Fact]
+        public async Task Test_ReadOrdersTraceRecordAndStateMessages()
+        {
+            var source = new OrderedSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+
+            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
+                Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement());
+            channel.Writer.Complete();
+
+            var messages = await ReadAll(channel);
+            var started = messages.FindIndex(x => IsStatus(x, AirbyteStreamStatus.STARTED));
+            var record = messages.FindIndex(x => x.Type == MessageType.RECORD);
+            var state = messages.FindIndex(x => x.Type == MessageType.STATE);
+            var complete = messages.FindIndex(x => IsStatus(x, AirbyteStreamStatus.COMPLETE));
+
+            started.ShouldBeGreaterThanOrEqualTo(0);
+            record.ShouldBeGreaterThan(started);
+            state.ShouldBeGreaterThan(record);
+            complete.ShouldBeGreaterThan(state);
+        }
+
+        [Fact]
+        public async Task Test_CustomLegacyState_DoesNotAppendFallbackState()
+        {
+            var source = new LegacyStateSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+
+            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
+                Catalog("users", SyncMode.full_refresh), "{}".AsJsonElement());
+            channel.Writer.Complete();
+
+            var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).ToArray();
+            states.Length.ShouldBe(1);
+            states[0].State!.Type.ShouldBeNull();
+            states[0].State!.Data.GetProperty("legacy").GetBoolean().ShouldBeTrue();
         }
 
         [Fact]
@@ -87,6 +122,19 @@ namespace Airbyte.Cdk.Tests.Sources
 
             message.Record!.Stream.ShouldBe("users");
             message.Record.Namespace.ShouldBeNull();
+        }
+
+        [Fact]
+        public async Task Test_ReadMatchesEmptyCatalogNamespaceToNullStreamNamespace()
+        {
+            var source = new NullNamespaceSource();
+            var channel = Channel.CreateUnbounded<AirbyteMessage>();
+
+            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, "{}".AsJsonElement(),
+                Catalog("users", SyncMode.full_refresh, string.Empty), "{}".AsJsonElement());
+            channel.Writer.Complete();
+
+            (await ReadAll(channel)).Count(x => x.Type == MessageType.STATE).ShouldBe(1);
         }
 
         [Fact]
@@ -103,6 +151,19 @@ namespace Airbyte.Cdk.Tests.Sources
 
             source.StreamInstance.ReceivedState.GetProperty("id").GetInt32().ShouldBe(7);
         }
+
+        private static async Task<List<AirbyteMessage>> ReadAll(Channel<AirbyteMessage> channel)
+        {
+            var messages = new List<AirbyteMessage>();
+            await foreach (var message in channel.Reader.ReadAllAsync())
+                messages.Add(message);
+            return messages;
+        }
+
+        private static bool IsStatus(AirbyteMessage message, AirbyteStreamStatus status) =>
+            message.Type == MessageType.TRACE &&
+            message.Trace?.Type == AirbyteTraceType.STREAM_STATUS &&
+            message.Trace.StreamStatus?.Status == status;
 
         private static ConfiguredAirbyteCatalog Catalog(string name, SyncMode syncMode, string? ns = null) =>
             new()
@@ -146,6 +207,81 @@ namespace Airbyte.Cdk.Tests.Sources
             {
                 ReceivedState = streamstate;
                 return Task.FromResult(RecordCount);
+            }
+        }
+
+        private class NullNamespaceSource : AbstractSource
+        {
+            public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
+            {
+                exc = null!;
+                return true;
+            }
+
+            public override Stream[] Streams(JsonElement config) => new Stream[] { new NullNamespaceStream() };
+        }
+
+        private class NullNamespaceStream : Stream
+        {
+            public NullNamespaceStream() => _givenName = "users";
+
+            public override Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+                ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
+                string[]? cursorfield = null, Dictionary<string, object>? streamslice = null) =>
+                Task.FromResult(0L);
+        }
+
+        private class OrderedSource : AbstractSource
+        {
+            public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
+            {
+                exc = null!;
+                return true;
+            }
+
+            public override Stream[] Streams(JsonElement config) => new Stream[] { new OrderedStream() };
+        }
+
+        private class OrderedStream : Stream
+        {
+            public OrderedStream() => _givenName = "users";
+
+            public override async Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+                ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
+                string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
+            {
+                await streamchannel.WriteAsync(
+                    AbstractSource.AsAirbyteMessage(Name, Namespace, "{\"id\":1}".AsJsonElement()));
+                logger.Info("inside stream");
+                return 1;
+            }
+        }
+
+        private class LegacyStateSource : AbstractSource
+        {
+            public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
+            {
+                exc = null!;
+                return true;
+            }
+
+            public override Stream[] Streams(JsonElement config) => new Stream[] { new LegacyStateStream() };
+        }
+
+        private class LegacyStateStream : Stream
+        {
+            public LegacyStateStream() => _givenName = "users";
+
+            public override async Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+                ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
+                string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
+            {
+                await streamchannel.WriteAsync(new AirbyteMessage
+                {
+                    Type = MessageType.STATE,
+                    State = new AirbyteStateMessage { Data = "{\"legacy\":true}".AsJsonElement() }
+                });
+                return 1;
             }
         }
 
