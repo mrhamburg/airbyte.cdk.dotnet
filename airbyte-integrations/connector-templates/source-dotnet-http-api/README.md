@@ -8,7 +8,7 @@ For information about how to use this connector within Airbyte, see [the documen
 ### Prerequisites
 **To iterate on this connector, make sure to complete this prerequisites section.**
 
-#### Minimum Dotnet version required `= 6.0.x`
+#### Minimum Dotnet version required `= 10.0.x`
 
 ### Locally running the connector
 ```

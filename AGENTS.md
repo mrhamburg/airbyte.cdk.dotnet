@@ -10,7 +10,7 @@ The Airbyte .NET CDK: a framework for building Airbyte source and destination co
 
 | Path | Purpose |
 |------|---------|
-| `Airbyte.Cdk/` | CDK library, CLI entrypoint, models, and connector generator (`OutputType=Exe`, targets `net6.0`) |
+| `Airbyte.Cdk/` | CDK library, CLI entrypoint, models, and connector generator (`OutputType=Exe`, targets `net10.0`) |
 | `Airbyte.Cdk.Tests/` | xUnit test project for the CDK |
 | `airbyte-integrations/connectors/` | Concrete connectors (e.g. `source-exchange-rates-free`) |
 | `airbyte-integrations/connector-templates/` | Handlebars (`.hbs`) templates used by `dotnet run init` |
@@ -21,7 +21,7 @@ There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk` and `Air
 
 ## Prerequisites and commands
 
-- .NET SDK 6.0.x. `global.json` pins `6.0` with `rollForward: latestMajor` and `allowPrerelease: true`.
+- .NET SDK 10.0.x. `global.json` pins `10.0.100` with `rollForward: latestFeature`.
 - Docker is required for the generator, connector image builds, and release workflows.
 
 ```bash
@@ -76,6 +76,6 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 
 - The CDK project is an executable and generates a package on build (`GeneratePackageOnBuild=true`); building it also produces a `.nupkg`.
 - `AirbyteEntrypoint` reads `AIRBYTE_IMPL_PATH` before anything else; local connector runs therefore need the built DLL or must run through the connector project's own `Main`.
-- Docker images pin `mcr.microsoft.com/dotnet/sdk:6.0` and `runtime:6.0`, even though `global.json` allows rolling forward locally.
+- Docker images pin `mcr.microsoft.com/dotnet/sdk:10.0` and `runtime:10.0`.
 - Some test files are empty placeholders (e.g. `TestHttp.cs`, `TestStreamsCore.cs`). Do not assume they contain coverage.
 - Avoid changing `Airbyte.Cdk/Airbyte.Cdk.nuspec` paths or icon names without verifying the package output, since the package is published from a Docker build context.

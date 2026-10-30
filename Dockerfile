@@ -1,5 +1,5 @@
 ﻿# Build and publish cdk
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 ARG BUILD_VERSION="0.0.1"
 ARG WORKDIR=/airbyte/build
