@@ -178,7 +178,14 @@ namespace Airbyte.Cdk.Sources
             // A stream other streams depend on keeps its records so the substreams do not read it a second time.
             var channel = Channel;
             var collector = default(RecordCollectingChannelWriter);
-            if (streamsInstances.Any(x => x.Dependency?.ParentStream == streaminstance.Name))
+            var cached = false;
+            IReadOnlyList<JsonElement>? parentCache = null;
+            if (streaminstance.Dependency == null && parentRecords.TryGetValue(streaminstance.Name, out var found))
+            {
+                cached = true;
+                parentCache = found;
+            }
+            if (!cached && streamsInstances.Any(x => x.Dependency?.ParentStream == streaminstance.Name))
             {
                 collector = new RecordCollectingChannelWriter(Channel);
                 channel = collector;
@@ -188,8 +195,10 @@ namespace Airbyte.Cdk.Sources
             {
                 long recordcount;
                 if (streaminstance.Dependency != null)
-                    recordcount = await ReadSubstream(logger, streaminstance, configuredstream, streamsInstances,
-                        parentRecords, stateElement, recordlimit);
+                    recordcount = await ReadSubstream(logger, streaminstance, descriptor, configuredstream, streamsInstances,
+                        parentRecords, stateElement, recordlimit, stateEmitter);
+                else if (cached)
+                    recordcount = await ReplayCachedRecords(streaminstance, parentCache!, channel, recordlimit);
                 else if (configuredstream.SyncMode == SyncMode.incremental && streaminstance.SupportsIncremental)
                     recordcount = await ReadIncremental(logger, streaminstance, configuredstream, stateElement, recordlimit, channel);
                 else
@@ -225,23 +234,24 @@ namespace Airbyte.Cdk.Sources
         /// Reads a substream once per record of its parent. The parent key is passed as a stream slice, which the
         /// stream uses to build its request, for example <c>projects/{project_id}/line_items</c>.
         /// </summary>
-        private async Task<long> ReadSubstream(AirbyteLogger logger, Stream streaminstance,
+        private async Task<long> ReadSubstream(AirbyteLogger logger, Stream streaminstance, StreamDescriptor descriptor,
             ConfiguredAirbyteStream configuredstream, Stream[] streamsInstances,
-            Dictionary<string, IReadOnlyList<JsonElement>> parentRecords, JsonElement stateElement, long? recordlimit)
+            Dictionary<string, IReadOnlyList<JsonElement>> parentRecords, JsonElement stateElement, long? recordlimit,
+            StateEmitter stateEmitter)
         {
             var dependency = streaminstance.Dependency!;
-
-            // Slicing one parent record over another would need per-parent state, which the protocol models as a
-            // substream state the CDK does not emit yet.
-            if (configuredstream.SyncMode == SyncMode.incremental)
-                throw new Exception(
-                    $"Stream '{streaminstance.Name}' is a substream of '{dependency.ParentStream}' and only supports full_refresh");
 
             if (recordlimit is <= 0)
                 return 0;
 
             var parents = await ParentRecords(logger, streaminstance, dependency, streamsInstances, parentRecords);
             logger.Info($"Reading substream {streaminstance.Name} for {parents.Count} {dependency.ParentStream} record(s)");
+
+            // A substream keeps the state of the stream it is, not one cursor per parent. The cursor therefore has
+            // to move forward monotonically across parents, so the last emitted state is fed to the next parent and
+            // the stream's GetUpdatedState decides how to merge it.
+            var incremental = configuredstream.SyncMode == SyncMode.incremental && streaminstance.SupportsIncremental;
+            var state = stateElement;
 
             long recordcount = 0;
             foreach (var parent in parents)
@@ -258,9 +268,37 @@ namespace Airbyte.Cdk.Sources
                 if (remaining is <= 0)
                     break;
 
-                var slice = new Dictionary<string, object> { { dependency.SliceParameter, key! } };
-                recordcount += await streaminstance.ReadRecords(logger, SyncMode.full_refresh, Channel, stateElement,
-                    remaining, configuredstream.CursorField, slice);
+                var slice = incremental
+                    ? streaminstance.StreamSlices(SyncMode.incremental, configuredstream.CursorField!, state)
+                    : new Dictionary<string, object>();
+                slice ??= new Dictionary<string, object>();
+                slice[dependency.SliceParameter] = key!;
+
+                recordcount += await streaminstance.ReadRecords(logger,
+                    incremental ? SyncMode.incremental : SyncMode.full_refresh, Channel, state, remaining,
+                    configuredstream.CursorField, slice);
+
+                if (incremental && stateEmitter.TryGetLastState(descriptor, out var emitted))
+                    state = emitted;
+            }
+
+            return recordcount;
+        }
+
+        /// <summary>
+        /// Emits the records of a parent that was already read for one of its substreams, so a catalog that lists
+        /// the substream first does not read the parent twice.
+        /// </summary>
+        private static async Task<long> ReplayCachedRecords(Stream streaminstance, IReadOnlyList<JsonElement> records,
+            ChannelWriter<AirbyteMessage> channel, long? recordlimit)
+        {
+            var replay = recordlimit.HasValue ? records.Take((int)Math.Min(recordlimit.Value, int.MaxValue)) : records;
+            long recordcount = 0;
+
+            foreach (var record in replay)
+            {
+                await channel.WriteAsync(AsAirbyteMessage(streaminstance.Name, streaminstance.Namespace, record));
+                recordcount++;
             }
 
             return recordcount;
@@ -299,8 +337,15 @@ namespace Airbyte.Cdk.Sources
             });
 
             parent.StateEmitter = new StateEmitter(channel.Writer);
-            await parent.ReadRecords(logger, SyncMode.full_refresh, channel.Writer, "{}".AsJsonElement(), null, null!, null!);
-            channel.Writer.Complete();
+            try
+            {
+                await parent.ReadRecords(logger, SyncMode.full_refresh, channel.Writer, "{}".AsJsonElement(), null, null!, null!);
+            }
+            finally
+            {
+                // Completing in a finally keeps the collecting task from waiting forever when the parent read throws.
+                channel.Writer.TryComplete();
+            }
 
             var records = await collecting;
             parentRecords[dependency.ParentStream] = records;

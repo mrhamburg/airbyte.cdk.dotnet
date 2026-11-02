@@ -132,10 +132,18 @@ var lineItems = UrlBase.HttpStream()
 ```
 
 `SubstreamDependency(parentStream, parentKeyField, sliceParameter)` supports a dotted key path (`customer.id`).
-The parent is read once: when it is part of the catalog its records are also emitted and reused, otherwise it is
-read internally without emitting records. Parent records without a usable key are skipped with a warning, and a
-substream only supports `full_refresh` — per-parent state would need a substream state type the CDK does not emit
-yet.
+
+- **The parent is read once.** When it is in the catalog its records are emitted and reused; when it is not, it is
+  read internally without emitting records. Order does not matter: if the substream is read first, the parent's
+  records are replayed from the cache when its own catalog entry is reached.
+- **Parent records without the key are skipped** with a warning rather than failing the sync.
+- **State belongs to the substream, not to each parent.** A substream is a stream: it keeps one cursor, and the
+  CDK feeds the last state it emitted into the next parent's read so the cursor cannot move backwards when parents
+  come back in an arbitrary order. The stream's `GetUpdatedState` still decides how to merge, so implement it as a
+  maximum (`max(current state, record cursor)`) when the API has no ordering guarantee.
+- **`incremental` is supported** as long as the stream reports a cursor and the API filters per parent; the parent
+  key is merged into whatever `StreamSlices` returns.
+- **Nested substreams are rejected** with an explicit message: a substream cannot itself be the parent of another.
 
 ### Practical Tips
 

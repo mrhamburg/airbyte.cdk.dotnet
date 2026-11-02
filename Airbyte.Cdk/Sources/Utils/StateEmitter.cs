@@ -16,6 +16,7 @@ namespace Airbyte.Cdk.Sources.Utils
     {
         private readonly ChannelWriter<AirbyteMessage> _channel;
         private readonly Dictionary<string, string> _lastEmitted = new();
+        private readonly Dictionary<string, JsonElement> _states = new();
         private readonly object _sync = new();
 
         public StateEmitter(ChannelWriter<AirbyteMessage> channel) => _channel = channel;
@@ -35,11 +36,29 @@ namespace Airbyte.Cdk.Sources.Utils
                     return false;
 
                 _lastEmitted[key] = stateJson;
+                if (state.HasValue)
+                    _states[key] = state.Value;
             }
 
             var message = StateMessageFactory.Create(descriptor, state, recordCount);
             await _channel.WriteAsync(new AirbyteMessage { Type = MessageType.STATE, State = message });
             return true;
+        }
+
+        /// <summary>
+        /// Returns the last state emitted for a stream. Substreams use it to carry the cursor from one parent
+        /// record to the next, so the reported state cannot move backwards when parents arrive out of order.
+        /// </summary>
+        public bool TryGetLastState(StreamDescriptor descriptor, out JsonElement state)
+        {
+            lock (_sync)
+            {
+                if (_states.TryGetValue(Key(descriptor), out state))
+                    return true;
+            }
+
+            state = default;
+            return false;
         }
 
         /// <summary>

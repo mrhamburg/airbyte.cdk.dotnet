@@ -105,16 +105,63 @@ namespace Airbyte.Cdk.Tests.Sources
         }
 
         [Fact]
-        public async Task Test_Substream_RejectsIncrementalSync()
+        public async Task Test_Substream_IncrementalReadsWithItsOwnState()
+        {
+            var parent = new RecordingStream("projects", Json("{\"id\":\"p1\"}"));
+            var child = new RecordingSubstream("project_line_items", new SubstreamDependency("projects", "id", "project_id"));
+            var source = new SubstreamSource(parent, child);
+            var state = "[{\"type\":\"STREAM\",\"stream\":{\"stream_descriptor\":{\"name\":\"project_line_items\"},\"stream_state\":{\"cursor\":\"2026-01-01\"}}}]";
+
+            await Read(source, state, Catalog("project_line_items", SyncMode.incremental));
+
+            child.Modes.ShouldBe(new[] { SyncMode.incremental });
+            child.ReceivedStates[0].GetProperty("cursor").GetString().ShouldBe("2026-01-01");
+        }
+
+        [Fact]
+        public async Task Test_Substream_IncrementalCarriesStateBetweenParents()
+        {
+            var parent = new RecordingStream("projects", Json("{\"id\":\"p1\"}"), Json("{\"id\":\"p2\"}"));
+            var child = new RecordingSubstream("project_line_items", new SubstreamDependency("projects", "id", "project_id"))
+            {
+                EmitState = true
+            };
+            var source = new SubstreamSource(parent, child);
+
+            await Read(source, "{}", Catalog("project_line_items", SyncMode.incremental));
+
+            // The state the first parent emitted is what the second parent starts from, so the cursor cannot move
+            // backwards when the parent order is arbitrary.
+            child.ReceivedStates.Count.ShouldBe(2);
+            child.ReceivedStates[1].GetProperty("cursor").GetString().ShouldBe("p1");
+        }
+
+        [Fact]
+        public async Task Test_Substream_CatalogOrderDoesNotReadParentTwice()
         {
             var parent = new RecordingStream("projects", Json("{\"id\":\"p1\"}"));
             var child = new RecordingSubstream("project_line_items", new SubstreamDependency("projects", "id", "project_id"));
             var source = new SubstreamSource(parent, child);
 
-            var exception = await Should.ThrowAsync<Exception>(() =>
-                Read(source, Catalog("project_line_items", SyncMode.incremental)));
+            // Substream first: the parent is read for context, then replayed for its own catalog entry.
+            var messages = await Read(source, Catalog("project_line_items"), Catalog("projects"));
 
-            exception.Message.ShouldContain("only supports full_refresh");
+            parent.Reads.ShouldBe(1);
+            child.Slices.ShouldBe(new[] { "p1" });
+            messages.Count(x => x.Type == MessageType.RECORD && x.Record!.Stream == "projects").ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task Test_Substream_ParentFailureIsPropagated()
+        {
+            var parent = new ThrowingStream("projects");
+            var child = new RecordingSubstream("project_line_items", new SubstreamDependency("projects", "id", "project_id"));
+            var source = new SubstreamSource(parent, child);
+
+            var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+                Read(source, Catalog("project_line_items")));
+
+            exception.Message.ShouldBe("parent failed");
         }
 
         [Fact]
@@ -168,9 +215,17 @@ namespace Airbyte.Cdk.Tests.Sources
         }
 
         private static async Task<List<AirbyteMessage>> Read(AbstractSource source, params ConfiguredAirbyteCatalog[] catalogs)
-            => await Read(source, null, catalogs);
+            => await Read(source, null, "{}", catalogs);
 
         private static async Task<List<AirbyteMessage>> Read(AbstractSource source, long? limit,
+            params ConfiguredAirbyteCatalog[] catalogs)
+            => await Read(source, limit, "{}", catalogs);
+
+        private static async Task<List<AirbyteMessage>> Read(AbstractSource source, string state,
+            params ConfiguredAirbyteCatalog[] catalogs)
+            => await Read(source, null, state, catalogs);
+
+        private static async Task<List<AirbyteMessage>> Read(AbstractSource source, long? limit, string state,
             params ConfiguredAirbyteCatalog[] catalogs)
         {
             var channel = Channel.CreateUnbounded<AirbyteMessage>();
@@ -179,7 +234,7 @@ namespace Airbyte.Cdk.Tests.Sources
                 ? JsonSerializer.SerializeToElement(new Dictionary<string, object> { { "_limit", limit.Value } })
                 : Json("{}");
 
-            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, config, merged, Json("{}"));
+            await source.Read(new AirbyteLogger(_ => { }), channel.Writer, config, merged, state.AsJsonElement());
             channel.Writer.Complete();
 
             var messages = new List<AirbyteMessage>();
@@ -241,6 +296,16 @@ namespace Airbyte.Cdk.Tests.Sources
             }
         }
 
+        private sealed class ThrowingStream : Stream
+        {
+            public ThrowingStream(string name) => _givenName = name;
+
+            public override Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+                ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
+                string[]? cursorfield = null, Dictionary<string, object>? streamslice = null) =>
+                throw new InvalidOperationException("parent failed");
+        }
+
         private sealed class RecordingSubstream : Stream
         {
             private readonly SubstreamDependency _dependency;
@@ -255,10 +320,21 @@ namespace Airbyte.Cdk.Tests.Sources
 
             public List<string> Slices { get; } = new();
 
-            public override Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+            public List<SyncMode> Modes { get; } = new();
+
+            public List<JsonElement> ReceivedStates { get; } = new();
+
+            public bool EmitState { get; set; }
+
+            public override string[] CursorField => new[] { "cursor" };
+
+            public override async Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
                 ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
                 string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
             {
+                Modes.Add(syncMode);
+                ReceivedStates.Add(streamstate.Clone());
+
                 var key = streamslice![_dependency.SliceParameter].ToString()!;
                 Slices.Add(key);
                 streamchannel.TryWrite(AbstractSource.AsAirbyteMessage(Name,
@@ -267,7 +343,11 @@ namespace Airbyte.Cdk.Tests.Sources
                         { _dependency.SliceParameter, key }
                     })));
 
-                return Task.FromResult(1L);
+                if (EmitState && StateEmitter != null)
+                    await StateEmitter.EmitAsync(new StreamDescriptor { Name = Name },
+                        JsonSerializer.SerializeToElement(new Dictionary<string, string> { { "cursor", key } }));
+
+                return 1L;
             }
         }
     }
