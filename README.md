@@ -248,11 +248,21 @@ the workflow is edited; only `main` can deploy. The job gets no store credential
 also removes `SECRETS_POSTGRESQL_*` and `AIRBYTE_INTEGRATION_SECRETS_JSON` from the processes it starts, so a
 connector only sees the values it was given through its config file.
 
+The PostgreSQL store is not reachable from the public internet: it sits behind a NetBird network. Before reading a
+secret the job joins that network with [NetBird Connect](https://github.com/marketplace/actions/netbird-connect)
+(`Alemiz112/netbird-connect`, pinned to a commit) and leaves it again in an `always()` step. The join passes
+`--accept-routes`, so the network must advertise the route to the database (a routing peer, or the database itself
+as a peer). Without `NETBIRD_SETUP_KEY` the step is skipped and the scenarios fall back to their skipped state.
+
 One-time setup (repository admin):
 
 - Create the `integration` environment and set *Deployment branches and tags* to *Selected branches* → `main`.
 - Put `SECRETS_POSTGRESQL_CONNECTION_STRING` and `SECRETS_POSTGRESQL_ENCRYPTION_KEY` in that environment, and delete
   the repository-level copies; otherwise `secrets.*` still resolves outside the environment.
+- Put a NetBird **ephemeral** setup key in `NETBIRD_SETUP_KEY`, and `NETBIRD_MANAGEMENT_URL` when the network is
+  self-hosted (leave it empty for NetBird cloud). An ephemeral key removes the peer when the runner disconnects.
+- Scope the NetBird policy for that key to the database host and port, and use a read-only PostgreSQL role: a run
+  on `main` executes repository code with network access to the store.
 - Optionally add required reviewers, so every post-merge run also needs an approval.
 
 The credentialed job runs the whole repository at `main`, so restrict who can merge changes under `.github/`,
