@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "date": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "amount": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "contra_account_owner": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "contra_account_iban": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "_links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "payment_methods": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "sources": {
+              "type": [
+                "null",
+                "object"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

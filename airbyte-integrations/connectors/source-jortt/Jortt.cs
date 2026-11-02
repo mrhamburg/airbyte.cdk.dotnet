@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Airbyte.Cdk;
 using Airbyte.Cdk.Sources;
+using Airbyte.Cdk.Sources.Streams;
 using Airbyte.Cdk.Sources.Utils;
 using Flurl;
 using Flurl.Http;
@@ -126,6 +127,15 @@ namespace source_jortt
 
                 Paged(listBase, "v3/projects", "projects"),
                 Paged(listBase, "v3/labels", "labels", false),
+
+                Substream(listBase, "projects", "id", "project_id", "v3/projects/{project_id}/line_items",
+                    "project_line_items"),
+                Substream(listBase, "bank_accounts", "id", "bank_account_id",
+                    "v3/bank-accounts/{bank_account_id}/bank-transactions", "bank_transactions"),
+                Substream(listBase, "invoices", "id", "invoice_id", "v3/payments/{invoice_id}", "invoice_payments",
+                    false),
+                Substream(listBase, "expenses", "id", "expense_id", "v3/payments/{expense_id}", "expense_payments",
+                    false),
                 Yearly(periodBase, "v3/loonjournaalposten", "loonjournaalposten", startDate),
 
                 Single(objectBase, "v3/organizations/me", "organization"),
@@ -164,6 +174,24 @@ namespace source_jortt
                         parameters[key] = value;
                     return parameters;
                 })
+                .Create(name);
+        }
+
+        /// <summary>
+        /// A collection that only exists below a parent object, read once per parent record. The parent key is
+        /// handed to the path through the stream slice.
+        /// </summary>
+        private static Stream Substream(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string parent,
+            string parentKeyField, string sliceParameter, string pathTemplate, string name, bool paged = true)
+        {
+            return builder
+                .Path((_, streamSlice, _) => pathTemplate.Replace("{" + sliceParameter + "}",
+                    streamSlice != null && streamSlice.TryGetValue(sliceParameter, out var key)
+                        ? key?.ToString() ?? string.Empty
+                        : string.Empty))
+                .Dependency(new SubstreamDependency(parent, parentKeyField, sliceParameter))
+                .RequestParams((_, _, nextpagetoken) =>
+                    paged ? PageParameters(nextpagetoken) : new Dictionary<string, object>())
                 .Create(name);
         }
 

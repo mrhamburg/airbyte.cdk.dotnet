@@ -1,0 +1,16 @@
+{
+  "id": "<id>",
+  "date": "<date>",
+  "amount": "<amount>",
+  "description": "<description>",
+  "contra_account_owner": "<contra_account_owner>",
+  "contra_account_iban": "<contra_account_iban>",
+  "_links": {
+    "payment_methods": {
+      "sources": {
+        "href": {},
+        "type": {}
+      }
+    }
+  }
+}

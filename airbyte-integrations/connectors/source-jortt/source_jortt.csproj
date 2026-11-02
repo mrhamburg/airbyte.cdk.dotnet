@@ -8,7 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Airbyte.Cdk" />
+    <!-- Temporary: connectors normally reference the published Airbyte.Cdk package (see Directory.Packages.props).
+         Substreams (SubstreamDependency) are not in a published version yet; switch back to
+         <PackageReference Include="Airbyte.Cdk" /> as soon as 0.0.9 is on nuget.org. -->
+    <ProjectReference Include="..\..\..\Airbyte.Cdk\Airbyte.Cdk.csproj" />
     <PackageReference Include="Flurl.Http" />
   </ItemGroup>
 

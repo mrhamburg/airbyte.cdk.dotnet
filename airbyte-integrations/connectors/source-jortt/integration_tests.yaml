@@ -54,6 +54,14 @@ tests:
       - name: report_summary_invoices
       - name: report_summary_profit_and_loss
 
+  - name: substreams
+    limit: 10
+    streams:
+      - name: project_line_items
+      - name: bank_transactions
+      - name: invoice_payments
+      - name: expense_payments
+
   - name: payroll
     config:
       start_date: "2026-01-01"

@@ -49,6 +49,10 @@ credentialed run.
 | `report_summary_cash_and_bank` | `GET /v3/reports/summaries/cash_and_bank` | full refresh |
 | `report_summary_invoices` | `GET /v3/reports/summaries/invoices` | full refresh |
 | `report_summary_profit_and_loss` | `GET /v3/reports/summaries/profit_and_loss` | full refresh |
+| `project_line_items` | `GET /v3/projects/{id}/line_items` | full refresh, substream of `projects` |
+| `bank_transactions` | `GET /v3/bank-accounts/{id}/bank-transactions` | full refresh, substream of `bank_accounts` |
+| `invoice_payments` | `GET /v3/payments/{id}` | full refresh, substream of `invoices` |
+| `expense_payments` | `GET /v3/payments/{id}` | full refresh, substream of `expenses` |
 
 Only `expenses` has a server-side date filter, which is why it is the only incremental stream: the cursor is
 `vat_date` and each request sends `vat_date_from`.
@@ -80,10 +84,19 @@ Airbyte itself never sends state for a full-refresh stream.
 API. `loonjournaalposten` walks years the same way. The five `report_summary_*` streams are snapshots for the
 current period and emit a single record per run.
 
-Not implemented: `payments/{sink_id}` and `bank-accounts/{id}/bank-transactions` (both require a parent object,
-which needs a fan-out the CDK does not provide), the per-project sub-resources
-(`/v3/projects/{id}/line_items`, `/line_items/summary`, `/invoice`) for the same reason, and `tradenames`,
-which only exists on the deprecated v1 path.
+### Substreams
+
+`project_line_items`, `bank_transactions`, `invoice_payments` and `expense_payments` only exist below a parent
+object, so they use the CDK's parent/child support (`SubstreamDependency`). Each is read once per parent record
+with the parent key in the request path.
+
+A substream always needs its parent for context: when the parent is not selected in the catalog it is read
+internally and its records are **not** emitted; when it is selected, its records are emitted as well and the
+parent is still only read once. Selecting only `project_line_items` therefore syncs line items for every project
+without also syncing the projects.
+
+Not implemented: `/v3/projects/{id}/line_items/summary` and `/v3/projects/{id}/invoice` (also substreams, but
+report-like aggregates), and `tradenames`, which only exists on the deprecated v1 path.
 
 Several of these endpoints are documented on the developer site but missing from the published
 `/swagger_doc`; the streams follow the documentation. `projects`, `labels` and `loonjournaalposten` are marked
@@ -111,6 +124,10 @@ dotnet run -- read --command read --config sample_files/config.json \
 
 dotnet test source_jortt.sln   # unit tests, no network
 ```
+
+The project references `Airbyte.Cdk` from this repository rather than the published package, because the
+substream API is not in a released version yet. It goes back to `<PackageReference Include="Airbyte.Cdk" />`
+once 0.0.9 is on nuget.org.
 
 `discover` makes no HTTP request — the token is fetched on the first API call — but `client_id` and
 `client_secret` must still be present in the config, so placeholder values are enough.

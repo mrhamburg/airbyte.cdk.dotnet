@@ -270,6 +270,45 @@ namespace source_jortt.Tests
         }
     }
 
+    public class SubstreamTests
+    {
+        private static Jortt Source() => new();
+
+        private static System.Collections.Generic.Dictionary<string, Airbyte.Cdk.Sources.Streams.Stream> Streams()
+        {
+            var config = JsonDocument.Parse(@"{""client_id"":""id"",""client_secret"":""secret""}").RootElement.Clone();
+            return Source().Streams(config).ToDictionary(x => x.Name);
+        }
+
+        [Theory]
+        [InlineData("project_line_items", "projects", "id", "project_id")]
+        [InlineData("bank_transactions", "bank_accounts", "id", "bank_account_id")]
+        [InlineData("invoice_payments", "invoices", "id", "invoice_id")]
+        [InlineData("expense_payments", "expenses", "id", "expense_id")]
+        public void Test_Substreams_DeclareTheirParent(string stream, string parent, string keyField, string slice)
+        {
+            var dependency = Streams()[stream].Dependency;
+
+            dependency.ShouldNotBeNull();
+            dependency!.ParentStream.ShouldBe(parent);
+            dependency.ParentKeyField.ShouldBe(keyField);
+            dependency.SliceParameter.ShouldBe(slice);
+        }
+
+        [Fact]
+        public void Test_Substreams_ParentsAreAvailableStreams()
+        {
+            var streams = Streams();
+
+            streams.Keys.ShouldContain("projects");
+            streams.Keys.ShouldContain("bank_accounts");
+            streams.Keys.ShouldContain("invoices");
+            streams.Keys.ShouldContain("expenses");
+
+            streams.Values.Count(x => x.Dependency != null).ShouldBe(4);
+        }
+    }
+
     public class SchemaTests
     {
         public static IEnumerable<object[]> Streams() => new[]
@@ -278,7 +317,8 @@ namespace source_jortt.Tests
             "ledger_accounts_cost", "ledger_accounts_income", "ledger_accounts_balance",
             "projects", "labels", "loonjournaalposten", "organization",
             "report_balance", "report_profit_and_loss", "report_summary_balance", "report_summary_btw",
-            "report_summary_cash_and_bank", "report_summary_invoices", "report_summary_profit_and_loss"
+            "report_summary_cash_and_bank", "report_summary_invoices", "report_summary_profit_and_loss",
+            "project_line_items", "bank_transactions", "invoice_payments", "expense_payments"
         }.Select(x => new object[] { x });
 
         [Theory]

@@ -31,6 +31,10 @@
     { "stream": { "name": "report_summary_btw", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "report_summary_cash_and_bank", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "report_summary_invoices", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
-    { "stream": { "name": "report_summary_profit_and_loss", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" }
+    { "stream": { "name": "report_summary_profit_and_loss", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "project_line_items", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "bank_transactions", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "invoice_payments", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "expense_payments", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" }
   ]
 }
