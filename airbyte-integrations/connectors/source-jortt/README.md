@@ -156,8 +156,8 @@ once 0.0.9 is on nuget.org.
 ## Integration tests
 
 `integration_tests.yaml` declares a full-refresh scenario, an `expenses` full-refresh scenario and an incremental
-`expenses` scenario. They are skipped until `JORTT_CLIENT_ID` and `JORTT_CLIENT_SECRET` exist. CI only injects the
-secret store for pushes and manual runs, never for pull requests, so the scenarios are skipped there as well.
+`expenses` scenario. They are skipped until `JORTT_CLIENT_ID` and `JORTT_CLIENT_SECRET` exist. CI runs them only on
+`main` through the `integration` environment, so a local run without credentials reports them as skipped.
 
 The files under `source_jortt.Tests/Fixtures/` are documentation placeholders (`"<booking_id>"`) and only prove the
 schema shape. Replace them with sanitized real responses after the first credentialed run. The same run is the

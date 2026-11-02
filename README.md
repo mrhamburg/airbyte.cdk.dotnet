@@ -238,10 +238,25 @@ configured (`SECRETS_POSTGRESQL_CONNECTION_STRING` or `AIRBYTE_INTEGRATION_SECRE
 masked in error output, and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in
 which case the secret values in it are masked.
 
-`.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
-a push to `main`. Credentials are injected for pushes to `main` and manual runs only: a `pull_request` job would
-execute branch code with the whole secret store, so anyone who can push a branch could read every connector's
-secrets. Pull requests therefore run uncredentialed and report the credential-dependent scenarios as skipped.
+`.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a push to `main`, plus
+manual runs. It has no `pull_request` trigger, because that event executes the workflow file of the pull request
+head with the repository's secrets.
+
+The job that needs credentials references the `integration` GitHub environment. GitHub checks the environment's
+deployment branch policy against the ref of the run, so a branch or a pull request is refused those secrets however
+the workflow is edited; only `main` can deploy. The job gets no store credentials at repository level. The harness
+also removes `SECRETS_POSTGRESQL_*` and `AIRBYTE_INTEGRATION_SECRETS_JSON` from the processes it starts, so a
+connector only sees the values it was given through its config file.
+
+One-time setup (repository admin):
+
+- Create the `integration` environment and set *Deployment branches and tags* to *Selected branches* → `main`.
+- Put `SECRETS_POSTGRESQL_CONNECTION_STRING` and `SECRETS_POSTGRESQL_ENCRYPTION_KEY` in that environment, and delete
+  the repository-level copies; otherwise `secrets.*` still resolves outside the environment.
+- Optionally add required reviewers, so every post-merge run also needs an approval.
+
+The credentialed job runs the whole repository at `main`, so restrict who can merge changes under `.github/`,
+`tests/` and the package configuration (`Directory.Packages.props`, `NuGet.Config`) with required reviews.
 
 #### Publishing a new version of a connector
 

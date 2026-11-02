@@ -1,9 +1,17 @@
 name: Connector Integration Tests
 
+# Credentials live in the `integration` environment, whose deployment branch policy allows `main` only. GitHub
+# checks that policy against the ref of the run, so a branch or a pull request is refused the environment secrets
+# however the workflow is edited. There is deliberately no `pull_request` trigger: that event runs the workflow
+# file of the pull request head with the repository's secrets.
+#
+# One-time setup (repository admin):
+#   * environment `integration` -> Deployment branches and tags -> Selected branches: main
+#   * environment secrets: SECRETS_POSTGRESQL_CONNECTION_STRING, SECRETS_POSTGRESQL_ENCRYPTION_KEY
+#   * delete the repository-level copies of those secrets, otherwise `secrets.*` still resolves outside the
+#     environment
+#   * optional: required reviewers, so every post-merge run also needs a human approval
 on:
-  pull_request:
-    paths:
-      - 'airbyte-integrations/connectors/**'
   push:
     branches: [ main ]
     paths:
@@ -20,9 +28,6 @@ permissions:
 
 concurrency:
   group: connector-integration-${{ github.ref }}
-  # A pull request only competes with itself; a push to main must finish, because its connectors are the
-  # ones whose post-merge state we care about.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changed:
@@ -47,8 +52,6 @@ jobs:
         shell: bash
         env:
           INPUT_CONNECTOR: ${{ inputs.connector }}
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
@@ -59,9 +62,8 @@ jobs:
               *) connector="airbyte-integrations/connectors/$connector" ;;
             esac
             echo "$connector/integration_tests.yaml" > "$RUNNER_TEMP/changed.txt"
-          elif [ "$EVENT_NAME" = "pull_request" ]; then
-            git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
           else
+            # A manual run has no before-sha, so it compares against the previous commit.
             base="$BEFORE_SHA"
             if [ -z "$base" ] || ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
               base="HEAD~1"
@@ -93,6 +95,8 @@ jobs:
     if: needs.changed.outputs.has_connectors == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The environment's deployment branch policy is the control that keeps the store away from branch code.
+    environment: integration
     strategy:
       fail-fast: false
       matrix:
@@ -116,17 +120,13 @@ jobs:
         env:
           CONNECTOR: ${{ matrix.connector }}
           EVENT_NAME: ${{ github.event_name }}
-          # A PostgreSQL secret store wins when it is configured; every connection detail comes from the
-          # environment, so nothing lands in the repository. Otherwise a JSON object can supply the same keys.
-          #
-          # Credentials are injected for pushes and manual runs only. A `pull_request` job executes branch code,
-          # so giving it the store would let anyone who can push a branch read every connector's secrets. Pull
-          # requests therefore run uncredentialed and report the credentialed scenarios as skipped.
-          SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ github.event_name != 'pull_request' && secrets.SECRETS_POSTGRESQL_CONNECTION_STRING || '' }}
-          SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ github.event_name != 'pull_request' && secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY || '' }}
-          AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ github.event_name != 'pull_request' && secrets.AIRBYTE_INTEGRATION_SECRETS_JSON || '' }}
+          # The environment supplies these; nothing is stored at repository level. A PostgreSQL store wins when
+          # it is configured, otherwise a JSON object can supply the same keys.
+          SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ secrets.SECRETS_POSTGRESQL_CONNECTION_STRING }}
+          SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY }}
+          AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
         run: |
-          # On main a skipped scenario is a failure, because a skip there looks green while proving nothing.
+          # A skipped scenario on main is a failure, because a skip there looks green while proving nothing.
           # That only holds once a secret store is configured: before the first credentials exist every key is
           # missing, and enforcing it would make every credentialed connector red.
           extra=""
