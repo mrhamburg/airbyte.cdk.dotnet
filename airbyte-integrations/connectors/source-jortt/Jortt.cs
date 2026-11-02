@@ -11,6 +11,7 @@ using Airbyte.Cdk.Sources.Streams;
 using Airbyte.Cdk.Sources.Utils;
 using Flurl;
 using Flurl.Http;
+using Polly;
 using Stream = Airbyte.Cdk.Sources.Streams.Stream;
 
 namespace source_jortt
@@ -39,11 +40,35 @@ namespace source_jortt
         /// </summary>
         public const int DefaultLookbackDays = 7;
 
+        /// <summary>
+        /// Attempts per request. The organization lookup used by <c>check</c> shares the limit and the backoff of
+        /// the streams, so a transient failure does not turn into a red check.
+        /// </summary>
+        private const int MaxRetries = 5;
+
+        private const int BackoffSeconds = 5;
+
         private const string DateFormat = "yyyy-MM-dd";
+
+        private static readonly ISyncPolicy OrganizationsPolicy = Policy
+            .Handle<FlurlHttpException>(IsTransient)
+            .WaitAndRetry(MaxRetries, Backoff);
 
         public override bool CheckConnection(AirbyteLogger logger, JsonElement config, out Exception exc)
         {
             exc = null;
+
+            // The rest of the config is validated by the first request, but a malformed start_date would
+            // silently widen the sync, so check it before any network call.
+            try
+            {
+                StartDate(config);
+            }
+            catch (Exception e)
+            {
+                exc = e;
+                return false;
+            }
 
             string token;
             try
@@ -72,6 +97,14 @@ namespace source_jortt
             {
                 // Every other stream would fail with organization.header_required, so a green check here would
                 // be a lie.
+                if (organizationIds.Count == 0)
+                {
+                    exc = new Exception(
+                        "These credentials cannot act on any Jortt administration, so every read would fail with " +
+                        "organization.header_required. Ask an administrator to grant access to one.");
+                    return false;
+                }
+
                 if (organizationIds.Count > 1)
                 {
                     exc = new Exception(
@@ -95,7 +128,7 @@ namespace source_jortt
         public override Stream[] Streams(JsonElement config)
         {
             var organizationId = Optional(config, "organization_id");
-            var startDate = ParseDate(Optional(config, "start_date"));
+            var startDate = StartDate(config);
             var lookbackDays = OptionalInt(config, "lookback_days") ?? DefaultLookbackDays;
 
             // No request is made here, so `discover` works with placeholder credentials: it only reads the
@@ -154,10 +187,13 @@ namespace source_jortt
         private static Airbyte.Cdk.Sources.Utils.FluentStreamBuilder Common(
             Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, JorttAuth auth, string organizationId) =>
             builder
-                .MaxRetries(5)
+                .MaxRetries(MaxRetries)
                 .ShouldRetry(exception => ShouldRetry(exception, auth))
-                .BackoffTime((retryCount, _) => TimeSpan.FromSeconds(Math.Max(5, retryCount * 5)))
+                .BackoffTime((retryCount, _) => Backoff(retryCount))
                 .RequestHeaders((_, _, _) => Headers(auth, organizationId));
+
+        private static TimeSpan Backoff(int retryCount) =>
+            TimeSpan.FromSeconds(Math.Max(BackoffSeconds, retryCount * BackoffSeconds));
 
         /// <summary>
         /// A list endpoint. <paramref name="paged"/> is false for the endpoints Jortt does not paginate: they
@@ -218,10 +254,13 @@ namespace source_jortt
         private static Stream Monthly(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path,
             string name, DateTime? startDate)
         {
+            // One clock read: two reads around midnight on 31 December could give a window that ends before it
+            // starts.
+            var now = DateTime.UtcNow;
             var first = startDate.HasValue
                 ? new DateTime(startDate.Value.Year, startDate.Value.Month, 1)
-                : new DateTime(DateTime.UtcNow.Year, 1, 1);
-            var last = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+                : new DateTime(now.Year, 1, 1);
+            var last = new DateTime(now.Year, now.Month, 1);
 
             return builder
                 .Path((_, _, _) => path)
@@ -240,8 +279,9 @@ namespace source_jortt
         private static Stream Yearly(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path,
             string name, DateTime? startDate)
         {
-            var first = (startDate ?? new DateTime(DateTime.UtcNow.Year, 1, 1)).Year;
-            var last = DateTime.UtcNow.Year;
+            var now = DateTime.UtcNow;
+            var first = (startDate ?? new DateTime(now.Year, 1, 1)).Year;
+            var last = now.Year;
 
             return builder
                 .Path((_, _, _) => path)
@@ -335,11 +375,33 @@ namespace source_jortt
             exception.StatusCode == null || exception.StatusCode is 429 or 500 or 502 or 503 or 504;
 
         /// <summary>
-        /// Retries transient failures, and a 401 once after dropping the cached token. A token that is revoked
-        /// mid-sync would otherwise fail the whole run.
+        /// Retries transient failures, and a 401 once with a fresh token. A token that is revoked mid-sync would
+        /// otherwise fail the whole run.
         /// </summary>
         internal static bool ShouldRetry(FlurlHttpException exception, JorttAuth auth) =>
-            exception.StatusCode == 401 ? auth.TryRefreshAfterUnauthorized() : IsTransient(exception);
+            exception.StatusCode == 401 ? RefreshAuthorization(exception, auth) : IsTransient(exception);
+
+        /// <summary>
+        /// The retry re-sends the request that was built before the 401, so the cached token must be dropped and
+        /// the header replaced; invalidating alone would send the rejected token a second time.
+        /// </summary>
+        private static bool RefreshAuthorization(FlurlHttpException exception, JorttAuth auth)
+        {
+            var request = exception.Call?.Request;
+            if (request == null || !auth.TryRefreshAfterUnauthorized())
+                return false;
+
+            try
+            {
+                request.WithHeader("Authorization", $"Bearer {auth.GetAccessToken()}");
+                return true;
+            }
+            catch (Exception)
+            {
+                // A broken token endpoint is reported as the original 401 instead of a second failure.
+                return false;
+            }
+        }
 
         internal static Dictionary<string, object> PageParameters(Dictionary<string, object> nextpagetoken) =>
             new() { { "page", nextpagetoken != null && nextpagetoken.TryGetValue("page", out var page) ? page : 1 } };
@@ -379,13 +441,13 @@ namespace source_jortt
         {
             var body = response.GetStringAsync().Result.AsJsonElement();
             if (body.ValueKind != JsonValueKind.Object || !body.TryGetProperty("data", out var data))
-                throw new Exception($"Jortt answered without 'data': {Excerpt(body)}");
+                throw new JorttResponseException($"Jortt answered without 'data': {Excerpt(body)}");
 
             if (data.ValueKind == JsonValueKind.Null)
                 return Array.Empty<JsonElement>();
 
             if (data.ValueKind != expected)
-                throw new Exception(
+                throw new JorttResponseException(
                     $"Jortt answered with 'data' of kind {data.ValueKind} instead of {expected}: {Excerpt(body)}");
 
             return expected == JsonValueKind.Object ? new[] { data } : data.EnumerateArray().ToList();
@@ -485,13 +547,13 @@ namespace source_jortt
 
         private static List<string> Organizations(string token)
         {
-            var body = ApiBase
+            var body = OrganizationsPolicy.Execute(() => ApiBase
                 .AppendPathSegment("v3/organizations")
                 .WithHeader("Accept", "application/json")
                 .WithOAuthBearerToken(token)
                 .GetJsonAsync<JsonElement>()
                 .GetAwaiter()
-                .GetResult();
+                .GetResult());
 
             return body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
                 ? data.EnumerateArray()
@@ -552,6 +614,21 @@ namespace source_jortt
                 ? value.GetString()
                 : null;
 
+        /// <summary>
+        /// The configured start date. A value that is present but cannot be parsed fails: silently treating it as
+        /// "no start date" would turn a typo into an unbounded sync.
+        /// </summary>
+        internal static DateTime? StartDate(JsonElement config)
+        {
+            var value = Optional(config, "start_date");
+            if (value == null)
+                return null;
+
+            return ParseDate(value)
+                ?? throw new InvalidOperationException(
+                    $"Config property 'start_date' must be a date in the form yyyy-MM-dd, but was '{value}'");
+        }
+
         internal static DateTime? ParseDate(string value) =>
             DateTime.TryParseExact(value, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None,
                 out var parsed)
@@ -594,6 +671,17 @@ namespace source_jortt
             && value.TryGetInt32(out var number)
                 ? Math.Max(0, number)
                 : null;
+    }
+
+    /// <summary>
+    /// A Jortt response this connector was not written for, for example a successful answer without the expected
+    /// <c>data</c> member. A visible failure beats a green sync that reads nothing.
+    /// </summary>
+    internal sealed class JorttResponseException : Exception
+    {
+        public JorttResponseException(string message) : base(message)
+        {
+        }
     }
 
     /// <summary>
@@ -648,7 +736,9 @@ namespace source_jortt
                 .GetAwaiter()
                 .GetResult();
 
-            _token = response.GetProperty("access_token").GetString();
+            _token = response.TryGetProperty("access_token", out var token) && token.ValueKind == JsonValueKind.String
+                ? token.GetString()
+                : null;
             var expiresIn = response.TryGetProperty("expires_in", out var value) && value.TryGetInt32(out var seconds)
                 ? seconds
                 : 3600;
@@ -656,7 +746,7 @@ namespace source_jortt
             // Renew a minute early so a token cannot expire in flight.
             _expiresAt = _clock().AddSeconds(Math.Max(1, expiresIn - 60));
 
-            return _token ?? throw new Exception("Jortt did not return an access token");
+            return _token ?? throw new JorttResponseException("Jortt did not return an access token");
         }
 
         /// <summary>

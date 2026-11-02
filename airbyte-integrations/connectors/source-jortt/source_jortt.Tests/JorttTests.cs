@@ -4,12 +4,14 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Airbyte.Cdk;
 using Airbyte.Cdk.Sources.Streams.Http;
 using Flurl.Http;
 using Flurl.Http.Testing;
 using Json.Schema;
 using Shouldly;
 using Xunit;
+using static source_jortt.Tests.TestData;
 
 namespace source_jortt.Tests
 {
@@ -106,9 +108,9 @@ namespace source_jortt.Tests
             var withoutData = await "https://api.jortt.nl/v3/customers".GetAsync();
             var objectData = await "https://api.jortt.nl/v3/customers".GetAsync();
 
-            Should.Throw<Exception>(() => Jortt.ParseData(withoutData).ToList())
+            Should.Throw<JorttResponseException>(() => Jortt.ParseData(withoutData).ToList())
                 .Message.ShouldContain("without 'data'");
-            Should.Throw<Exception>(() => Jortt.ParseData(objectData).ToList())
+            Should.Throw<JorttResponseException>(() => Jortt.ParseData(objectData).ToList())
                 .Message.ShouldContain("instead of Array");
         }
 
@@ -120,15 +122,13 @@ namespace source_jortt.Tests
 
             var response = await "https://api.jortt.nl/v3/organizations/me".GetAsync();
 
-            Should.Throw<Exception>(() => Jortt.ParseObjectData(response).ToList())
+            Should.Throw<JorttResponseException>(() => Jortt.ParseObjectData(response).ToList())
                 .Message.ShouldContain("instead of Object");
         }
     }
 
     public class CursorTests
     {
-        private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
-
         [Fact]
         public void Test_CursorTracker_KeepsHighestDateRegardlessOfOrder()
         {
@@ -144,7 +144,7 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_ExpensesCursor_PrefersTheHighestOfStateAndRecords()
         {
-            var state = Json(@"{""vat_date"":""2026-02-01""}");
+            var state = ParseJson(@"{""vat_date"":""2026-02-01""}");
 
             Jortt.FormatDate(Jortt.ExpensesCursor(state, new DateTime(2026, 1, 1), null)!.Value)
                 .ShouldBe("2026-02-01");
@@ -155,7 +155,7 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_ExpensesCursor_FallsBackToStartDate()
         {
-            var state = Json("{}");
+            var state = ParseJson("{}");
 
             Jortt.FormatDate(Jortt.ExpensesCursor(state, null, new DateTime(2020, 1, 1))!.Value)
                 .ShouldBe("2020-01-01");
@@ -164,13 +164,13 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_ExpensesCursor_IsNullWithoutStateRecordsOrStartDate()
         {
-            Jortt.ExpensesCursor(Json("{}"), null, null).ShouldBeNull();
+            Jortt.ExpensesCursor(ParseJson("{}"), null, null).ShouldBeNull();
         }
 
         [Fact]
         public void Test_ExpensesLowerBound_AppliesLookback()
         {
-            var state = Json(@"{""vat_date"":""2026-10-10""}");
+            var state = ParseJson(@"{""vat_date"":""2026-10-10""}");
 
             Jortt.FormatDate(Jortt.ExpensesLowerBound(state, null, null, 7)!.Value).ShouldBe("2026-10-03");
         }
@@ -180,17 +180,17 @@ namespace source_jortt.Tests
         {
             // A full refresh must not silently drop history, so start_date has no default and no lower bound is
             // sent when nothing is known.
-            Jortt.ExpensesLowerBound(Json("{}"), null, null, 7).ShouldBeNull();
+            Jortt.ExpensesLowerBound(ParseJson("{}"), null, null, 7).ShouldBeNull();
         }
 
         [Fact]
         public void Test_ExpensesLowerBound_NeverReachesBehindStartDate()
         {
             // start_date is a floor, so the lookback may not pull the window behind it.
-            Jortt.FormatDate(Jortt.ExpensesLowerBound(Json("{}"), null, new DateTime(2026, 9, 1), 7)!.Value)
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(ParseJson("{}"), null, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-09-01");
 
-            var stale = Json(@"{""vat_date"":""2020-01-01""}");
+            var stale = ParseJson(@"{""vat_date"":""2020-01-01""}");
             Jortt.FormatDate(Jortt.ExpensesLowerBound(stale, null, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-09-01");
         }
@@ -198,11 +198,11 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_ExpensesLowerBound_ClampsOnlyWhenTheLookbackCrossesStartDate()
         {
-            var near = Json(@"{""vat_date"":""2026-09-05""}");
+            var near = ParseJson(@"{""vat_date"":""2026-09-05""}");
             Jortt.FormatDate(Jortt.ExpensesLowerBound(near, null, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-09-01");
 
-            var far = Json(@"{""vat_date"":""2026-10-10""}");
+            var far = ParseJson(@"{""vat_date"":""2026-10-10""}");
             Jortt.FormatDate(Jortt.ExpensesLowerBound(far, null, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-10-03");
         }
@@ -256,7 +256,8 @@ namespace source_jortt.Tests
 
             var auth = new JorttAuth("https://app.jortt.nl/oauth-provider/oauth/token", "id", "secret", "s");
 
-            Should.Throw<Exception>(() => auth.GetAccessToken());
+            Should.Throw<JorttResponseException>(() => auth.GetAccessToken())
+                .Message.ShouldContain("access token");
         }
 
         [Fact]
@@ -275,15 +276,34 @@ namespace source_jortt.Tests
         }
 
         [Fact]
-        public async Task Test_ShouldRetry_RefreshesTheTokenOnceAfterUnauthorized()
+        public async Task Test_ShouldRetry_RetriesWithAFreshTokenAfterUnauthorized()
         {
             using var httpTest = new HttpTest();
             httpTest.RespondWith("unauthorized", 401);
+            httpTest.RespondWith(TokenResponse, 200);
+            httpTest.RespondWith(@"{""data"":[]}", 200);
+
+            var auth = new JorttAuth("https://app.jortt.nl/oauth-provider/oauth/token", "id", "secret", "s");
+            var request = "https://api.jortt.nl/v3/expenses".WithHeader("Authorization", "Bearer stale");
+            var exception = await Should.ThrowAsync<FlurlHttpException>(() => request.GetAsync());
+            Jortt.ShouldRetry(exception, auth).ShouldBeTrue();
+            Jortt.ShouldRetry(exception, auth).ShouldBeFalse();
+
+            // The retry re-sends the request that was built before the 401, so the header must be the new token.
+            await exception.Call.Request.GetAsync();
+            httpTest.CallLog[^1].HttpRequestMessage.Headers.Authorization!.Parameter.ShouldBe("token-1");
+        }
+
+        [Fact]
+        public async Task Test_ShouldRetry_DoesNotRetryWhenTheTokenRefreshFails()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith("unauthorized", 401);
+            httpTest.RespondWith(@"{""error"":""invalid_client""}", 400);
 
             var auth = new JorttAuth("https://app.jortt.nl/oauth-provider/oauth/token", "id", "secret", "s");
             var exception = await Should.ThrowAsync<FlurlHttpException>(() => "https://api.jortt.nl/x".GetAsync());
 
-            Jortt.ShouldRetry(exception, auth).ShouldBeTrue();
             Jortt.ShouldRetry(exception, auth).ShouldBeFalse();
         }
 
@@ -302,12 +322,10 @@ namespace source_jortt.Tests
 
     public class ConfigTests
     {
-        private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
-
         [Fact]
         public void Test_Optional_ReturnsNullForBlankValues()
         {
-            var config = Json(@"{""client_id"":""  "",""organization_id"":""""}");
+            var config = ParseJson(@"{""client_id"":""  "",""organization_id"":""""}");
 
             Jortt.Optional(config, "client_id").ShouldBeNull();
             Jortt.Optional(config, "organization_id").ShouldBeNull();
@@ -317,16 +335,33 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_Optional_ReturnsTrimmedValue()
         {
-            Jortt.Optional(Json(@"{""client_id"":""abc""}"), "client_id").ShouldBe("abc");
+            Jortt.Optional(ParseJson(@"{""client_id"":""abc""}"), "client_id").ShouldBe("abc");
         }
 
         [Fact]
         public void Test_OptionalInt_IgnoresStringsAndClampsNegativeValues()
         {
-            Jortt.OptionalInt(Json(@"{""lookback_days"":7}"), "lookback_days").ShouldBe(7);
-            Jortt.OptionalInt(Json(@"{""lookback_days"":""7""}"), "lookback_days").ShouldBeNull();
-            Jortt.OptionalInt(Json(@"{""lookback_days"":-3}"), "lookback_days").ShouldBe(0);
-            Jortt.OptionalInt(Json("{}"), "lookback_days").ShouldBeNull();
+            Jortt.OptionalInt(ParseJson(@"{""lookback_days"":7}"), "lookback_days").ShouldBe(7);
+            Jortt.OptionalInt(ParseJson(@"{""lookback_days"":""7""}"), "lookback_days").ShouldBeNull();
+            Jortt.OptionalInt(ParseJson(@"{""lookback_days"":-3}"), "lookback_days").ShouldBe(0);
+            Jortt.OptionalInt(ParseJson("{}"), "lookback_days").ShouldBeNull();
+        }
+
+        [Fact]
+        public void Test_StartDate_RejectsAnUnparsableValue()
+        {
+            // The spec pattern accepts 2026-02-30, so the connector itself must reject it instead of silently
+            // reading everything.
+            Should.Throw<InvalidOperationException>(() => Jortt.StartDate(ParseJson(@"{""start_date"":""2026-02-30""}")))
+                .Message.ShouldContain("start_date");
+        }
+
+        [Fact]
+        public void Test_StartDate_AllowsAnEmptyValueAndParsesAValidOne()
+        {
+            Jortt.StartDate(ParseJson(@"{""start_date"":""  ""}")).ShouldBeNull();
+            Jortt.FormatDate(Jortt.StartDate(ParseJson(@"{""start_date"":""2026-09-01""}"))!.Value)
+                .ShouldBe("2026-09-01");
         }
 
         [Fact]
@@ -378,18 +413,82 @@ namespace source_jortt.Tests
             Jortt.ParseError("not json").Key.ShouldBeNull();
             Jortt.ParseError(@"{""data"":[]}").Key.ShouldBeNull();
         }
+
+        [Fact]
+        public async Task Test_Describe_RendersTheHttpStatusAndTheJorttErrorKey()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(
+                @"{""error"":{""key"":""organization.header_required"",""message"":""Name the organization""}}", 400);
+
+            var exception =
+                await Should.ThrowAsync<FlurlHttpException>(() => "https://api.jortt.nl/v3/customers".GetAsync());
+
+            Jortt.Describe(exception).ShouldBe("HTTP 400 organization.header_required: Name the organization");
+            Jortt.Describe(new InvalidOperationException("inner problem")).ShouldBe("inner problem");
+        }
+    }
+
+    public class CheckConnectionTests
+    {
+        [Fact]
+        public void Test_Check_FailsWithoutAnyAdministration()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(TokenResponse, 200);
+            httpTest.RespondWith(@"{""data"":[]}", 200);
+
+            var ok = new Jortt().CheckConnection(new AirbyteLogger(), ParseJson(CredentialsConfig), out var exc);
+
+            ok.ShouldBeFalse();
+            exc.ShouldNotBeNull();
+            exc!.Message.ShouldContain("cannot act on any Jortt administration");
+        }
+
+        [Fact]
+        public void Test_Check_PassesWithOneAdministrationAndNoOrganizationId()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(TokenResponse, 200);
+            httpTest.RespondWith(@"{""data"":[{""id"":""org-1""}]}", 200);
+
+            var ok = new Jortt().CheckConnection(new AirbyteLogger(), ParseJson(CredentialsConfig), out var exc);
+
+            ok.ShouldBeTrue();
+            exc.ShouldBeNull();
+        }
+
+        [Fact]
+        public void Test_Check_FailsWithSeveralAdministrationsAndNoOrganizationId()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(TokenResponse, 200);
+            httpTest.RespondWith(@"{""data"":[{""id"":""org-1""},{""id"":""org-2""}]}", 200);
+
+            var ok = new Jortt().CheckConnection(new AirbyteLogger(), ParseJson(CredentialsConfig), out var exc);
+
+            ok.ShouldBeFalse();
+            exc!.Message.ShouldContain("org-1");
+            exc.Message.ShouldContain("org-2");
+        }
+
+        [Fact]
+        public void Test_Check_FailsForAnUnparsableStartDateWithoutMakingARequest()
+        {
+            // An HttpTest without a queued response fails when a request is made, which proves check stops early.
+            using var httpTest = new HttpTest();
+
+            var config = ParseJson(
+                @"{""client_id"":""id"",""client_secret"":""secret"",""start_date"":""2026-02-30""}");
+            var ok = new Jortt().CheckConnection(new AirbyteLogger(), config, out var exc);
+
+            ok.ShouldBeFalse();
+            exc!.Message.ShouldContain("start_date");
+        }
     }
 
     public class SubstreamTests
     {
-        private static Jortt Source() => new();
-
-        private static System.Collections.Generic.Dictionary<string, Airbyte.Cdk.Sources.Streams.Stream> Streams()
-        {
-            var config = JsonDocument.Parse(@"{""client_id"":""id"",""client_secret"":""secret""}").RootElement.Clone();
-            return Source().Streams(config).ToDictionary(x => x.Name);
-        }
-
         [Theory]
         [InlineData("project_line_items", "projects", "id", "project_id")]
         [InlineData("bank_transactions", "bank_accounts", "id", "bank_account_id")]
@@ -421,13 +520,6 @@ namespace source_jortt.Tests
 
     public class StreamRequestTests
     {
-        private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
-
-        private static Dictionary<string, HttpStream> Streams() =>
-            new Jortt()
-                .Streams(Json(@"{""client_id"":""id"",""client_secret"":""secret""}"))
-                .ToDictionary(x => x.Name, x => (HttpStream)x);
-
         [Fact]
         public async Task Test_Expenses_KeepsTheDateFilterStableAcrossPages()
         {
@@ -436,8 +528,8 @@ namespace source_jortt.Tests
                 @"{""data"":[{""vat_date"":""2026-10-10""}],""_links"":{""next"":{""href"":""https://api.jortt.nl/v3/expenses?page=2""}}}",
                 200);
 
-            var expenses = Streams()["expenses"];
-            var state = Json(@"{""vat_date"":""2026-01-01""}");
+            var expenses = HttpStreams()["expenses"];
+            var state = ParseJson(@"{""vat_date"":""2026-01-01""}");
 
             var first = expenses.RequestParams(state, null, null);
             var response = await "https://api.jortt.nl/v3/expenses".GetAsync();
@@ -458,13 +550,13 @@ namespace source_jortt.Tests
             httpTest.RespondWith(
                 @"{""data"":[{""vat_date"":""2026-03-01""},{""vat_date"":""2026-10-10""}]}", 200);
 
-            var expenses = Streams()["expenses"];
-            var state = Json(@"{""vat_date"":""2026-01-01""}");
+            var expenses = HttpStreams()["expenses"];
+            var state = ParseJson(@"{""vat_date"":""2026-01-01""}");
             var response = await "https://api.jortt.nl/v3/expenses".GetAsync();
             expenses.ParseResponse(response, state, null, null).Count().ShouldBe(2);
 
             // The tracker now only feeds the state, never the paging filter.
-            expenses.GetUpdatedState(state, Json("{}")).GetProperty("vat_date").GetString()
+            expenses.GetUpdatedState(state, ParseJson("{}")).GetProperty("vat_date").GetString()
                 .ShouldBe("2026-10-10");
         }
 
@@ -472,11 +564,11 @@ namespace source_jortt.Tests
         public void Test_Expenses_ClampsTheFilterToStartDate()
         {
             var expenses = (HttpStream)new Jortt()
-                .Streams(Json(
+                .Streams(ParseJson(
                     @"{""client_id"":""id"",""client_secret"":""secret"",""start_date"":""2026-09-01""}"))
                 .Single(x => x.Name == "expenses");
 
-            expenses.RequestParams(Json("{}"), null, null)["vat_date_from"].ShouldBe("2026-09-01");
+            expenses.RequestParams(ParseJson("{}"), null, null)["vat_date_from"].ShouldBe("2026-09-01");
         }
 
         [Theory]
@@ -489,8 +581,8 @@ namespace source_jortt.Tests
             using var httpTest = new HttpTest();
             httpTest.RespondWith(@"{""data"":[{""booking_id"":""b-1""},{""booking_id"":""b-2""}]}", 200);
 
-            var records = Streams()[streamName]
-                .ParseResponse(await "https://api.jortt.nl/v3/parent/1/children".GetAsync(), Json("{}"),
+            var records = HttpStreams()[streamName]
+                .ParseResponse(await "https://api.jortt.nl/v3/parent/1/children".GetAsync(), ParseJson("{}"),
                     new Dictionary<string, object> { { field, "parent-1" } }, null)
                 .ToList();
 
@@ -501,37 +593,42 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_WithProperty_KeepsAValueTheApiSentAndIgnoresNonObjects()
         {
-            Jortt.WithProperty(Json(@"{""project_id"":""from-api""}"), "project_id", "from-slice")
+            Jortt.WithProperty(ParseJson(@"{""project_id"":""from-api""}"), "project_id", "from-slice")
                 .GetProperty("project_id").GetString().ShouldBe("from-api");
-            Jortt.WithProperty(Json(@"{""id"":""x""}"), "project_id", "from-slice")
+            Jortt.WithProperty(ParseJson(@"{""id"":""x""}"), "project_id", "from-slice")
                 .GetProperty("project_id").GetString().ShouldBe("from-slice");
-            Jortt.WithProperty(Json("[1]"), "project_id", "from-slice").ValueKind.ShouldBe(JsonValueKind.Array);
+            Jortt.WithProperty(ParseJson("[1]"), "project_id", "from-slice").ValueKind.ShouldBe(JsonValueKind.Array);
         }
     }
 
     public class SchemaTests
     {
-        public static IEnumerable<object[]> Streams() => new[]
-        {
-            "organizations", "customers", "invoices", "estimates", "expenses", "receipts", "bank_accounts",
-            "ledger_accounts_cost", "ledger_accounts_income", "ledger_accounts_balance",
-            "projects", "labels", "loonjournaalposten", "organization",
-            "report_balance", "report_profit_and_loss", "report_summary_balance", "report_summary_btw",
-            "report_summary_cash_and_bank", "report_summary_invoices", "report_summary_profit_and_loss",
-            "project_line_items", "bank_transactions", "invoice_payments", "expense_payments"
-        }.Select(x => new object[] { x });
+        /// <summary>
+        /// Derived from the connector, so a new stream cannot skip the fixture and schema checks below.
+        /// </summary>
+        public static IEnumerable<object[]> Streams() =>
+            new Jortt().Streams(ParseJson(CredentialsConfig)).Select(x => new object[] { x.Name });
 
         [Theory]
         [MemberData(nameof(Streams))]
         public void Test_FixtureMatchesSchema(string stream)
         {
-            var schema = JsonSchema.FromFile(Path.Combine(AppContext.BaseDirectory, "schemas", stream + ".json"));
-            var fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures",
-                stream + ".json"))).RootElement;
+            var schema = JsonSchema.FromFile(SchemaPath(stream));
+            var fixture = JsonDocument.Parse(File.ReadAllText(FixturePath(stream))).RootElement;
 
             var result = schema.Evaluate(fixture, new EvaluationOptions { OutputFormat = OutputFormat.List });
 
             result.IsValid.ShouldBeTrue(Violations(result));
+        }
+
+        [Fact]
+        public void Test_EveryStreamHasASchemaAndAFixture()
+        {
+            foreach (var stream in new Jortt().Streams(ParseJson(CredentialsConfig)).Select(x => x.Name))
+            {
+                File.Exists(SchemaPath(stream)).ShouldBeTrue($"schemas/{stream}.json is missing");
+                File.Exists(FixturePath(stream)).ShouldBeTrue($"Fixtures/{stream}.json is missing");
+            }
         }
 
         [Fact]
@@ -547,6 +644,12 @@ namespace source_jortt.Tests
 
             result.IsValid.ShouldBeTrue(Violations(result));
         }
+
+        private static string SchemaPath(string stream) =>
+            Path.Combine(AppContext.BaseDirectory, "schemas", stream + ".json");
+
+        private static string FixturePath(string stream) =>
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", stream + ".json");
 
         private static string Violations(EvaluationResults result) =>
             string.Join(Environment.NewLine, (result.Details ?? new List<EvaluationResults>())

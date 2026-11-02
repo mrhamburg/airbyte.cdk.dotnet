@@ -15,7 +15,8 @@ customers:read invoices:read estimates:read expenses:read organizations:read rec
 Use `client_id` and `client_secret` from the registration. When the credentials may act on more than one
 administration the API answers `organization.header_required`; set `organization_id` to one of the IDs returned by
 `GET /v3/organizations`. `check` fails with the list of available IDs when the header would be required and no
-`organization_id` was given, so a green check never precedes a failing read.
+`organization_id` was given, so a green check never precedes a failing read. It also fails when the credentials
+cannot act on any administration, because then every read would fail with `organization.header_required`.
 
 The Jortt API requires an administration on the MKB or Plus plan. Without one, every request fails with
 `organization.requires_mkb_plan`.
@@ -24,8 +25,10 @@ Jortt documents no specific scope for receipts, bank accounts or ledger accounts
 does not implicitly cover them, those three groups return `403` while check still succeeds. Confirm on the first
 credentialed run.
 
-The access token is cached until a minute before it expires. A `401` mid-sync drops that token and retries once;
-a second `401` fails the run, because that means the credentials are rejected rather than stale.
+The access token is cached until a minute before it expires. A `401` mid-sync drops that token, replaces the
+`Authorization` header of the failed request and retries once; a second `401` fails the run, because that means the
+credentials are rejected rather than stale. The organization lookup used by `check` shares the retry policy of the
+streams, so a transient server error does not turn into a red check.
 
 ## Streams
 
@@ -77,7 +80,8 @@ Jortt does not document a sort order. That also makes the terminal state safe to
 
 `start_date` is optional. When set it is a lower bound for `expenses` in **both** sync modes, so a full refresh with
 `start_date` set does not read earlier history; leave it empty to read everything. The lookback never reaches behind
-it: the request starts at `max(cursor - lookback_days, start_date)`.
+it: the request starts at `max(cursor - lookback_days, start_date)`. A value that is present but is not a real date
+(for example `2026-02-30`) fails `check` and the read instead of silently reading everything.
 
 The state file drives the incremental filter, so do not pass a `--state` file when running a manual full refresh —
 Airbyte itself never sends state for a full-refresh stream.
