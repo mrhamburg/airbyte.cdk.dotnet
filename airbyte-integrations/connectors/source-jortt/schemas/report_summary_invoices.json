@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "sent": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "amount": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "null",
+                "number",
+                "string"
+              ]
+            },
+            "currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "due_and_late": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "amount": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "null",
+                "number",
+                "string"
+              ]
+            },
+            "currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "late": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "amount": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "null",
+                "number",
+                "string"
+              ]
+            },
+            "currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

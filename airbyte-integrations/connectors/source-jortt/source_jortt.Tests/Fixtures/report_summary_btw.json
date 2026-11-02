@@ -1,0 +1,11 @@
+{
+  "period_indicator": [
+    "mrt 2024",
+    "Q1 2024",
+    "2024"
+  ],
+  "total_vat": {
+    "value": "365.00",
+    "currency": "EUR"
+  }
+}

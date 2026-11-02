@@ -29,7 +29,7 @@ namespace source_jortt
         /// Read-only scopes the source needs. The registered OAuth application must grant them.
         /// </summary>
         public const string DefaultScopes =
-            "customers:read invoices:read estimates:read expenses:read organizations:read reconciling:read";
+            "customers:read invoices:read estimates:read expenses:read organizations:read reconciling:read payroll:read";
 
         /// <summary>
         /// Expenses entered late carry an old VAT date, so the incremental filter deliberately reaches back
@@ -100,33 +100,156 @@ namespace source_jortt
             // schema files shipped next to the connector.
             var auth = Auth(config);
 
-            var baseimpl = ApiBase.HttpStream()
-                .MaxRetries(5)
-                .ShouldRetry(IsTransient)
-                .BackoffTime((retryCount, _) => TimeSpan.FromSeconds(Math.Max(5, retryCount * 5)))
-                .RequestHeaders((_, _, _) => Headers(auth, organizationId))
+            var listBase = Common(ApiBase.HttpStream(), auth, organizationId)
                 .ParseResponse((response, _, _, _) => ParseData(response))
                 .NextPageToken((_, response) => NextPageToken(response));
 
+            // Period driven streams walk periods themselves, so they must not inherit the link based pagination.
+            var periodBase = Common(ApiBase.HttpStream(), auth, organizationId)
+                .ParseResponse((response, _, _, _) => ParseData(response));
+
+            var objectBase = Common(ApiBase.HttpStream(), auth, organizationId)
+                .ParseResponse((response, _, _, _) => ParseObjectData(response));
+
             return new Stream[]
             {
-                List(baseimpl, "v3/organizations", "organizations"),
-                List(baseimpl, "v3/customers", "customers"),
-                List(baseimpl, "v3/invoices", "invoices"),
-                List(baseimpl, "v3/estimates", "estimates"),
-                Expenses(baseimpl, startDate, lookbackDays),
-                List(baseimpl, "v3/receipts", "receipts", ("scope", "all")),
-                List(baseimpl, "v3/bank-accounts", "bank_accounts"),
-                List(baseimpl, "v3/ledger_accounts/expenses/cost", "ledger_accounts_cost"),
-                List(baseimpl, "v3/ledger_accounts/expenses/income", "ledger_accounts_income"),
-                List(baseimpl, "v3/ledger_accounts/expenses/balance", "ledger_accounts_balance")
+                Paged(listBase, "v3/organizations", "organizations", false),
+                Paged(listBase, "v3/customers", "customers"),
+                Paged(listBase, "v3/invoices", "invoices"),
+                Paged(listBase, "v3/estimates", "estimates"),
+                Expenses(listBase, startDate, lookbackDays),
+                Paged(listBase, "v3/receipts", "receipts", false, ("scope", "all")),
+                Paged(listBase, "v3/bank-accounts", "bank_accounts", false),
+                Paged(listBase, "v3/ledger_accounts/expenses/cost", "ledger_accounts_cost", false),
+                Paged(listBase, "v3/ledger_accounts/expenses/income", "ledger_accounts_income", false),
+                Paged(listBase, "v3/ledger_accounts/expenses/balance", "ledger_accounts_balance", false),
+
+                Paged(listBase, "v3/projects", "projects"),
+                Paged(listBase, "v3/labels", "labels", false),
+                Yearly(periodBase, "v3/loonjournaalposten", "loonjournaalposten", startDate),
+
+                Single(objectBase, "v3/organizations/me", "organization"),
+
+                Monthly(objectBase, "v3/reports/balance", "report_balance", startDate),
+                Monthly(objectBase, "v3/reports/profit-and-loss", "report_profit_and_loss", startDate),
+                Single(objectBase, "v3/reports/summaries/balance", "report_summary_balance"),
+                Single(objectBase, "v3/reports/summaries/btw", "report_summary_btw"),
+                Single(objectBase, "v3/reports/summaries/cash_and_bank", "report_summary_cash_and_bank"),
+                Single(objectBase, "v3/reports/summaries/invoices", "report_summary_invoices"),
+                Single(objectBase, "v3/reports/summaries/profit_and_loss", "report_summary_profit_and_loss")
             };
         }
 
+        private static Airbyte.Cdk.Sources.Utils.FluentStreamBuilder Common(
+            Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, JorttAuth auth, string organizationId) =>
+            builder
+                .MaxRetries(5)
+                .ShouldRetry(IsTransient)
+                .BackoffTime((retryCount, _) => TimeSpan.FromSeconds(Math.Max(5, retryCount * 5)))
+                .RequestHeaders((_, _, _) => Headers(auth, organizationId));
+
         /// <summary>
-        /// Expenses are the only Jortt object with a date filter, so they are the only incremental stream. The
-        /// cursor is the expense VAT date, which is what <c>vat_date_from</c> filters on.
+        /// A list endpoint. <paramref name="paged"/> is false for the endpoints Jortt does not paginate: they
+        /// reject nothing, but there is no page parameter to send.
         /// </summary>
+        private static Stream Paged(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path, string name,
+            bool paged = true, params (string Key, object Value)[] query)
+        {
+            return builder
+                .Path((_, _, _) => path)
+                .RequestParams((_, _, nextpagetoken) =>
+                {
+                    var parameters = paged ? PageParameters(nextpagetoken) : new Dictionary<string, object>();
+                    foreach (var (key, value) in query)
+                        parameters[key] = value;
+                    return parameters;
+                })
+                .Create(name);
+        }
+
+        /// <summary>
+        /// An endpoint that answers with a single object in <c>data</c>.
+        /// </summary>
+        private static Stream Single(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path, string name) =>
+            builder.Path((_, _, _) => path).Create(name);
+
+        /// <summary>
+        /// A report for one calendar month per record, walking from the start date (or January of the current
+        /// year) through the current month.
+        /// </summary>
+        private static Stream Monthly(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path,
+            string name, DateTime? startDate)
+        {
+            var first = startDate.HasValue
+                ? new DateTime(startDate.Value.Year, startDate.Value.Month, 1)
+                : new DateTime(DateTime.UtcNow.Year, 1, 1);
+            var last = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+
+            return builder
+                .Path((_, _, _) => path)
+                .RequestParams((_, _, nextpagetoken) =>
+                {
+                    var period = nextpagetoken == null ? first : Period(nextpagetoken, first);
+                    return new Dictionary<string, object> { { "year", period.Year }, { "month", period.Month } };
+                })
+                .NextPageToken((request, _) => NextPeriod(request, last, months: 1))
+                .Create(name);
+        }
+
+        /// <summary>
+        /// Payroll journal entries are filtered by year, so one request covers a whole year.
+        /// </summary>
+        private static Stream Yearly(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path,
+            string name, DateTime? startDate)
+        {
+            var first = (startDate ?? new DateTime(DateTime.UtcNow.Year, 1, 1)).Year;
+            var last = DateTime.UtcNow.Year;
+
+            return builder
+                .Path((_, _, _) => path)
+                .RequestParams((_, _, nextpagetoken) => new Dictionary<string, object>
+                {
+                    { "year", nextpagetoken != null && nextpagetoken.TryGetValue("year", out var year) ? year : first }
+                })
+                .NextPageToken((request, _) => NextYear(request, last))
+                .Create(name);
+        }
+
+        private static DateTime Period(Dictionary<string, object> token, DateTime fallback) =>
+            token.TryGetValue("year", out var year) && int.TryParse(year?.ToString(), out var y)
+            && token.TryGetValue("month", out var month) && int.TryParse(month?.ToString(), out var m)
+                ? new DateTime(y, m, 1)
+                : fallback;
+
+        private static Dictionary<string, object> NextPeriod(IFlurlRequest request, DateTime last, int months)
+        {
+            var year = QueryInt(request, "year");
+            var month = QueryInt(request, "month");
+            if (year == null || month == null)
+                return null;
+
+            var next = new DateTime(year.Value, month.Value, 1).AddMonths(months);
+            return next > last
+                ? null
+                : new Dictionary<string, object> { { "year", next.Year }, { "month", next.Month } };
+        }
+
+        private static Dictionary<string, object> NextYear(IFlurlRequest request, int last)
+        {
+            var year = QueryInt(request, "year");
+            if (year == null)
+                return null;
+
+            var next = year.Value + 1;
+            return next > last ? null : new Dictionary<string, object> { { "year", next } };
+        }
+
+        private static int? QueryInt(IFlurlRequest request, string name)
+        {
+            var value = request.Url.QueryParams.FirstOrDefault(name)?.ToString();
+            return int.TryParse(value, out var parsed) ? parsed : null;
+        }
+
         private static Stream Expenses(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, DateTime? startDate,
             int lookbackDays)
         {
@@ -166,23 +289,6 @@ namespace source_jortt
                 .Create("expenses");
         }
 
-        private static Stream List(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path, string name,
-            params (string Key, object Value)[] query)
-        {
-            // Every list endpoint is paged, so the page token always has to reach the request parameters;
-            // without that the next-page token repeats forever.
-            return builder
-                .Path((_, _, _) => path)
-                .RequestParams((_, _, nextpagetoken) =>
-                {
-                    var parameters = PageParameters(nextpagetoken);
-                    foreach (var (key, value) in query)
-                        parameters[key] = value;
-                    return parameters;
-                })
-                .Create(name);
-        }
-
         internal static bool IsTransient(FlurlHttpException exception) =>
             exception.StatusCode == null || exception.StatusCode is 429 or 500 or 502 or 503 or 504;
 
@@ -215,6 +321,14 @@ namespace source_jortt
             return body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
                 ? data.EnumerateArray().ToList()
                 : new List<JsonElement>();
+        }
+
+        internal static IEnumerable<JsonElement> ParseObjectData(IFlurlResponse response)
+        {
+            var body = response.GetStringAsync().Result.AsJsonElement();
+            return body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
+                ? new[] { data }
+                : Array.Empty<JsonElement>();
         }
 
         internal static string Describe(Exception exception) => exception switch

@@ -1,6 +1,7 @@
 {
   "streams": [
     { "stream": { "name": "organizations", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "organization", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "customers", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "invoices", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "estimates", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
@@ -20,6 +21,16 @@
     { "stream": { "name": "bank_accounts", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "ledger_accounts_cost", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
     { "stream": { "name": "ledger_accounts_income", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
-    { "stream": { "name": "ledger_accounts_balance", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" }
+    { "stream": { "name": "ledger_accounts_balance", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "projects", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "labels", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "loonjournaalposten", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_balance", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_profit_and_loss", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_summary_balance", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_summary_btw", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_summary_cash_and_bank", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_summary_invoices", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" },
+    { "stream": { "name": "report_summary_profit_and_loss", "json_schema": {}, "supported_sync_modes": ["full_refresh"] }, "sync_mode": "full_refresh", "destination_sync_mode": "overwrite" }
   ]
 }

@@ -38,6 +38,17 @@ credentialed run.
 | `ledger_accounts_cost` | `GET /v3/ledger_accounts/expenses/cost` | full refresh |
 | `ledger_accounts_income` | `GET /v3/ledger_accounts/expenses/income` | full refresh |
 | `ledger_accounts_balance` | `GET /v3/ledger_accounts/expenses/balance` | full refresh |
+| `projects` | `GET /v3/projects` | full refresh |
+| `labels` | `GET /v3/labels` | full refresh |
+| `loonjournaalposten` | `GET /v3/loonjournaalposten?year=` | full refresh (one request per year) |
+| `organization` | `GET /v3/organizations/me` | full refresh (single record) |
+| `report_balance` | `GET /v3/reports/balance?year=&month=` | full refresh (one record per month) |
+| `report_profit_and_loss` | `GET /v3/reports/profit-and-loss?year=&month=` | full refresh (one record per month) |
+| `report_summary_balance` | `GET /v3/reports/summaries/balance` | full refresh (single record) |
+| `report_summary_btw` | `GET /v3/reports/summaries/btw` | full refresh |
+| `report_summary_cash_and_bank` | `GET /v3/reports/summaries/cash_and_bank` | full refresh |
+| `report_summary_invoices` | `GET /v3/reports/summaries/invoices` | full refresh |
+| `report_summary_profit_and_loss` | `GET /v3/reports/summaries/profit_and_loss` | full refresh |
 
 Only `expenses` has a server-side date filter, which is why it is the only incremental stream: the cursor is
 `vat_date` and each request sends `vat_date_from`.
@@ -62,9 +73,21 @@ Jortt does not document a sort order. That also makes the terminal state safe to
 The state file drives the incremental filter, so do not pass a `--state` file when running a manual full refresh —
 Airbyte itself never sends state for a full-refresh stream.
 
-Not implemented: reports (aggregates rather than records), `payments/{sink_id}` and
-`bank-accounts/{id}/bank-transactions` (both require a parent object, which needs a fan-out the CDK does not
-provide), and labels, tradenames and payroll, which only exist on the deprecated v1 paths.
+### Reports and payroll
+
+`report_balance` and `report_profit_and_loss` emit one record per calendar month, walking from `start_date`
+(or January of the current year when it is not set) through the current month, passing `year` and `month` to the
+API. `loonjournaalposten` walks years the same way. The five `report_summary_*` streams are snapshots for the
+current period and emit a single record per run.
+
+Not implemented: `payments/{sink_id}` and `bank-accounts/{id}/bank-transactions` (both require a parent object,
+which needs a fan-out the CDK does not provide), the per-project sub-resources
+(`/v3/projects/{id}/line_items`, `/line_items/summary`, `/invoice`) for the same reason, and `tradenames`,
+which only exists on the deprecated v1 path.
+
+Several of these endpoints are documented on the developer site but missing from the published
+`/swagger_doc`; the streams follow the documentation. `projects`, `labels` and `loonjournaalposten` are marked
+"Native v1 endpoint, also callable as v3" in the docs.
 
 ## Configuration
 
@@ -73,7 +96,7 @@ provide), and labels, tradenames and payroll, which only exist on the deprecated
 | `client_id` | yes | OAuth client ID |
 | `client_secret` | yes | OAuth client secret |
 | `organization_id` | no | Administration to read, when the credentials span several |
-| `start_date` | no | Lower bound for `expenses`, in both sync modes. No default: unset reads the full history |
+| `start_date` | no | Lower bound for `expenses` (both sync modes) and the first month/year walked by the reports and payroll streams. Unset reads the full expenses history and starts reports in January of the current year |
 | `lookback_days` | no | Days to reach back behind the incremental cursor, default `7` |
 | `scopes` | no | Override the requested scopes |
 

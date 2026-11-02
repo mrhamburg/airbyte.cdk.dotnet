@@ -234,7 +234,8 @@
     "peppol_identifier": {
       "type": [
         "null",
-        "integer"
+        "integer",
+        "string"
       ]
     }
   }

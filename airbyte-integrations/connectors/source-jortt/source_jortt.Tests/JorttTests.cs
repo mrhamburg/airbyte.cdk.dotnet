@@ -275,7 +275,10 @@ namespace source_jortt.Tests
         public static IEnumerable<object[]> Streams() => new[]
         {
             "organizations", "customers", "invoices", "estimates", "expenses", "receipts", "bank_accounts",
-            "ledger_accounts_cost", "ledger_accounts_income", "ledger_accounts_balance"
+            "ledger_accounts_cost", "ledger_accounts_income", "ledger_accounts_balance",
+            "projects", "labels", "loonjournaalposten", "organization",
+            "report_balance", "report_profit_and_loss", "report_summary_balance", "report_summary_btw",
+            "report_summary_cash_and_bank", "report_summary_invoices", "report_summary_profit_and_loss"
         }.Select(x => new object[] { x });
 
         [Theory]

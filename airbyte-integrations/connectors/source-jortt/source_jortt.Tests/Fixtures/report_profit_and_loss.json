@@ -1,0 +1,50 @@
+{
+  "period": {
+    "start_date": "<start_date>",
+    "end_date": "<end_date>",
+    "cycle": "<cycle>"
+  },
+  "sections": [
+    {
+      "key": "<key>",
+      "side": "<side>",
+      "total": {
+        "amount": {
+          "amount": "22.00",
+          "currency": "EUR"
+        },
+        "side": "debit"
+      },
+      "ledger_accounts": [
+        {
+          "id": "placeholder",
+          "parent_id": "placeholder",
+          "name": "placeholder",
+          "depth": 0,
+          "amount": {}
+        }
+      ]
+    }
+  ],
+  "possible_profit": {
+    "amount": {
+      "amount": "22.00",
+      "currency": "EUR"
+    },
+    "side": "debit"
+  },
+  "profit_before_tax": {
+    "amount": {
+      "amount": "22.00",
+      "currency": "EUR"
+    },
+    "side": "debit"
+  },
+  "profit": {
+    "amount": {
+      "amount": "22.00",
+      "currency": "EUR"
+    },
+    "side": "debit"
+  }
+}

@@ -2,9 +2,9 @@ connector:
   module: Jortt
 
 # Credentials are not provisioned yet, so these scenarios are reported as skipped (`::warning::`) instead of
-# silently passing. Once AIRBYTE_INTEGRATION_SECRETS_JSON contains these keys, main starts enforcing them.
-# organization_id is intentionally not mapped: it is only required when the credentials can act on more than
-# one administration, and the harness skips a scenario when any declared secret is missing.
+# silently passing. Once AIRBYTE_INTEGRATION_SECRETS_JSON (or the PostgreSQL store) contains these keys, main
+# starts enforcing them. organization_id is intentionally not mapped: it is only required when the credentials
+# can act on more than one administration, and the harness skips a scenario when any declared secret is missing.
 secrets:
   client_id: JORTT_CLIENT_ID
   client_secret: JORTT_CLIENT_SECRET
@@ -14,6 +14,7 @@ tests:
     limit: 25
     streams:
       - name: organizations
+      - name: organization
       - name: customers
       - name: invoices
       - name: estimates
@@ -22,6 +23,8 @@ tests:
       - name: ledger_accounts_cost
       - name: ledger_accounts_income
       - name: ledger_accounts_balance
+      - name: projects
+      - name: labels
 
   - name: expenses full refresh
     limit: 25
@@ -37,3 +40,23 @@ tests:
         state:
           expenses:
             vat_date: "2026-09-01"
+
+  - name: reports
+    config:
+      start_date: "2026-01-01"
+    limit: 20
+    streams:
+      - name: report_balance
+      - name: report_profit_and_loss
+      - name: report_summary_balance
+      - name: report_summary_btw
+      - name: report_summary_cash_and_bank
+      - name: report_summary_invoices
+      - name: report_summary_profit_and_loss
+
+  - name: payroll
+    config:
+      start_date: "2026-01-01"
+    limit: 5
+    streams:
+      - name: loonjournaalposten

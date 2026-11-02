@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "period": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "start_date": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "end_date": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cycle": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "as_of_date": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "total_debit": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "amount": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "amount": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        },
+        "side": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "total_credit": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "amount": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "amount": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        },
+        "side": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "items": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "side": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "group": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "total": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "amount": {
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "side": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          },
+          "ledger_accounts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "id": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "amount": {
+                  "type": [
+                    "null",
+                    "object"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

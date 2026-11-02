@@ -1,0 +1,38 @@
+{
+  "id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "vat_type": "vat",
+  "company_name": "Jortt B.V.",
+  "company_name_line_2": "IT department",
+  "address_street": "Nieuwezijds Voorburgwal 147",
+  "address_postal_code": "1012 RJ",
+  "address_city": "Amsterdam",
+  "address_country_code": "NL",
+  "address_country_name": "Nederland",
+  "tax_registration_number": "NL999999999B01",
+  "chamber_of_commerce_number": "12345678",
+  "bank_account_iban": "NL10BANK 1234 5678 90",
+  "bank_account_bban": "123456789",
+  "owners": [
+    {
+      "id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+      "full_name": "Jari Litmanen"
+    }
+  ],
+  "legal_form": "bv",
+  "website": "http://www.jortt.nl",
+  "phonenumber": "+31 20 1234567",
+  "invoice_from_email": "support@jortt.nl",
+  "one_stop_shop_enabled": false,
+  "has_mollie": false,
+  "jortt_start_date": "2026-10-06T08:55:10+02:00",
+  "invoice_from_email_confirmed": true,
+  "data_complete_for_sending_invoices": true,
+  "default_vat": {
+    "category": "exempt",
+    "value": "0.0"
+  },
+  "has_peppol_access": false,
+  "access_to_jortt_zzp": false,
+  "access_to_jortt_mkb": false,
+  "access_to_jortt_plus": false
+}

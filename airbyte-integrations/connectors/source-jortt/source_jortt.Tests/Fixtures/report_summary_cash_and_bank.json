@@ -1,0 +1,34 @@
+{
+  "bank_accounts": [
+    {
+      "bank_account_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+      "archived": false,
+      "description": "User set description",
+      "balance": {
+        "value": "placeholder",
+        "currency": "placeholder"
+      },
+      "iban": "NL10BANK 1234 5678 90",
+      "bank": "Rabobank"
+    }
+  ],
+  "liquid_assets": [
+    {
+      "archived": false,
+      "ledger_account_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+      "balance": {
+        "value": "placeholder",
+        "currency": "placeholder"
+      },
+      "display_number": "credit_card",
+      "liquid_asset_type": "credit_card"
+    }
+  ],
+  "kas": {
+    "balance": {
+      "value": "365.00",
+      "currency": "EUR"
+    }
+  },
+  "has_mollie": false
+}

@@ -1,0 +1,15 @@
+{
+  "total_opbrengsten": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "total_kosten": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "possible_profit": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "end_date": "<end_date>"
+}
