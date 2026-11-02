@@ -259,7 +259,9 @@ One-time setup (repository admin):
 
 - Create the `integration` environment and set *Deployment branches and tags* to *Selected branches* → `main`.
 - Put `SECRETS_POSTGRESQL_CONNECTION_STRING` and `SECRETS_POSTGRESQL_ENCRYPTION_KEY` in that environment, and delete
-  the repository-level copies; otherwise `secrets.*` still resolves outside the environment.
+  the repository-level copies; otherwise `secrets.*` still resolves outside the environment. The job pins
+  `SECRETS_POSTGRESQL_SCHEMA` to `secrets`, so the store's tables must live in that schema (not the provider
+  default, `public`).
 - Put a NetBird **ephemeral** setup key in `NETBIRD_SETUP_KEY`, and `NETBIRD_MANAGEMENT_URL` when the network is
   self-hosted (leave it empty for NetBird cloud). An ephemeral key removes the peer when the runner disconnects.
 - Scope the NetBird policy for that key to the database host and port, and use a read-only PostgreSQL role: a run
