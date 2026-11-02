@@ -250,9 +250,10 @@ connector only sees the values it was given through its config file.
 
 The PostgreSQL store is not reachable from the public internet: it sits behind a NetBird network. Before reading a
 secret the job joins that network with [NetBird Connect](https://github.com/marketplace/actions/netbird-connect)
-(`Alemiz112/netbird-connect`, pinned to a commit) and leaves it again in an `always()` step. The join passes
-`--accept-routes`, so the network must advertise the route to the database (a routing peer, or the database itself
-as a peer). Without `NETBIRD_SETUP_KEY` the step is skipped and the scenarios fall back to their skipped state.
+(`Alemiz112/netbird-connect`, pinned to a commit) and leaves it again in an `always()` step. After the connection
+the job accepts the network routes with `netbird routes select all` (`netbird up` has no route flag), so the network
+must advertise the route to the database (a routing peer, or the database itself as a peer). Without
+`NETBIRD_SETUP_KEY` the steps are skipped and the scenarios fall back to their skipped state.
 
 One-time setup (repository admin):
 
