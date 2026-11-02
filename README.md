@@ -227,7 +227,8 @@ Secrets are resolved through the `ISecretSource` seam. Three implementations shi
 - **PostgreSQL store** (`mrhamburg.SecretsManager.PostgreSql`) — selected as soon as `SECRETS_POSTGRESQL_CONNECTION_STRING`
   is set. Connection details never appear in the repository: every value comes from environment variables
   (`SECRETS_POSTGRESQL_CONNECTION_STRING`, `_SCHEMA`, `_TABLE_PREFIX`, `_AUTO_CREATE_SCHEMA`, `_ENCRYPTION_KEY`,
-  `_ENCRYPTION_KEY_FILE`). A YAML secret key is the key in the store.
+  `_ENCRYPTION_KEY_FILE`). A YAML secret key is the key in the store. Use a role that can only read the secret
+  table, so a leaked connection string cannot rewrite credentials.
 - **JSON object** in `AIRBYTE_INTEGRATION_SECRETS_JSON`.
 - **Environment variables**, where a secret key is the variable name.
 
@@ -238,7 +239,9 @@ masked in error output, and the rendered `config.json` is deleted after a run un
 which case the secret values in it are masked.
 
 `.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
-a push to `main`.
+a push to `main`. Credentials are injected for pushes to `main` and manual runs only: a `pull_request` job would
+execute branch code with the whole secret store, so anyone who can push a branch could read every connector's
+secrets. Pull requests therefore run uncredentialed and report the credential-dependent scenarios as skipped.
 
 #### Publishing a new version of a connector
 

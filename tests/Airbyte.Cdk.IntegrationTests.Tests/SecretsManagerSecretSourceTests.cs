@@ -96,6 +96,17 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         }
 
         [Fact]
+        public async Task Test_DisposeAsync_DoesNotMaskAFactoryFailure()
+        {
+            var source = new SecretsManagerSecretSource(() => throw new InvalidOperationException("bad connection string"));
+
+            await Should.ThrowAsync<InvalidOperationException>(() => source.GetAsync("any", CancellationToken.None));
+
+            // Lazy caches the exception; disposing must not re-throw it and hide the real harness error.
+            await Should.NotThrowAsync(() => source.DisposeAsync().AsTask());
+        }
+
+        [Fact]
         public async Task Test_GetAsync_ReturnsNullWhenTheKeyDoesNotExist()
         {
             var source = new SecretsManagerSecretSource(() => new MissingSecretProvider());

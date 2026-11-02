@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Airbyte.Cdk;
 using Airbyte.Cdk.Sources;
@@ -154,7 +155,7 @@ namespace source_jortt
             Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, JorttAuth auth, string organizationId) =>
             builder
                 .MaxRetries(5)
-                .ShouldRetry(IsTransient)
+                .ShouldRetry(exception => ShouldRetry(exception, auth))
                 .BackoffTime((retryCount, _) => TimeSpan.FromSeconds(Math.Max(5, retryCount * 5)))
                 .RequestHeaders((_, _, _) => Headers(auth, organizationId));
 
@@ -179,8 +180,14 @@ namespace source_jortt
 
         /// <summary>
         /// A collection that only exists below a parent object, read once per parent record. The parent key is
-        /// handed to the path through the stream slice.
+        /// handed to the path through the stream slice and written into every record, because the payments and
+        /// transactions endpoints do not repeat the parent id.
         /// </summary>
+        /// <remarks>
+        /// A 404 (the parent disappeared between the two reads) or 403 (the application lacks a scope) on this
+        /// request fails the run on purpose: a skipped child list is silent data loss, and the error message names
+        /// the HTTP status and the Jortt error key.
+        /// </remarks>
         private static Stream Substream(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string parent,
             string parentKeyField, string sliceParameter, string pathTemplate, string name, bool paged = true)
         {
@@ -190,6 +197,9 @@ namespace source_jortt
                         ? key?.ToString() ?? string.Empty
                         : string.Empty))
                 .Dependency(new SubstreamDependency(parent, parentKeyField, sliceParameter))
+                // AddFunc replaces an existing entry, so this parser replaces the list parser of Common().
+                .ParseResponse((response, _, streamSlice, _) =>
+                    WithParentKey(ParseData(response), sliceParameter, streamSlice))
                 .RequestParams((_, _, nextpagetoken) =>
                     paged ? PageParameters(nextpagetoken) : new Dictionary<string, object>())
                 .Create(name);
@@ -305,7 +315,11 @@ namespace source_jortt
                 .RequestParams((state, _, nextpagetoken) =>
                 {
                     var parameters = PageParameters(nextpagetoken);
-                    var from = ExpensesLowerBound(state, seen.Max, startDate, lookbackDays);
+
+                    // Bound the request from the incoming state and start_date only. seen.Max grows while the
+                    // pages are parsed, so using it here would change the filter between page 1 and page 2, and
+                    // Jortt applies `page` to whatever result set the current filters produce.
+                    var from = ExpensesLowerBound(state, null, startDate, lookbackDays);
 
                     // Only send the filter when there is a lower bound: a full refresh must not silently drop
                     // history, so start_date has no default.
@@ -319,6 +333,13 @@ namespace source_jortt
 
         internal static bool IsTransient(FlurlHttpException exception) =>
             exception.StatusCode == null || exception.StatusCode is 429 or 500 or 502 or 503 or 504;
+
+        /// <summary>
+        /// Retries transient failures, and a 401 once after dropping the cached token. A token that is revoked
+        /// mid-sync would otherwise fail the whole run.
+        /// </summary>
+        internal static bool ShouldRetry(FlurlHttpException exception, JorttAuth auth) =>
+            exception.StatusCode == 401 ? auth.TryRefreshAfterUnauthorized() : IsTransient(exception);
 
         internal static Dictionary<string, object> PageParameters(Dictionary<string, object> nextpagetoken) =>
             new() { { "page", nextpagetoken != null && nextpagetoken.TryGetValue("page", out var page) ? page : 1 } };
@@ -343,20 +364,60 @@ namespace source_jortt
                 : null;
         }
 
-        internal static IEnumerable<JsonElement> ParseData(IFlurlResponse response)
+        internal static IEnumerable<JsonElement> ParseData(IFlurlResponse response) =>
+            Data(response, JsonValueKind.Array);
+
+        internal static IEnumerable<JsonElement> ParseObjectData(IFlurlResponse response) =>
+            Data(response, JsonValueKind.Object);
+
+        /// <summary>
+        /// Reads the <c>data</c> member of the response envelope. A missing or unexpected shape fails loudly: an
+        /// empty list would produce a green sync that reads nothing. An explicit <c>data: null</c> is the API
+        /// saying there is nothing to return.
+        /// </summary>
+        private static IEnumerable<JsonElement> Data(IFlurlResponse response, JsonValueKind expected)
         {
             var body = response.GetStringAsync().Result.AsJsonElement();
-            return body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
-                ? data.EnumerateArray().ToList()
-                : new List<JsonElement>();
+            if (body.ValueKind != JsonValueKind.Object || !body.TryGetProperty("data", out var data))
+                throw new Exception($"Jortt answered without 'data': {Excerpt(body)}");
+
+            if (data.ValueKind == JsonValueKind.Null)
+                return Array.Empty<JsonElement>();
+
+            if (data.ValueKind != expected)
+                throw new Exception(
+                    $"Jortt answered with 'data' of kind {data.ValueKind} instead of {expected}: {Excerpt(body)}");
+
+            return expected == JsonValueKind.Object ? new[] { data } : data.EnumerateArray().ToList();
         }
 
-        internal static IEnumerable<JsonElement> ParseObjectData(IFlurlResponse response)
+        private static string Excerpt(JsonElement body)
         {
-            var body = response.GetStringAsync().Result.AsJsonElement();
-            return body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
-                ? new[] { data }
-                : Array.Empty<JsonElement>();
+            var raw = body.GetRawText();
+            return raw.Length <= 200 ? raw : raw.Substring(0, 200) + "...";
+        }
+
+        /// <summary>
+        /// Writes the parent key into every child record. The API already sends it for some endpoints (for
+        /// example <c>project_line_items</c> carries <c>project_id</c>), and those values are kept.
+        /// </summary>
+        internal static IEnumerable<JsonElement> WithParentKey(IEnumerable<JsonElement> records, string field,
+            Dictionary<string, object> streamSlice)
+        {
+            if (streamSlice == null || !streamSlice.TryGetValue(field, out var key) || key == null)
+                return records;
+
+            return records.Select(record => WithProperty(record, field, key.ToString())).ToList();
+        }
+
+        internal static JsonElement WithProperty(JsonElement record, string field, string value)
+        {
+            if (record.ValueKind != JsonValueKind.Object || record.TryGetProperty(field, out _))
+                return record;
+
+            var node = JsonNode.Parse(record.GetRawText())!.AsObject();
+            node[field] = value;
+            return JsonSerializer.SerializeToElement(node);
         }
 
         internal static string Describe(Exception exception) => exception switch
@@ -471,11 +532,15 @@ namespace source_jortt
 
         /// <summary>
         /// Lower bound actually sent as <c>vat_date_from</c>. The lookback window catches expenses that were
-        /// booked late with an older VAT date, which a cursor alone would skip forever.
+        /// booked late with an older VAT date, which a cursor alone would skip forever. <paramref name="startDate"/>
+        /// stays a floor, so the lookback never reaches behind the configured start date.
         /// </summary>
         internal static DateTime? ExpensesLowerBound(JsonElement state, DateTime? seenMax, DateTime? startDate,
-            int lookbackDays) =>
-            ExpensesCursor(state, seenMax, startDate)?.AddDays(-lookbackDays);
+            int lookbackDays)
+        {
+            var cursor = ExpensesCursor(state, seenMax, startDate);
+            return cursor == null ? null : MaxDate(cursor.Value.AddDays(-lookbackDays), startDate);
+        }
 
         internal static DateTime? StateDate(JsonElement state) =>
             state.ValueKind == JsonValueKind.Object ? ParseDate(Date(state, "vat_date")) : null;
@@ -519,8 +584,16 @@ namespace source_jortt
             return string.IsNullOrWhiteSpace(text) ? null : text;
         }
 
+        /// <summary>
+        /// A non-negative integer config value. A string, a fractional number or a negative value falls back to
+        /// null, because a negative lookback would move the window forward and skip records.
+        /// </summary>
         internal static int? OptionalInt(JsonElement config, string property) =>
-            config.TryGetProperty(property, out var value) && value.TryGetInt32(out var number) ? number : null;
+            config.TryGetProperty(property, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt32(out var number)
+                ? Math.Max(0, number)
+                : null;
     }
 
     /// <summary>
@@ -549,6 +622,7 @@ namespace source_jortt
         private readonly string _clientSecret;
         private readonly string _scopes;
         private readonly Func<DateTime> _clock;
+        private bool _refreshedAfterUnauthorized;
         private string _token;
         private DateTime _expiresAt;
 
@@ -583,6 +657,21 @@ namespace source_jortt
             _expiresAt = _clock().AddSeconds(Math.Max(1, expiresIn - 60));
 
             return _token ?? throw new Exception("Jortt did not return an access token");
+        }
+
+        /// <summary>
+        /// Drops the cached token after a 401 so the next attempt requests a new one. Returns false when that
+        /// already happened once, so a token the API keeps rejecting fails the run instead of retrying forever.
+        /// </summary>
+        public bool TryRefreshAfterUnauthorized()
+        {
+            if (_refreshedAfterUnauthorized)
+                return false;
+
+            _refreshedAfterUnauthorized = true;
+            _token = null;
+            _expiresAt = default;
+            return true;
         }
     }
 }

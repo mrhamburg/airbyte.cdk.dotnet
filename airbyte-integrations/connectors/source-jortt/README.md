@@ -9,7 +9,7 @@ The source uses the OAuth 2.0 **client credentials** grant, which requires a Jor
 **Settings > API** in your administration. The application must grant the read scopes the source requests:
 
 ```
-customers:read invoices:read estimates:read expenses:read organizations:read reconciling:read
+customers:read invoices:read estimates:read expenses:read organizations:read reconciling:read payroll:read
 ```
 
 Use `client_id` and `client_secret` from the registration. When the credentials may act on more than one
@@ -23,6 +23,9 @@ The Jortt API requires an administration on the MKB or Plus plan. Without one, e
 Jortt documents no specific scope for receipts, bank accounts or ledger accounts; if the registered application
 does not implicitly cover them, those three groups return `403` while check still succeeds. Confirm on the first
 credentialed run.
+
+The access token is cached until a minute before it expires. A `401` mid-sync drops that token and retries once;
+a second `401` fails the run, because that means the credentials are rejected rather than stale.
 
 ## Streams
 
@@ -63,7 +66,8 @@ Jortt exposes no modification timestamp, so the cursor is the business date of t
 changed. Two consequences:
 
 - **Late-booked expenses.** A bookkeeper can enter an expense today with last month's VAT date. `lookback_days`
-  (default `7`) widens every incremental request, so those entries are still picked up.
+  (default `7`) widens every incremental request, so those entries are still picked up. The filter is computed
+  once per sync from the incoming state and `start_date`, so every page of one read asks for the same window.
 - **Edits to old expenses.** Changing an expense that is older than the lookback window does not move its VAT date,
   so the edit is never seen. Run a periodic **full refresh** (for example weekly) to catch them. A full refresh
   sends no date filter and reads everything.
@@ -72,7 +76,8 @@ The cursor is the highest VAT date the stream has seen, tracked independently of
 Jortt does not document a sort order. That also makes the terminal state safe to resume from.
 
 `start_date` is optional. When set it is a lower bound for `expenses` in **both** sync modes, so a full refresh with
-`start_date` set does not read earlier history; leave it empty to read everything.
+`start_date` set does not read earlier history; leave it empty to read everything. The lookback never reaches behind
+it: the request starts at `max(cursor - lookback_days, start_date)`.
 
 The state file drives the incremental filter, so do not pass a `--state` file when running a manual full refresh —
 Airbyte itself never sends state for a full-refresh stream.
@@ -88,7 +93,13 @@ current period and emit a single record per run.
 
 `project_line_items`, `bank_transactions`, `invoice_payments` and `expense_payments` only exist below a parent
 object, so they use the CDK's parent/child support (`SubstreamDependency`). Each is read once per parent record
-with the parent key in the request path.
+with the parent key in the request path, and the key is also written into every record (`project_id`,
+`bank_account_id`, `invoice_id`, `expense_id`) because the payments and transactions endpoints do not repeat it.
+Without it a child record cannot be joined back to its parent.
+
+A 404 or 403 on a per-parent request fails the run instead of being skipped: a 404 means the parent disappeared
+between the two reads, a 403 means the application lacks a scope, and both are worth surfacing instead of leaving a
+silent gap in the child data.
 
 A substream always needs its parent for context: when the parent is not selected in the catalog it is read
 internally and its records are **not** emitted; when it is selected, its records are emitted as well and the
@@ -115,7 +126,13 @@ Several of these endpoints are documented on the developer site but missing from
 
 ## Local development
 
+The CDK entrypoint loads the connector from the built DLL, so export the same two variables the Dockerfile sets
+before running the CLI:
+
 ```bash
+export AIRBYTE_IMPL_PATH=$PWD/bin/Debug/net10.0/source_jortt.dll
+export AIRBYTE_IMPL_MODULE=Jortt
+
 dotnet run -- read --command spec
 dotnet run -- read --command discover --config sample_files/config.json
 dotnet run -- read --command check --config sample_files/config.json
@@ -135,7 +152,12 @@ once 0.0.9 is on nuget.org.
 ## Integration tests
 
 `integration_tests.yaml` declares a full-refresh scenario, an `expenses` full-refresh scenario and an incremental
-`expenses` scenario. They are skipped until `JORTT_CLIENT_ID` and `JORTT_CLIENT_SECRET` exist:
+`expenses` scenario. They are skipped until `JORTT_CLIENT_ID` and `JORTT_CLIENT_SECRET` exist. CI only injects the
+secret store for pushes and manual runs, never for pull requests, so the scenarios are skipped there as well.
+
+The files under `source_jortt.Tests/Fixtures/` are documentation placeholders (`"<booking_id>"`) and only prove the
+schema shape. Replace them with sanitized real responses after the first credentialed run. The same run is the
+first real test of the endpoints that the developer documentation describes but the swagger file omits.
 
 ```bash
 dotnet run --project ../../../tests/Airbyte.Cdk.IntegrationTests -- \

@@ -35,7 +35,7 @@
       "lookback_days": {
         "type": "integer",
         "title": "Lookback days",
-        "description": "How many days before the incremental cursor the expenses filter starts. Expenses booked late carry an old VAT date, so a window wider than zero is needed to pick them up.",
+        "description": "How many days before the incremental cursor the expenses filter starts. Expenses booked late carry an old VAT date, so a window wider than zero is needed to pick them up. The window never reaches behind start_date; negative values are ignored.",
         "minimum": 0,
         "default": 7
       },

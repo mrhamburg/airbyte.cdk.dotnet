@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Airbyte.Cdk.Sources.Streams.Http;
 using Flurl.Http;
 using Flurl.Http.Testing;
 using Json.Schema;
@@ -74,17 +75,53 @@ namespace source_jortt.Tests
         }
 
         [Fact]
-        public async Task Test_ParseData_ReturnsEveryRecordAndToleratesMissingData()
+        public async Task Test_ParseData_ReturnsEveryRecord()
         {
             using var httpTest = new HttpTest();
             httpTest.RespondWith(@"{""data"":[{""id"":""a""},{""id"":""b""}]}", 200);
+
+            var response = await "https://api.jortt.nl/v3/customers".GetAsync();
+
+            Jortt.ParseData(response).Count().ShouldBe(2);
+        }
+
+        [Fact]
+        public async Task Test_ParseData_TreatsNullDataAsEmpty()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(@"{""data"":null}", 200);
+
+            var response = await "https://api.jortt.nl/v3/customers".GetAsync();
+
+            Jortt.ParseData(response).ShouldBeEmpty();
+        }
+
+        [Fact]
+        public async Task Test_ParseData_FailsOnAnUnexpectedShapeInsteadOfSyncingNothing()
+        {
+            using var httpTest = new HttpTest();
             httpTest.RespondWith(@"{""error"":{""code"":401}}", 200);
+            httpTest.RespondWith(@"{""data"":{""id"":""a""}}", 200);
 
-            var withData = await "https://api.jortt.nl/v3/customers".GetAsync();
             var withoutData = await "https://api.jortt.nl/v3/customers".GetAsync();
+            var objectData = await "https://api.jortt.nl/v3/customers".GetAsync();
 
-            Jortt.ParseData(withData).Count().ShouldBe(2);
-            Jortt.ParseData(withoutData).ShouldBeEmpty();
+            Should.Throw<Exception>(() => Jortt.ParseData(withoutData).ToList())
+                .Message.ShouldContain("without 'data'");
+            Should.Throw<Exception>(() => Jortt.ParseData(objectData).ToList())
+                .Message.ShouldContain("instead of Array");
+        }
+
+        [Fact]
+        public async Task Test_ParseObjectData_FailsOnAnArrayShape()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(@"{""data"":[]}", 200);
+
+            var response = await "https://api.jortt.nl/v3/organizations/me".GetAsync();
+
+            Should.Throw<Exception>(() => Jortt.ParseObjectData(response).ToList())
+                .Message.ShouldContain("instead of Object");
         }
     }
 
@@ -145,6 +182,30 @@ namespace source_jortt.Tests
             // sent when nothing is known.
             Jortt.ExpensesLowerBound(Json("{}"), null, null, 7).ShouldBeNull();
         }
+
+        [Fact]
+        public void Test_ExpensesLowerBound_NeverReachesBehindStartDate()
+        {
+            // start_date is a floor, so the lookback may not pull the window behind it.
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(Json("{}"), null, new DateTime(2026, 9, 1), 7)!.Value)
+                .ShouldBe("2026-09-01");
+
+            var stale = Json(@"{""vat_date"":""2020-01-01""}");
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(stale, null, new DateTime(2026, 9, 1), 7)!.Value)
+                .ShouldBe("2026-09-01");
+        }
+
+        [Fact]
+        public void Test_ExpensesLowerBound_ClampsOnlyWhenTheLookbackCrossesStartDate()
+        {
+            var near = Json(@"{""vat_date"":""2026-09-05""}");
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(near, null, new DateTime(2026, 9, 1), 7)!.Value)
+                .ShouldBe("2026-09-01");
+
+            var far = Json(@"{""vat_date"":""2026-10-10""}");
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(far, null, new DateTime(2026, 9, 1), 7)!.Value)
+                .ShouldBe("2026-10-03");
+        }
     }
 
     public class AuthTests
@@ -197,6 +258,46 @@ namespace source_jortt.Tests
 
             Should.Throw<Exception>(() => auth.GetAccessToken());
         }
+
+        [Fact]
+        public void Test_TryRefreshAfterUnauthorized_DropsTheCachedTokenOnlyOnce()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(@"{""access_token"":""token-1"",""expires_in"":7200}", 200);
+            httpTest.RespondWith(@"{""access_token"":""token-2"",""expires_in"":7200}", 200);
+
+            var auth = new JorttAuth("https://app.jortt.nl/oauth-provider/oauth/token", "id", "secret", "s");
+
+            auth.GetAccessToken().ShouldBe("token-1");
+            auth.TryRefreshAfterUnauthorized().ShouldBeTrue();
+            auth.GetAccessToken().ShouldBe("token-2");
+            auth.TryRefreshAfterUnauthorized().ShouldBeFalse();
+        }
+
+        [Fact]
+        public async Task Test_ShouldRetry_RefreshesTheTokenOnceAfterUnauthorized()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith("unauthorized", 401);
+
+            var auth = new JorttAuth("https://app.jortt.nl/oauth-provider/oauth/token", "id", "secret", "s");
+            var exception = await Should.ThrowAsync<FlurlHttpException>(() => "https://api.jortt.nl/x".GetAsync());
+
+            Jortt.ShouldRetry(exception, auth).ShouldBeTrue();
+            Jortt.ShouldRetry(exception, auth).ShouldBeFalse();
+        }
+
+        [Fact]
+        public async Task Test_ShouldRetry_LeavesClientErrorsAlone()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith("forbidden", 403);
+
+            var auth = new JorttAuth("https://app.jortt.nl/oauth-provider/oauth/token", "id", "secret", "s");
+            var exception = await Should.ThrowAsync<FlurlHttpException>(() => "https://api.jortt.nl/x".GetAsync());
+
+            Jortt.ShouldRetry(exception, auth).ShouldBeFalse();
+        }
     }
 
     public class ConfigTests
@@ -217,6 +318,15 @@ namespace source_jortt.Tests
         public void Test_Optional_ReturnsTrimmedValue()
         {
             Jortt.Optional(Json(@"{""client_id"":""abc""}"), "client_id").ShouldBe("abc");
+        }
+
+        [Fact]
+        public void Test_OptionalInt_IgnoresStringsAndClampsNegativeValues()
+        {
+            Jortt.OptionalInt(Json(@"{""lookback_days"":7}"), "lookback_days").ShouldBe(7);
+            Jortt.OptionalInt(Json(@"{""lookback_days"":""7""}"), "lookback_days").ShouldBeNull();
+            Jortt.OptionalInt(Json(@"{""lookback_days"":-3}"), "lookback_days").ShouldBe(0);
+            Jortt.OptionalInt(Json("{}"), "lookback_days").ShouldBeNull();
         }
 
         [Fact]
@@ -306,6 +416,96 @@ namespace source_jortt.Tests
             streams.Keys.ShouldContain("expenses");
 
             streams.Values.Count(x => x.Dependency != null).ShouldBe(4);
+        }
+    }
+
+    public class StreamRequestTests
+    {
+        private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
+
+        private static Dictionary<string, HttpStream> Streams() =>
+            new Jortt()
+                .Streams(Json(@"{""client_id"":""id"",""client_secret"":""secret""}"))
+                .ToDictionary(x => x.Name, x => (HttpStream)x);
+
+        [Fact]
+        public async Task Test_Expenses_KeepsTheDateFilterStableAcrossPages()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(
+                @"{""data"":[{""vat_date"":""2026-10-10""}],""_links"":{""next"":{""href"":""https://api.jortt.nl/v3/expenses?page=2""}}}",
+                200);
+
+            var expenses = Streams()["expenses"];
+            var state = Json(@"{""vat_date"":""2026-01-01""}");
+
+            var first = expenses.RequestParams(state, null, null);
+            var response = await "https://api.jortt.nl/v3/expenses".GetAsync();
+            expenses.ParseResponse(response, state, null, null).Count().ShouldBe(1);
+            var second = expenses.RequestParams(state, null, new Dictionary<string, object> { { "page", 2 } });
+
+            // Parsing page 1 moved the cursor to 2026-10-10. Page 2 must still ask for the same window: Jortt
+            // applies page=2 to the result set of the filters in that request, so a moving filter skips history.
+            first["vat_date_from"].ShouldBe("2025-12-25");
+            second["vat_date_from"].ShouldBe("2025-12-25");
+            second["page"].ShouldBe(2);
+        }
+
+        [Fact]
+        public async Task Test_Expenses_UpdatesStateFromTheHighestDateItSaw()
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(
+                @"{""data"":[{""vat_date"":""2026-03-01""},{""vat_date"":""2026-10-10""}]}", 200);
+
+            var expenses = Streams()["expenses"];
+            var state = Json(@"{""vat_date"":""2026-01-01""}");
+            var response = await "https://api.jortt.nl/v3/expenses".GetAsync();
+            expenses.ParseResponse(response, state, null, null).Count().ShouldBe(2);
+
+            // The tracker now only feeds the state, never the paging filter.
+            expenses.GetUpdatedState(state, Json("{}")).GetProperty("vat_date").GetString()
+                .ShouldBe("2026-10-10");
+        }
+
+        [Fact]
+        public void Test_Expenses_ClampsTheFilterToStartDate()
+        {
+            var expenses = (HttpStream)new Jortt()
+                .Streams(Json(
+                    @"{""client_id"":""id"",""client_secret"":""secret"",""start_date"":""2026-09-01""}"))
+                .Single(x => x.Name == "expenses");
+
+            expenses.RequestParams(Json("{}"), null, null)["vat_date_from"].ShouldBe("2026-09-01");
+        }
+
+        [Theory]
+        [InlineData("bank_transactions", "bank_account_id")]
+        [InlineData("invoice_payments", "invoice_id")]
+        [InlineData("expense_payments", "expense_id")]
+        [InlineData("project_line_items", "project_id")]
+        public async Task Test_Substreams_WriteTheParentKeyIntoEveryRecord(string streamName, string field)
+        {
+            using var httpTest = new HttpTest();
+            httpTest.RespondWith(@"{""data"":[{""booking_id"":""b-1""},{""booking_id"":""b-2""}]}", 200);
+
+            var records = Streams()[streamName]
+                .ParseResponse(await "https://api.jortt.nl/v3/parent/1/children".GetAsync(), Json("{}"),
+                    new Dictionary<string, object> { { field, "parent-1" } }, null)
+                .ToList();
+
+            records.Count.ShouldBe(2);
+            records.ShouldAllBe(record => record.GetProperty(field).GetString() == "parent-1");
+        }
+
+        [Fact]
+        public void Test_WithProperty_KeepsAValueTheApiSentAndIgnoresNonObjects()
+        {
+            Jortt.WithProperty(Json(@"{""project_id"":""from-api""}"), "project_id", "from-slice")
+                .GetProperty("project_id").GetString().ShouldBe("from-api");
+            Jortt.WithProperty(Json(@"{""id"":""x""}"), "project_id", "from-slice")
+                .GetProperty("project_id").GetString().ShouldBe("from-slice");
+            Jortt.WithProperty(Json("[1]"), "project_id", "from-slice").ValueKind.ShouldBe(JsonValueKind.Array);
         }
     }
 

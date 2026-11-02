@@ -118,9 +118,13 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           # A PostgreSQL secret store wins when it is configured; every connection detail comes from the
           # environment, so nothing lands in the repository. Otherwise a JSON object can supply the same keys.
-          SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ secrets.SECRETS_POSTGRESQL_CONNECTION_STRING }}
-          SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY }}
-          AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
+          #
+          # Credentials are injected for pushes and manual runs only. A `pull_request` job executes branch code,
+          # so giving it the store would let anyone who can push a branch read every connector's secrets. Pull
+          # requests therefore run uncredentialed and report the credentialed scenarios as skipped.
+          SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ github.event_name != 'pull_request' && secrets.SECRETS_POSTGRESQL_CONNECTION_STRING || '' }}
+          SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ github.event_name != 'pull_request' && secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY || '' }}
+          AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ github.event_name != 'pull_request' && secrets.AIRBYTE_INTEGRATION_SECRETS_JSON || '' }}
         run: |
           # On main a skipped scenario is a failure, because a skip there looks green while proving nothing.
           # That only holds once a secret store is configured: before the first credentials exist every key is

@@ -28,15 +28,10 @@ namespace Airbyte.Cdk.IntegrationTests
         public const string ConnectionStringVariable = "SECRETS_POSTGRESQL_CONNECTION_STRING";
 
         private readonly Lazy<ISecretProvider> _provider;
-        private bool _built;
 
         public SecretsManagerSecretSource(Func<ISecretProvider> providerFactory)
         {
-            _provider = new Lazy<ISecretProvider>(() =>
-            {
-                _built = true;
-                return providerFactory();
-            });
+            _provider = new Lazy<ISecretProvider>(providerFactory);
         }
 
         public async Task<string?> GetAsync(string key, CancellationToken cancellationToken)
@@ -51,7 +46,9 @@ namespace Airbyte.Cdk.IntegrationTests
 
         public async ValueTask DisposeAsync()
         {
-            if (_built)
+            // IsValueCreated stays false when the factory threw, so disposing after a failed build does not
+            // re-throw the cached exception and mask the real harness error.
+            if (_provider.IsValueCreated)
                 await _provider.Value.DisposeAsync();
         }
 
