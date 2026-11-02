@@ -114,6 +114,37 @@ public override Stream[] Streams(JsonElement config)
 }
 ```
 
+### Substreams (parent and child streams)
+
+Some APIs only expose a collection below a parent object, for example `projects/{project_id}/line_items`. Declare
+the child as a substream and it is read once per parent record, with the parent key available to the request
+callbacks through the stream slice:
+
+```csharp
+var projects = UrlBase.HttpStream()
+    .Path((_, _, _) => "v3/projects")
+    .Create("projects");
+
+var lineItems = UrlBase.HttpStream()
+    .Path((_, streamSlice, _) => $"v3/projects/{streamSlice["project_id"]}/line_items")
+    .Dependency(new SubstreamDependency("projects", "id", "project_id"))
+    .Create("project_line_items");
+```
+
+`SubstreamDependency(parentStream, parentKeyField, sliceParameter)` supports a dotted key path (`customer.id`).
+
+- **The parent is read once.** When it is in the catalog its records are emitted and reused; when it is not, it is
+  read internally without emitting records. Order does not matter: if the substream is read first, the parent's
+  records are replayed from the cache when its own catalog entry is reached.
+- **Parent records without the key are skipped** with a warning rather than failing the sync.
+- **State belongs to the substream, not to each parent.** A substream is a stream: it keeps one cursor, and the
+  CDK feeds the last state it emitted into the next parent's read so the cursor cannot move backwards when parents
+  come back in an arbitrary order. The stream's `GetUpdatedState` still decides how to merge, so implement it as a
+  maximum (`max(current state, record cursor)`) when the API has no ordering guarantee.
+- **`incremental` is supported** as long as the stream reports a cursor and the API filters per parent; the parent
+  key is merged into whatever `StreamSlices` returns.
+- **Nested substreams are rejected** with an explicit message: a substream cannot itself be the parent of another.
+
 ### Practical Tips
 
 Airbyte recommends using the CDK template generator to develop with the CDK. The template generates created all the required scaffolding, with convenient TODOs, allowing developers to truly focus on implementing the API.

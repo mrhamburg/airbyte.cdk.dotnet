@@ -81,6 +81,12 @@ namespace Airbyte.Cdk.Sources.Streams
         public StateEmitter? StateEmitter { get; internal set; }
 
         /// <summary>
+        /// When set, this stream is a substream: it is read once per record of the stream named in the
+        /// dependency, and the parent key is handed to <see cref="ReadRecords"/> through the stream slice.
+        /// </summary>
+        public virtual SubstreamDependency? Dependency => null;
+
+        /// <summary>
         /// This method should be overridden by subclasses to read records based on the inputs
         /// </summary>
         public abstract Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode, ChannelWriter<AirbyteMessage> streamchannel,
