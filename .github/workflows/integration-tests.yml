@@ -15,6 +15,8 @@ name: Connector Integration Tests
 #       NETBIRD_SETUP_KEY (ephemeral), NETBIRD_MANAGEMENT_URL (self-hosted only; empty means NetBird cloud)
 #   * delete the repository-level copies of those secrets, otherwise `secrets.*` still resolves outside the
 #     environment
+#   * the store tables live in the schema the job pins below: SECRETS_POSTGRESQL_SCHEMA=secrets
+#     (the provider defaults to `public`)
 #   * optional: required reviewers, so every post-merge run also needs a human approval
 on:
   push:
@@ -153,6 +155,9 @@ jobs:
           SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ secrets.SECRETS_POSTGRESQL_CONNECTION_STRING }}
           SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY }}
           AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
+          # The store keeps its tables in `secrets`. The provider falls back to `public`, which the read-only CI
+          # role does not need to reach.
+          SECRETS_POSTGRESQL_SCHEMA: secrets
         run: |
           # A skipped scenario on main is a failure, because a skip there looks green while proving nothing.
           # That only holds once a secret store is configured: before the first credentials exist every key is
