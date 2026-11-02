@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "vat_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "company_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "company_name_line_2": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_street": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_postal_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_city": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_country_code": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "address_country_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "tax_registration_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "chamber_of_commerce_number": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "bank_account_iban": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "bank_account_bban": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "owners": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "full_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "legal_form": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "website": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "phonenumber": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "invoice_from_email": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "one_stop_shop_enabled": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "has_mollie": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "jortt_start_date": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "invoice_from_email_confirmed": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "data_complete_for_sending_invoices": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "default_vat": {
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "has_peppol_access": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "access_to_jortt_zzp": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "access_to_jortt_mkb": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "access_to_jortt_plus": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    }
+  }
+}

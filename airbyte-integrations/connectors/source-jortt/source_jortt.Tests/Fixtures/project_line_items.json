@@ -1,0 +1,26 @@
+{
+  "project_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "description": "Work done today",
+  "amount": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "quantity": "202",
+  "invoice_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "user_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "organization_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "line_item_id": 22,
+  "status": "billable",
+  "date": "2020-02-23T00:00:00.000+01:00",
+  "line_item_type": "time_registration",
+  "created_at": "2020-02-23T00:00:00.000+01:00",
+  "updated_at": "2020-02-23T00:00:00.000+01:00",
+  "total_amount": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "user_record": {
+    "id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+    "full_name": "Jari Litmanen"
+  }
+}

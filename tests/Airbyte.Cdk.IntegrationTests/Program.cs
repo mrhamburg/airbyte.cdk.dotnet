@@ -69,20 +69,29 @@ namespace Airbyte.Cdk.IntegrationTests
                 throw new UsageException("run requires at least one --connector <path>.");
 
             var options = new RunOptions(noSkip, keepArtifacts, verbose);
-            var runner = new Runner(SecretSourceFactory.Create(), options);
+            var secrets = SecretSourceFactory.Create();
+            var runner = new Runner(secrets, options);
             var results = new List<ConnectorResult>();
 
-            foreach (var connector in connectors)
+            try
             {
-                try
+                foreach (var connector in connectors)
                 {
-                    results.Add(await runner.RunAsync(connector, CancellationToken.None));
+                    try
+                    {
+                        results.Add(await runner.RunAsync(connector, CancellationToken.None));
+                    }
+                    catch (Exception e)
+                    {
+                        results.Add(new ConnectorResult(Path.GetFullPath(connector), Status.Failed,
+                            Array.Empty<TestResult>(), new[] { $"harness error: {e.GetType().Name}: {e.Message}" }));
+                    }
                 }
-                catch (Exception e)
-                {
-                    results.Add(new ConnectorResult(Path.GetFullPath(connector), Status.Failed,
-                        Array.Empty<TestResult>(), new[] { $"harness error: {e.GetType().Name}: {e.Message}" }));
-                }
+            }
+            finally
+            {
+                if (secrets is IAsyncDisposable disposable)
+                    await disposable.DisposeAsync();
             }
 
             Report(results, options);

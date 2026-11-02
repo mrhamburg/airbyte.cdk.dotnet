@@ -1,0 +1,18 @@
+{
+  "balans_vaste_activa": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "balans_vlottende_activa": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "balans_eigen_vermogen": {
+    "value": "365.00",
+    "currency": "EUR"
+  },
+  "balans_overige_passiva": {
+    "value": "365.00",
+    "currency": "EUR"
+  }
+}

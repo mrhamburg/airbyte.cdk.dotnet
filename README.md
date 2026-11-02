@@ -31,6 +31,7 @@ Component | Type |Code | Installation | Version
 ----------|------|-----|------|--------
 Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
 Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/source-exchange-rates-free` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-exchange-rates-free?sort=semver&style=flat)
+Jortt | Source | [source-jortt](airbyte-integrations/connectors/source-jortt) | `docker pull airbytedotnet/source-jortt` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-jortt?sort=semver&style=flat)
 
 ## Protocol compatibility
 
@@ -221,16 +222,51 @@ still fetched in full until the later ones reach the cap; the retained slice kee
 An `incremental` scenario must also emit at least one `STATE` message, so a connector that degrades to a full
 refresh cannot pass quietly.
 
-Secrets are resolved through the `ISecretSource` seam. Two implementations ship: environment variables (a secret
-key is the variable name) and a JSON object supplied through `AIRBYTE_INTEGRATION_SECRETS_JSON`, which lets CI pass
-every connector credential through one repository secret. The SecretsManager PostgreSQL provider plugs into the
-same interface. A scenario whose secrets are unavailable is reported as **skipped**, never as passed; the workflow
-passes `--no-skip` on `main`, so a missing secret fails the build there. Secret values are masked in error output,
-and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in which case the secret
-values in it are masked.
+Secrets are resolved through the `ISecretSource` seam. Three implementations ship:
 
-`.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a pull request or
-a push to `main`.
+- **PostgreSQL store** (`mrhamburg.SecretsManager.PostgreSql`) — selected as soon as `SECRETS_POSTGRESQL_CONNECTION_STRING`
+  is set. Connection details never appear in the repository: every value comes from environment variables
+  (`SECRETS_POSTGRESQL_CONNECTION_STRING`, `_SCHEMA`, `_TABLE_PREFIX`, `_AUTO_CREATE_SCHEMA`, `_ENCRYPTION_KEY`,
+  `_ENCRYPTION_KEY_FILE`). A YAML secret key is the key in the store. Use a role that can only read the secret
+  table, so a leaked connection string cannot rewrite credentials.
+- **JSON object** in `AIRBYTE_INTEGRATION_SECRETS_JSON`.
+- **Environment variables**, where a secret key is the variable name.
+
+A scenario whose secrets are unavailable is reported as **skipped**, never as passed; once a secret store is
+configured (`SECRETS_POSTGRESQL_CONNECTION_STRING` or `AIRBYTE_INTEGRATION_SECRETS_JSON`) the workflow passes
+`--no-skip` on `main`, so a missing credential then fails the build instead of looking green. Secret values are
+masked in error output, and the rendered `config.json` is deleted after a run unless `--keep-artifacts` is set, in
+which case the secret values in it are masked.
+
+`.github/workflows/integration-tests.yml` runs only the connectors whose files changed in a push to `main`, plus
+manual runs. It has no `pull_request` trigger, because that event executes the workflow file of the pull request
+head with the repository's secrets.
+
+The job that needs credentials references the `integration` GitHub environment. GitHub checks the environment's
+deployment branch policy against the ref of the run, so a branch or a pull request is refused those secrets however
+the workflow is edited; only `main` can deploy. The job gets no store credentials at repository level. The harness
+also removes `SECRETS_POSTGRESQL_*` and `AIRBYTE_INTEGRATION_SECRETS_JSON` from the processes it starts, so a
+connector only sees the values it was given through its config file.
+
+The PostgreSQL store is not reachable from the public internet: it sits behind a NetBird network. Before reading a
+secret the job joins that network with [NetBird Connect](https://github.com/marketplace/actions/netbird-connect)
+(`Alemiz112/netbird-connect`, pinned to a commit) and leaves it again in an `always()` step. The join passes
+`--accept-routes`, so the network must advertise the route to the database (a routing peer, or the database itself
+as a peer). Without `NETBIRD_SETUP_KEY` the step is skipped and the scenarios fall back to their skipped state.
+
+One-time setup (repository admin):
+
+- Create the `integration` environment and set *Deployment branches and tags* to *Selected branches* → `main`.
+- Put `SECRETS_POSTGRESQL_CONNECTION_STRING` and `SECRETS_POSTGRESQL_ENCRYPTION_KEY` in that environment, and delete
+  the repository-level copies; otherwise `secrets.*` still resolves outside the environment.
+- Put a NetBird **ephemeral** setup key in `NETBIRD_SETUP_KEY`, and `NETBIRD_MANAGEMENT_URL` when the network is
+  self-hosted (leave it empty for NetBird cloud). An ephemeral key removes the peer when the runner disconnects.
+- Scope the NetBird policy for that key to the database host and port, and use a read-only PostgreSQL role: a run
+  on `main` executes repository code with network access to the store.
+- Optionally add required reviewers, so every post-merge run also needs an approval.
+
+The credentialed job runs the whole repository at `main`, so restrict who can merge changes under `.github/`,
+`tests/` and the package configuration (`Directory.Packages.props`, `NuGet.Config`) with required reviews.
 
 #### Publishing a new version of a connector
 

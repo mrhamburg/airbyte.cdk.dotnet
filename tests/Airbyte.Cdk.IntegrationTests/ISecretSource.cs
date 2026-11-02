@@ -11,10 +11,9 @@ namespace Airbyte.Cdk.IntegrationTests
     /// Resolves the credentials a connector scenario needs.
     /// </summary>
     /// <remarks>
-    /// The intended production implementation reads from a PostgreSQL-backed secret store through
-    /// <c>SecretsManager.PostgreSql</c>. That package is not published to nuget.org yet, so this branch ships
-    /// two environment-backed implementations and keeps the seam in place: swapping in the store is a new
-    /// implementation of this interface plus one line in <see cref="SecretSourceFactory"/>.
+    /// CI reads from a PostgreSQL-backed secret store (<see cref="SecretsManagerSecretSource"/>); local runs fall
+    /// back to the JSON object or plain environment variables. Adding another backend is a new implementation of
+    /// this interface plus one branch in <see cref="SecretSourceFactory"/>.
     /// </remarks>
     public interface ISecretSource
     {
@@ -74,6 +73,12 @@ namespace Airbyte.Cdk.IntegrationTests
 
         public static ISecretSource Create()
         {
+            // A configured PostgreSQL store wins: it is the one place credentials are expected to live in CI.
+            var connectionString =
+                Environment.GetEnvironmentVariable(SecretsManagerSecretSource.ConnectionStringVariable);
+            if (!string.IsNullOrWhiteSpace(connectionString))
+                return new SecretsManagerSecretSource(SecretsManagerSecretSource.BuildFromEnvironment);
+
             var json = Environment.GetEnvironmentVariable(JsonSecretsVariable);
             return string.IsNullOrWhiteSpace(json) ? new EnvSecretSource() : new JsonSecretSource(json!);
         }

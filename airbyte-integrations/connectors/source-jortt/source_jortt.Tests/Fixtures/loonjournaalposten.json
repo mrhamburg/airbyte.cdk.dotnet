@@ -1,0 +1,96 @@
+{
+  "id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "period_date": "2023-10-01",
+  "bruto_loon": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "werkgeversdeel_sociale_lasten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "werkgeversdeel_pensioenkosten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "reservering_vakantiegeld": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "reservering_eindejaarsuitkering": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "onbelaste_reiskostenvergoedingen": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "onbelaste_vergoedingen_gericht_vrijgesteld": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "onbelaste_vergoedingen_wkr": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "declaraties_algemeen": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "declaraties_kantoorkosten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "declaraties_lunch_en_diner_representatiekosten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "declaraties_reiskosten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "declaraties_auto_en_transportkosten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "declaraties_verkoopkosten": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "eindheffing_wkr": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "netto_inhoudingen": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "afdrachtvermindering_speur_en_ontwikkelingswerk": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "te_betalen_nettolonen": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "te_betalen_sociale_lasten_loonbelasting": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "te_betalen_pensioenpremies": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "te_betalen_vakantiegeld": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "te_betalen_eindejaarsuitkering": {
+    "value": "10.10",
+    "currency": "EUR"
+  },
+  "te_betalen_loonbeslag": {
+    "value": "10.10",
+    "currency": "EUR"
+  }
+}

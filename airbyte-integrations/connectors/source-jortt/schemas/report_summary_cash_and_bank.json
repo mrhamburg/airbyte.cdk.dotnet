@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "bank_accounts": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "bank_account_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "archived": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "balance": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "value": {
+                "type": [
+                  "null",
+                  "number",
+                  "string"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          },
+          "iban": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bank": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "liquid_assets": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "archived": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "ledger_account_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "balance": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "value": {
+                "type": [
+                  "null",
+                  "number",
+                  "string"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          },
+          "display_number": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "liquid_asset_type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "kas": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "balance": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "null",
+                "number",
+                "string"
+              ]
+            },
+            "currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "has_mollie": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    }
+  }
+}

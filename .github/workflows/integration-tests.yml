@@ -1,9 +1,22 @@
 name: Connector Integration Tests
 
+# Credentials live in the `integration` environment, whose deployment branch policy allows `main` only. GitHub
+# checks that policy against the ref of the run, so a branch or a pull request is refused the environment secrets
+# however the workflow is edited. There is deliberately no `pull_request` trigger: that event runs the workflow
+# file of the pull request head with the repository's secrets.
+#
+# The secret store is not reachable from the public internet: it sits behind a NetBird network, so the
+# credentialed job joins that network with an ephemeral setup key before it reads a secret.
+#
+# One-time setup (repository admin):
+#   * environment `integration` -> Deployment branches and tags -> Selected branches: main
+#   * environment secrets
+#       SECRETS_POSTGRESQL_CONNECTION_STRING, SECRETS_POSTGRESQL_ENCRYPTION_KEY
+#       NETBIRD_SETUP_KEY (ephemeral), NETBIRD_MANAGEMENT_URL (self-hosted only; empty means NetBird cloud)
+#   * delete the repository-level copies of those secrets, otherwise `secrets.*` still resolves outside the
+#     environment
+#   * optional: required reviewers, so every post-merge run also needs a human approval
 on:
-  pull_request:
-    paths:
-      - 'airbyte-integrations/connectors/**'
   push:
     branches: [ main ]
     paths:
@@ -20,9 +33,6 @@ permissions:
 
 concurrency:
   group: connector-integration-${{ github.ref }}
-  # A pull request only competes with itself; a push to main must finish, because its connectors are the
-  # ones whose post-merge state we care about.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changed:
@@ -47,8 +57,6 @@ jobs:
         shell: bash
         env:
           INPUT_CONNECTOR: ${{ inputs.connector }}
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
@@ -59,9 +67,8 @@ jobs:
               *) connector="airbyte-integrations/connectors/$connector" ;;
             esac
             echo "$connector/integration_tests.yaml" > "$RUNNER_TEMP/changed.txt"
-          elif [ "$EVENT_NAME" = "pull_request" ]; then
-            git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
           else
+            # A manual run has no before-sha, so it compares against the previous commit.
             base="$BEFORE_SHA"
             if [ -z "$base" ] || ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
               base="HEAD~1"
@@ -93,6 +100,13 @@ jobs:
     if: needs.changed.outputs.has_connectors == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The environment's deployment branch policy is the control that keeps the store away from branch code.
+    environment: integration
+    # The secret store sits behind a NetBird network, so the runner joins it with an ephemeral setup key. Empty
+    # means no NetBird secret is configured yet, and the step is skipped instead of failing the job.
+    env:
+      NETBIRD_SETUP_KEY: ${{ secrets.NETBIRD_SETUP_KEY }}
+      NETBIRD_MANAGEMENT_URL: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
     strategy:
       fail-fast: false
       matrix:
@@ -111,19 +125,39 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
 
+      - name: Connect to the NetBird network
+        if: env.NETBIRD_SETUP_KEY != ''
+        uses: Alemiz112/netbird-connect@fbea46300ca7ee907ff7d8e39ede3f556a6ecf10 # v1.0.2
+        with:
+          setup-key: ${{ env.NETBIRD_SETUP_KEY }}
+          hostname: gh-${{ github.run_id }}-${{ strategy.job-index }}
+          management-url: ${{ env.NETBIRD_MANAGEMENT_URL || 'https://api.netbird.io:443' }}
+          # The store is reached through a route one of the peers advertises.
+          args: --accept-routes
+
       - name: Run integration tests
         shell: bash
         env:
           CONNECTOR: ${{ matrix.connector }}
           EVENT_NAME: ${{ github.event_name }}
-          # One repository secret holding a JSON object of connector credentials, for example
-          # {"SOURCE_EXAMPLE_API_KEY": "..."} — see README, Integration tests.
+          # The environment supplies these; nothing is stored at repository level. A PostgreSQL store wins when
+          # it is configured, otherwise a JSON object can supply the same keys.
+          SECRETS_POSTGRESQL_CONNECTION_STRING: ${{ secrets.SECRETS_POSTGRESQL_CONNECTION_STRING }}
+          SECRETS_POSTGRESQL_ENCRYPTION_KEY: ${{ secrets.SECRETS_POSTGRESQL_ENCRYPTION_KEY }}
           AIRBYTE_INTEGRATION_SECRETS_JSON: ${{ secrets.AIRBYTE_INTEGRATION_SECRETS_JSON }}
         run: |
-          # On main every declared secret is expected to exist: a skip there would look green while
-          # proving nothing.
+          # A skipped scenario on main is a failure, because a skip there looks green while proving nothing.
+          # That only holds once a secret store is configured: before the first credentials exist every key is
+          # missing, and enforcing it would make every credentialed connector red.
           extra=""
-          if [ "$EVENT_NAME" = "push" ]; then
+          if [ "$EVENT_NAME" = "push" ] && [ -n "$SECRETS_POSTGRESQL_CONNECTION_STRING$AIRBYTE_INTEGRATION_SECRETS_JSON" ]; then
             extra="--no-skip"
           fi
           dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- run --connector "$CONNECTOR" $extra
+
+      - name: Leave the NetBird network
+        # Also runs when the tests fail, so the peer does not stay connected. The setup key should be ephemeral as
+        # well, so the peer record disappears with the runner.
+        if: always() && env.NETBIRD_SETUP_KEY != ''
+        shell: bash
+        run: sudo netbird down

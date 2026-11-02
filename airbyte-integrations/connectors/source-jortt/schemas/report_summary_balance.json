@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "balans_vaste_activa": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "balans_vlottende_activa": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "balans_eigen_vermogen": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "balans_overige_passiva": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    }
+  }
+}

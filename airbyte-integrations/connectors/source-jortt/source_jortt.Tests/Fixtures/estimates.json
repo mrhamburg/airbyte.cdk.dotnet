@@ -1,0 +1,53 @@
+{
+  "id": "7d1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10",
+  "estimate_status": "sent",
+  "acceptance_status": "open",
+  "customer_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "tradename_id": null,
+  "estimate_number": "2026-0100",
+  "valid_until": "2026-02-15",
+  "total": {
+    "amount": "121.00",
+    "currency": "EUR"
+  },
+  "total_incl_vat": {
+    "amount": "146.41",
+    "currency": "EUR"
+  },
+  "net_amounts": false,
+  "introduction": null,
+  "remarks": null,
+  "reference": null,
+  "customer_company_name": "Acme BV",
+  "customer_attn": null,
+  "customer_address_street": "Dam 1",
+  "customer_address_city": "Amsterdam",
+  "customer_address_postal_code": "1012 JS",
+  "customer_address_country_code": "NL",
+  "customer_address_country_name": "Nederland",
+  "customer_address_extra_information": null,
+  "customer_vat_shifted": false,
+  "customer_vat_number": "NL000099998B57",
+  "language": "nl",
+  "line_items": [
+    {
+      "description": "Consultancy",
+      "vat": {
+        "value": 0.21,
+        "category": null
+      },
+      "quantity": 1,
+      "amount": {
+        "amount": "100.00",
+        "currency": "EUR"
+      },
+      "total_amount_ex_vat": {
+        "amount": "100.00",
+        "currency": "EUR"
+      }
+    }
+  ],
+  "discounts": [],
+  "sent_or_modified_on": "2026-01-15T09:30:00.000+01:00",
+  "attachments": []
+}

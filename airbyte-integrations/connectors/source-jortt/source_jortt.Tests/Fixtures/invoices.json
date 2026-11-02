@@ -1,0 +1,90 @@
+{
+  "id": "9f1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10",
+  "invoice_status": "paid",
+  "customer_id": "f8fd3e4e-da1c-43a7-892f-1410ac13e38a",
+  "tradename_id": null,
+  "invoice_number": "2026-0001",
+  "invoice_date": "2026-01-15",
+  "invoice_due_date": "2026-02-14",
+  "invoice_delivery_period": null,
+  "invoice_delivery_period_end": null,
+  "invoice_date_sent": "2026-01-15T09:30:00.000+01:00",
+  "invoice_total": {
+    "amount": "121.00",
+    "currency": "EUR"
+  },
+  "invoice_total_incl_vat": {
+    "amount": "121.00",
+    "currency": "EUR"
+  },
+  "invoice_due_amount": {
+    "amount": "0.00",
+    "currency": "EUR"
+  },
+  "send_method": "email",
+  "net_amounts": false,
+  "invoice_marked_free_of_vat": false,
+  "credited_invoice_id": null,
+  "remarks": null,
+  "introduction": null,
+  "number_of_reminders_sent": 0,
+  "last_reminded_at": null,
+  "payment_method": "pay_later",
+  "customer_company_name": "Acme BV",
+  "customer_attn": null,
+  "customer_address_street": "Dam 1",
+  "customer_address_city": "Amsterdam",
+  "customer_address_postal_code": "1012 JS",
+  "customer_address_country_code": "NL",
+  "customer_address_country_name": "Nederland",
+  "customer_address_extra_information": null,
+  "customer_vat_shifted": false,
+  "customer_vat_number": "NL000099998B57",
+  "customer_in_eu": true,
+  "customer_reference": null,
+  "customer_is_private": false,
+  "customer_mail_to": "finance@example.com",
+  "customer_mail_cc_addresses": [],
+  "language": "nl",
+  "line_items": [
+    {
+      "description": "Consultancy",
+      "vat": {
+        "value": 0.21,
+        "category": null
+      },
+      "quantity": 2,
+      "amount": {
+        "amount": "100.00",
+        "currency": "EUR"
+      },
+      "total_amount_ex_vat": {
+        "amount": "200.00",
+        "currency": "EUR"
+      },
+      "ledger_account_id": "61a5b600-16bc-013d-3d2d-42742b204134"
+    }
+  ],
+  "discounts": [
+    {
+      "description": "Loyalty",
+      "percentage": 5
+    }
+  ],
+  "reference": null,
+  "created_at": "2026-01-15T09:30:00.000+01:00",
+  "credit_invoice_ids": [],
+  "peppol_status": null,
+  "attachments": [
+    {
+      "id": "1b1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10",
+      "name": "invoice.pdf"
+    }
+  ],
+  "_links": {
+    "self": {
+      "href": "https://api.jortt.nl/v3/invoices/9f1e",
+      "type": "application/json"
+    }
+  }
+}

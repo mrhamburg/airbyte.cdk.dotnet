@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "period_indicator": {
+      "type": [
+        "null",
+        "string",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "string"
+        ]
+      }
+    },
+    "total_vat": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    }
+  }
+}

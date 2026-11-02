@@ -1,0 +1,23 @@
+{
+  "sent": {
+    "count": 0,
+    "amount": {
+      "value": "365.00",
+      "currency": "EUR"
+    }
+  },
+  "due_and_late": {
+    "count": 0,
+    "amount": {
+      "value": "365.00",
+      "currency": "EUR"
+    }
+  },
+  "late": {
+    "count": 0,
+    "amount": {
+      "value": "365.00",
+      "currency": "EUR"
+    }
+  }
+}

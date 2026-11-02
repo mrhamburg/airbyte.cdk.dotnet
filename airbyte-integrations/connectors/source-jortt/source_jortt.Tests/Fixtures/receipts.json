@@ -1,0 +1,32 @@
+{
+  "id": "5e1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10",
+  "description": "Hosting invoice January",
+  "file_type": "application/pdf",
+  "file_size": 23456,
+  "expense_id": "2c1e1f19-0e1a-4f3e-9e0a-2b0d6f1f2a10",
+  "in_inbox": false,
+  "created_at": "2026-01-20T12:00:00.000+01:00",
+  "receipt_value": {
+    "description": "Hosting January",
+    "invoice_number": "HOST-2026-01",
+    "invoice_date": "2026-01-01",
+    "vat_type": "standard",
+    "amount_incl_vat": {
+      "amount": "121.00",
+      "currency": "EUR"
+    },
+    "amount_excl_vat": {
+      "amount": "100.00",
+      "currency": "EUR"
+    },
+    "iban_codes": [
+      "NL91ABNA0417164300"
+    ],
+    "vat_numbers": [
+      "NL000099998B57"
+    ],
+    "coc_numbers": [
+      "41202536"
+    ]
+  }
+}

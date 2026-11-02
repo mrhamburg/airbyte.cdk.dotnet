@@ -114,6 +114,7 @@ namespace Airbyte.Cdk.IntegrationTests
 
             startInfo.Environment["AIRBYTE_IMPL_PATH"] = AssemblyPath;
             startInfo.Environment["AIRBYTE_IMPL_MODULE"] = _module;
+            SecretEnvironment.RemoveStoreVariables(startInfo.Environment);
 
             using var process = new Process { StartInfo = startInfo };
             process.Start();

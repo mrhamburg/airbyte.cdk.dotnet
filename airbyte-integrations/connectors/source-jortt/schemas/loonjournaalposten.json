@@ -1,0 +1,501 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "period_date": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "bruto_loon": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "werkgeversdeel_sociale_lasten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "werkgeversdeel_pensioenkosten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "reservering_vakantiegeld": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "reservering_eindejaarsuitkering": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "onbelaste_reiskostenvergoedingen": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "onbelaste_vergoedingen_gericht_vrijgesteld": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "onbelaste_vergoedingen_wkr": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "declaraties_algemeen": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "declaraties_kantoorkosten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "declaraties_lunch_en_diner_representatiekosten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "declaraties_reiskosten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "declaraties_auto_en_transportkosten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "declaraties_verkoopkosten": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "eindheffing_wkr": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "netto_inhoudingen": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "afdrachtvermindering_speur_en_ontwikkelingswerk": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "te_betalen_nettolonen": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "te_betalen_sociale_lasten_loonbelasting": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "te_betalen_pensioenpremies": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "te_betalen_vakantiegeld": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "te_betalen_eindejaarsuitkering": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "te_betalen_loonbeslag": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "null",
+            "number",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    }
+  }
+}

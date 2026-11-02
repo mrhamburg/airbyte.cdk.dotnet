@@ -1,0 +1,11 @@
+{
+  "booking_id": "<booking_id>",
+  "amount": {
+    "amount": "22.00",
+    "currency": "EUR"
+  },
+  "book_date": "<book_date>",
+  "ledger_account_id": "<ledger_account_id>",
+  "source_id": "<source_id>",
+  "description": "<description>"
+}
