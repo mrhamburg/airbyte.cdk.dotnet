@@ -132,8 +132,16 @@ jobs:
           setup-key: ${{ env.NETBIRD_SETUP_KEY }}
           hostname: gh-${{ github.run_id }}-${{ strategy.job-index }}
           management-url: ${{ env.NETBIRD_MANAGEMENT_URL || 'https://api.netbird.io:443' }}
-          # The store is reached through a route one of the peers advertises.
-          args: --accept-routes
+
+      - name: Accept the NetBird network routes
+        if: env.NETBIRD_SETUP_KEY != ''
+        shell: bash
+        # `netbird up` has no route flag (it rejects `--accept-routes`), and the store is reached through a network
+        # route a peer advertises. `routes select all` accepts every current and future network; `routes` is the
+        # alias of the newer `networks` command, so this works on older clients as well.
+        run: |
+          sudo netbird routes select all
+          sudo netbird routes list
 
       - name: Run integration tests
         shell: bash
