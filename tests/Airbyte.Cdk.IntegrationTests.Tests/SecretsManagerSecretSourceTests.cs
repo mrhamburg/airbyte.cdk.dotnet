@@ -109,6 +109,7 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         [Fact]
         public async Task Test_GetAsync_ReturnsNullWhenTheKeyDoesNotExist()
         {
+            // MissingSecretProvider fails when SecretExistsAsync is called, which proves one round trip is enough.
             var source = new SecretsManagerSecretSource(() => new MissingSecretProvider());
 
             (await source.GetAsync("absent", CancellationToken.None)).ShouldBeNull();
@@ -119,10 +120,11 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
     internal sealed class FailingSecretProvider : ISecretProvider
     {
         public Task<bool> SecretExistsAsync(string key, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("connection refused");
+            throw new NotSupportedException();
 
         public Task<SecretValue> GetSecretAsync(string key, SecretQuery? query = null,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("connection refused");
 
         public Task<SecretValue> PutSecretAsync(string key, string value, SecretMetadata? metadata = null,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -142,11 +144,11 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
     internal sealed class MissingSecretProvider : ISecretProvider
     {
         public Task<bool> SecretExistsAsync(string key, CancellationToken cancellationToken = default) =>
-            Task.FromResult(false);
+            throw new NotSupportedException();
 
         public Task<SecretValue> GetSecretAsync(string key, SecretQuery? query = null,
             CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            throw new SecretNotFoundException(key);
 
         public Task<SecretValue> PutSecretAsync(string key, string value, SecretMetadata? metadata = null,
             CancellationToken cancellationToken = default) =>

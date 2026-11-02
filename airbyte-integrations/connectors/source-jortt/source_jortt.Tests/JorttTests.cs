@@ -172,7 +172,7 @@ namespace source_jortt.Tests
         {
             var state = ParseJson(@"{""vat_date"":""2026-10-10""}");
 
-            Jortt.FormatDate(Jortt.ExpensesLowerBound(state, null, null, 7)!.Value).ShouldBe("2026-10-03");
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(state, null, 7)!.Value).ShouldBe("2026-10-03");
         }
 
         [Fact]
@@ -180,18 +180,18 @@ namespace source_jortt.Tests
         {
             // A full refresh must not silently drop history, so start_date has no default and no lower bound is
             // sent when nothing is known.
-            Jortt.ExpensesLowerBound(ParseJson("{}"), null, null, 7).ShouldBeNull();
+            Jortt.ExpensesLowerBound(ParseJson("{}"), null, 7).ShouldBeNull();
         }
 
         [Fact]
         public void Test_ExpensesLowerBound_NeverReachesBehindStartDate()
         {
             // start_date is a floor, so the lookback may not pull the window behind it.
-            Jortt.FormatDate(Jortt.ExpensesLowerBound(ParseJson("{}"), null, new DateTime(2026, 9, 1), 7)!.Value)
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(ParseJson("{}"), new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-09-01");
 
             var stale = ParseJson(@"{""vat_date"":""2020-01-01""}");
-            Jortt.FormatDate(Jortt.ExpensesLowerBound(stale, null, new DateTime(2026, 9, 1), 7)!.Value)
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(stale, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-09-01");
         }
 
@@ -199,11 +199,11 @@ namespace source_jortt.Tests
         public void Test_ExpensesLowerBound_ClampsOnlyWhenTheLookbackCrossesStartDate()
         {
             var near = ParseJson(@"{""vat_date"":""2026-09-05""}");
-            Jortt.FormatDate(Jortt.ExpensesLowerBound(near, null, new DateTime(2026, 9, 1), 7)!.Value)
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(near, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-09-01");
 
             var far = ParseJson(@"{""vat_date"":""2026-10-10""}");
-            Jortt.FormatDate(Jortt.ExpensesLowerBound(far, null, new DateTime(2026, 9, 1), 7)!.Value)
+            Jortt.FormatDate(Jortt.ExpensesLowerBound(far, new DateTime(2026, 9, 1), 7)!.Value)
                 .ShouldBe("2026-10-03");
         }
     }
@@ -634,16 +634,27 @@ namespace source_jortt.Tests
         [Fact]
         public void Test_SpecAcceptsTheSampleConfig()
         {
-            var spec = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "spec.json")))
-                .RootElement.GetProperty("connectionSpecification");
             var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures",
                 "config.json"))).RootElement;
 
-            var result = JsonSchema.FromText(spec.GetRawText())
+            var result = JsonSchema.FromText(Spec().GetRawText())
                 .Evaluate(config, new EvaluationOptions { OutputFormat = OutputFormat.List });
 
             result.IsValid.ShouldBeTrue(Violations(result));
         }
+
+        [Fact]
+        public void Test_SpecAndConnectorRequestTheSameScopes()
+        {
+            var defaultScopes = Spec().GetProperty("properties").GetProperty("scopes").GetProperty("default")
+                .GetString();
+
+            defaultScopes.ShouldBe(Jortt.DefaultScopes);
+        }
+
+        private static JsonElement Spec() =>
+            JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "spec.json")))
+                .RootElement.GetProperty("connectionSpecification");
 
         private static string SchemaPath(string stream) =>
             Path.Combine(AppContext.BaseDirectory, "schemas", stream + ".json");

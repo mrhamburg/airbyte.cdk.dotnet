@@ -34,14 +34,25 @@ namespace Airbyte.Cdk.IntegrationTests
             _provider = new Lazy<ISecretProvider>(providerFactory);
         }
 
+        /// <summary>
+        /// Returns the secret value, or <c>null</c> when the key does not exist.
+        /// </summary>
+        /// <remarks>
+        /// A missing key is a normal outcome (the scenario is then skipped), so the provider's not-found exception
+        /// becomes <c>null</c>. That keeps it to one round trip instead of asking
+        /// <see cref="ISecretProvider.SecretExistsAsync"/> first.
+        /// </remarks>
         public async Task<string?> GetAsync(string key, CancellationToken cancellationToken)
         {
-            var provider = _provider.Value;
-            if (!await provider.SecretExistsAsync(key, cancellationToken))
+            try
+            {
+                var secret = await _provider.Value.GetSecretAsync(key, null, cancellationToken);
+                return secret?.Value;
+            }
+            catch (SecretNotFoundException)
+            {
                 return null;
-
-            var secret = await provider.GetSecretAsync(key, null, cancellationToken);
-            return secret?.Value;
+            }
         }
 
         public async ValueTask DisposeAsync()

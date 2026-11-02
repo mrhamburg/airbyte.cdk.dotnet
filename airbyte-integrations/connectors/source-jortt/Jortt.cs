@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Airbyte.Cdk;
 using Airbyte.Cdk.Sources;
@@ -20,7 +20,7 @@ namespace source_jortt
     /// Jortt is a Dutch accounting package. This source reads the bookkeeping objects of one administration
     /// through the v3 REST API.
     /// </summary>
-    public class Jortt : AbstractSource
+    public sealed class Jortt : AbstractSource
     {
         public static async Task Main(string[] args) => await AirbyteEntrypoint.Main(args);
 
@@ -184,8 +184,7 @@ namespace source_jortt
             };
         }
 
-        private static Airbyte.Cdk.Sources.Utils.FluentStreamBuilder Common(
-            Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, JorttAuth auth, string organizationId) =>
+        private static FluentStreamBuilder Common(FluentStreamBuilder builder, JorttAuth auth, string organizationId) =>
             builder
                 .MaxRetries(MaxRetries)
                 .ShouldRetry(exception => ShouldRetry(exception, auth))
@@ -199,7 +198,7 @@ namespace source_jortt
         /// A list endpoint. <paramref name="paged"/> is false for the endpoints Jortt does not paginate: they
         /// reject nothing, but there is no page parameter to send.
         /// </summary>
-        private static Stream Paged(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path, string name,
+        private static Stream Paged(FluentStreamBuilder builder, string path, string name,
             bool paged = true, params (string Key, object Value)[] query)
         {
             return builder
@@ -224,7 +223,7 @@ namespace source_jortt
         /// request fails the run on purpose: a skipped child list is silent data loss, and the error message names
         /// the HTTP status and the Jortt error key.
         /// </remarks>
-        private static Stream Substream(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string parent,
+        private static Stream Substream(FluentStreamBuilder builder, string parent,
             string parentKeyField, string sliceParameter, string pathTemplate, string name, bool paged = true)
         {
             return builder
@@ -244,15 +243,14 @@ namespace source_jortt
         /// <summary>
         /// An endpoint that answers with a single object in <c>data</c>.
         /// </summary>
-        private static Stream Single(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path, string name) =>
+        private static Stream Single(FluentStreamBuilder builder, string path, string name) =>
             builder.Path((_, _, _) => path).Create(name);
 
         /// <summary>
         /// A report for one calendar month per record, walking from the start date (or January of the current
         /// year) through the current month.
         /// </summary>
-        private static Stream Monthly(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path,
-            string name, DateTime? startDate)
+        private static Stream Monthly(FluentStreamBuilder builder, string path, string name, DateTime? startDate)
         {
             // One clock read: two reads around midnight on 31 December could give a window that ends before it
             // starts.
@@ -276,8 +274,7 @@ namespace source_jortt
         /// <summary>
         /// Payroll journal entries are filtered by year, so one request covers a whole year.
         /// </summary>
-        private static Stream Yearly(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, string path,
-            string name, DateTime? startDate)
+        private static Stream Yearly(FluentStreamBuilder builder, string path, string name, DateTime? startDate)
         {
             var now = DateTime.UtcNow;
             var first = (startDate ?? new DateTime(now.Year, 1, 1)).Year;
@@ -328,8 +325,7 @@ namespace source_jortt
             return int.TryParse(value, out var parsed) ? parsed : null;
         }
 
-        private static Stream Expenses(Airbyte.Cdk.Sources.Utils.FluentStreamBuilder builder, DateTime? startDate,
-            int lookbackDays)
+        private static Stream Expenses(FluentStreamBuilder builder, DateTime? startDate, int lookbackDays)
         {
             // The API does not document a sort order, and the CDK only hands the last record of a page to
             // GetUpdatedState, so the stream tracks the highest VAT date it has seen instead of trusting order.
@@ -359,7 +355,7 @@ namespace source_jortt
                     // Bound the request from the incoming state and start_date only. seen.Max grows while the
                     // pages are parsed, so using it here would change the filter between page 1 and page 2, and
                     // Jortt applies `page` to whatever result set the current filters produce.
-                    var from = ExpensesLowerBound(state, null, startDate, lookbackDays);
+                    var from = ExpensesLowerBound(state, startDate, lookbackDays);
 
                     // Only send the filter when there is a lower bound: a full refresh must not silently drop
                     // history, so start_date has no default.
@@ -439,6 +435,8 @@ namespace source_jortt
         /// </summary>
         private static IEnumerable<JsonElement> Data(IFlurlResponse response, JsonValueKind expected)
         {
+            // The CDK calls ParseResponse synchronously and the body is already buffered, so .Result completes
+            // immediately; there is no async overload to use here.
             var body = response.GetStringAsync().Result.AsJsonElement();
             if (body.ValueKind != JsonValueKind.Object || !body.TryGetProperty("data", out var data))
                 throw new JorttResponseException($"Jortt answered without 'data': {Excerpt(body)}");
@@ -450,7 +448,8 @@ namespace source_jortt
                 throw new JorttResponseException(
                     $"Jortt answered with 'data' of kind {data.ValueKind} instead of {expected}: {Excerpt(body)}");
 
-            return expected == JsonValueKind.Object ? new[] { data } : data.EnumerateArray().ToList();
+            // The caller materializes once; a List here would only be copied again.
+            return expected == JsonValueKind.Object ? new[] { data } : data.EnumerateArray();
         }
 
         private static string Excerpt(JsonElement body)
@@ -469,17 +468,30 @@ namespace source_jortt
             if (streamSlice == null || !streamSlice.TryGetValue(field, out var key) || key == null)
                 return records;
 
-            return records.Select(record => WithProperty(record, field, key.ToString())).ToList();
+            return records.Select(record => WithProperty(record, field, key.ToString()));
         }
 
+        /// <summary>
+        /// Rebuilds the record with the extra member. The record is immutable, so this writes it once instead of
+        /// parsing it to a node tree and serializing it again.
+        /// </summary>
         internal static JsonElement WithProperty(JsonElement record, string field, string value)
         {
             if (record.ValueKind != JsonValueKind.Object || record.TryGetProperty(field, out _))
                 return record;
 
-            var node = JsonNode.Parse(record.GetRawText())!.AsObject();
-            node[field] = value;
-            return JsonSerializer.SerializeToElement(node);
+            using var buffer = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartObject();
+                writer.WriteString(field, value);
+                foreach (var property in record.EnumerateObject())
+                    property.WriteTo(writer);
+                writer.WriteEndObject();
+            }
+
+            using var document = JsonDocument.Parse(buffer.ToArray());
+            return document.RootElement.Clone();
         }
 
         internal static string Describe(Exception exception) => exception switch
@@ -597,10 +609,9 @@ namespace source_jortt
         /// booked late with an older VAT date, which a cursor alone would skip forever. <paramref name="startDate"/>
         /// stays a floor, so the lookback never reaches behind the configured start date.
         /// </summary>
-        internal static DateTime? ExpensesLowerBound(JsonElement state, DateTime? seenMax, DateTime? startDate,
-            int lookbackDays)
+        internal static DateTime? ExpensesLowerBound(JsonElement state, DateTime? startDate, int lookbackDays)
         {
-            var cursor = ExpensesCursor(state, seenMax, startDate);
+            var cursor = ExpensesCursor(state, null, startDate);
             return cursor == null ? null : MaxDate(cursor.Value.AddDays(-lookbackDays), startDate);
         }
 
