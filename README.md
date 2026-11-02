@@ -114,6 +114,29 @@ public override Stream[] Streams(JsonElement config)
 }
 ```
 
+### Substreams (parent and child streams)
+
+Some APIs only expose a collection below a parent object, for example `projects/{project_id}/line_items`. Declare
+the child as a substream and it is read once per parent record, with the parent key available to the request
+callbacks through the stream slice:
+
+```csharp
+var projects = UrlBase.HttpStream()
+    .Path((_, _, _) => "v3/projects")
+    .Create("projects");
+
+var lineItems = UrlBase.HttpStream()
+    .Path((_, streamSlice, _) => $"v3/projects/{streamSlice["project_id"]}/line_items")
+    .Dependency(new SubstreamDependency("projects", "id", "project_id"))
+    .Create("project_line_items");
+```
+
+`SubstreamDependency(parentStream, parentKeyField, sliceParameter)` supports a dotted key path (`customer.id`).
+The parent is read once: when it is part of the catalog its records are also emitted and reused, otherwise it is
+read internally without emitting records. Parent records without a usable key are skipped with a warning, and a
+substream only supports `full_refresh` — per-parent state would need a substream state type the CDK does not emit
+yet.
+
 ### Practical Tips
 
 Airbyte recommends using the CDK template generator to develop with the CDK. The template generates created all the required scaffolding, with convenient TODOs, allowing developers to truly focus on implementing the API.

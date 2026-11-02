@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Airbyte.Cdk.Models;
+using Airbyte.Cdk.Sources.Streams;
 using Airbyte.Cdk.Sources.Streams.Http;
 using Airbyte.Cdk.Sources.Streams.Http.Auth;
 using Flurl.Http;
@@ -265,6 +266,13 @@ namespace Airbyte.Cdk.Sources.Utils
         public FluentStreamBuilder CursorField(string[] value) => AddProperty(value, nameof(CursorField));
 
         /// <summary>
+        /// Declares this stream as a substream: it is read once per record of <paramref name="dependency"/>'s
+        /// parent stream, with the parent key exposed to the request callbacks through the stream slice.
+        /// </summary>
+        public FluentStreamBuilder Dependency(SubstreamDependency dependency) =>
+            AddProperty(dependency, nameof(Stream.Dependency));
+
+        /// <summary>
         /// Set the authentication implementation for this stream
         /// </summary>
         public FluentStreamBuilder WithAuth(AuthBase auth) => new(Name ?? "", _methods, _properties, auth);
@@ -388,6 +396,11 @@ namespace Airbyte.Cdk.Sources.Utils
         public override string[] CursorField
         {
             get => TryGetProperty(nameof(CursorField), out string[] value) ? value : base.CursorField;
+        }
+
+        public override SubstreamDependency? Dependency
+        {
+            get => TryGetProperty(nameof(Dependency), out SubstreamDependency value) ? value : base.Dependency;
         }
 
         public override bool RaiseOnHttpErrors
