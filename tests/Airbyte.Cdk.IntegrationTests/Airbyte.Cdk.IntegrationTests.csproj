@@ -12,8 +12,13 @@
     <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
     <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="mrhamburg.SecretsManager" />
+    <PackageReference Include="Parquet.Net" />
     <PackageReference Include="mrhamburg.SecretsManager.PostgreSql" />
     <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Airbyte.Cdk.IntegrationTests.Tests" />
   </ItemGroup>
 
   <ItemGroup>

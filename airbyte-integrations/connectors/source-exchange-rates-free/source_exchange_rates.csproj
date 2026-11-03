@@ -7,8 +7,15 @@
     <StartupObject />
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(UseLocalCdk)' == 'true'">
+    <ProjectReference Include="..\..\..\Airbyte.Cdk\Airbyte.Cdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseLocalCdk)' != 'true'">
     <PackageReference Include="Airbyte.Cdk" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Flurl.Http" />
     <PackageReference Include="JsonPointer.Net" />
   </ItemGroup>

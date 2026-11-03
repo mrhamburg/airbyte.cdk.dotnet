@@ -32,6 +32,7 @@ Component | Type |Code | Installation | Version
 Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
 Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/source-exchange-rates-free` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-exchange-rates-free?sort=semver&style=flat)
 Jortt | Source | [source-jortt](airbyte-integrations/connectors/source-jortt) | `docker pull airbytedotnet/source-jortt` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-jortt?sort=semver&style=flat)
+Local Parquet | Destination | [destination-local-parquet](airbyte-integrations/connectors/destination-local-parquet) | `docker pull airbytedotnet/destination-local-parquet` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/destination-local-parquet?sort=semver&style=flat)
 
 ## Protocol compatibility
 
@@ -66,6 +67,7 @@ Connector specifications should declare `protocol_version`; `Connector.Spec()` d
 - Sources now emit per-stream `STREAM` state instead of legacy `{"state":{"data":...}}` messages. Legacy state files are still accepted on input.
 - The state passed to a source can now be a JSON array of per-stream state messages. `AbstractSource.State` remains a `JsonElement`, but callers must not assume it is an object.
 - Destinations must flush pending records before returning from `Destination.Write` when the message is a `STATE`; the CDK echoes that state immediately after `Write` returns.
+- Destinations may override the new no-op `Destination.CompleteAsync`; the CDK calls it once after the input ends, before the process exits. Use it for a final flush or deferred cleanup such as removing old `overwrite` files.
 - Do not mix legacy `data` state and per-stream `STREAM` state within one source/sync; pick one representation.
 - Connector package pins should move to the next published CDK version before a connector image is rebuilt with these changes.
 
@@ -244,6 +246,13 @@ still fetched in full until the later ones reach the cap; the retained slice kee
 
 An `incremental` scenario must also emit at least one `STATE` message, so a connector that degrades to a full
 refresh cannot pass quietly.
+
+Destination connectors use a different scenario shape. Set `connector.type: destination` and add a `source`
+block naming the source connector directory and its config. The harness builds that source with
+`-p:UseLocalCdk=true` until the next CDK release ships the Protobuf socket transport. Destination scenarios run
+over Protobuf sockets only and cannot declare `limit` or `socket: false`; the harness injects `output_path` into
+the destination config for each scenario and validates the files it writes. Source config and state values
+may use `{{today-N}}` (for example `{{today-7}}`) to keep a live scenario bounded as time passes.
 
 Secrets are resolved through the `ISecretSource` seam. Three implementations ship:
 

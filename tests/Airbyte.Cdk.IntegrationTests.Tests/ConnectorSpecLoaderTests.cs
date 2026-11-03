@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Shouldly;
@@ -255,6 +257,147 @@ tests:
             var spec = ConnectorSpecLoader.Load(connector.Root);
 
             spec.Secrets["api_key"].ShouldBe("SOURCE_EXAMPLE_API_KEY");
+        }
+
+        private const string DestinationSpec = @"
+connector:
+  module: LocalParquet
+  type: destination
+source:
+  connector: ../source-example
+  config:
+    base: USD
+tests:
+  - name: full refresh
+    config: {}
+    streams:
+      - name: symbols
+";
+
+        [Fact]
+        public void Test_Load_DestinationTypeAndSourceBlock()
+        {
+            var repo = new TempRepository("destination-example", "source-example");
+            var destination = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "destination-example");
+            var source = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "source-example");
+            File.WriteAllText(Path.Combine(destination, "integration_tests.yaml"), DestinationSpec);
+            File.WriteAllText(Path.Combine(destination, "destination_example.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+            File.WriteAllText(Path.Combine(source, "Dockerfile"), "ENV AIRBYTE_IMPL_MODULE=\"ExchangeRates\"\n");
+            File.WriteAllText(Path.Combine(source, "source_example.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+            var spec = ConnectorSpecLoader.Load(destination);
+
+            spec.Type.ShouldBe(ConnectorType.Destination);
+            spec.Source!.ConnectorDirectory.ShouldBe(Path.GetFullPath(source));
+            spec.Source.Config.GetProperty("base").GetString().ShouldBe("USD");
+            spec.Tests[0].Socket.ShouldBeTrue();
+        }
+
+        [Fact]
+        public void Test_Load_DestinationWithoutProject_Throws()
+        {
+            var repo = new TempRepository("destination-example", "source-example");
+            var destination = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "destination-example");
+            var source = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "source-example");
+            File.WriteAllText(Path.Combine(destination, "integration_tests.yaml"), DestinationSpec);
+            File.WriteAllText(Path.Combine(source, "Dockerfile"), "ENV AIRBYTE_IMPL_MODULE=\"ExchangeRates\"\n");
+            File.WriteAllText(Path.Combine(source, "source_example.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(destination));
+            error.Message.ShouldContain("No .csproj found");
+        }
+
+        [Fact]
+        public void Test_Load_DestinationWithoutSource_Throws()
+        {
+            using var connector = new TempConnector("destination-example")
+                .WithDockerfile("LocalParquet")
+                .WithProject("destination_example.csproj")
+                .WithSpec(@"
+connector:
+  type: destination
+tests:
+  - name: t
+    streams:
+      - name: s
+");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+            error.Message.ShouldContain("source");
+        }
+
+        [Fact]
+        public void Test_Load_DestinationWithLimit_Throws()
+        {
+            using var connector = new TempConnector("destination-example")
+                .WithDockerfile("LocalParquet")
+                .WithProject("destination_example.csproj")
+                .WithSpec(@"
+connector:
+  type: destination
+source:
+  connector: ../source-example
+tests:
+  - name: t
+    limit: 10
+    streams:
+      - name: s
+");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+            error.Message.ShouldContain("limit");
+        }
+
+        [Fact]
+        public void Test_Load_DestinationWithSocketFalse_Throws()
+        {
+            using var connector = new TempConnector("destination-example")
+                .WithDockerfile("LocalParquet")
+                .WithProject("destination_example.csproj")
+                .WithSpec(@"
+connector:
+  type: destination
+source:
+  connector: ../source-example
+tests:
+  - name: t
+    socket: false
+    streams:
+      - name: s
+");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+            error.Message.ShouldContain("socket");
+        }
+
+        [Fact]
+        public void Test_Load_UnknownConnectorType_Throws()
+        {
+            using var connector = new TempConnector("destination-example")
+                .WithDockerfile("LocalParquet")
+                .WithProject()
+                .WithSpec(@"
+connector:
+  type: worker
+tests:
+  - name: t
+    streams:
+      - name: s
+");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(connector.Root));
+            error.Message.ShouldContain("type");
+        }
+
+        [Fact]
+        public void Test_Load_SourceTypeDefaults()
+        {
+            using var connector = new TempConnector()
+                .WithDockerfile("ExchangeRates")
+                .WithProject()
+                .WithSpec(MinimalSpec);
+
+            ConnectorSpecLoader.Load(connector.Root).Type.ShouldBe(ConnectorType.Source);
         }
     }
 }

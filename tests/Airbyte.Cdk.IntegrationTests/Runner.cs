@@ -96,34 +96,52 @@ namespace Airbyte.Cdk.IntegrationTests
                 ConnectorLocator.ConnectorName(directory), DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff"));
             Directory.CreateDirectory(artifacts);
 
+            ConnectorResult result;
+            try
+            {
+                if (spec.Type == ConnectorType.Destination)
+                    result = await DestinationRunner.RunAsync(spec, artifacts, _secrets, cancellationToken);
+                else
+                {
+                    result = await RunSourceAsync(spec, artifacts, cancellationToken);
+                }
+            }
+            catch
+            {
+                if (!_options.KeepArtifacts)
+                    TryDelete(artifacts);
+                throw;
+            }
+
+            var keep = _options.KeepArtifacts || result.Errors.Count > 0
+                                                    || result.Tests.Any(x => x.Status == Status.Failed);
+            if (!keep)
+                TryDelete(artifacts);
+
+            return result with { ArtifactsDirectory = Directory.Exists(artifacts) ? artifacts : null };
+        }
+
+        private async Task<ConnectorResult> RunSourceAsync(ConnectorSpec spec, string artifacts,
+            CancellationToken cancellationToken)
+        {
             var tests = new List<TestResult>();
             var errors = new List<string>();
 
-            var process = new ConnectorProcess(directory, spec.ProjectFile, spec.Module, artifacts);
-            try
+            var process = new ConnectorProcess(spec.Directory, spec.ProjectFile, spec.Module, artifacts);
+            var build = await process.BuildAsync(cancellationToken);
+            if (build.ExitCode != 0)
             {
-                var build = await process.BuildAsync(cancellationToken);
-                if (build.ExitCode != 0)
-                {
-                    errors.Add(build.TimedOut
-                        ? "dotnet build timed out."
-                        : $"dotnet build failed with exit code {build.ExitCode}:{Environment.NewLine}{Tail(build.Output)}");
-                }
-                else
-                {
-                    foreach (var test in spec.Tests)
-                        tests.Add(await RunTestAsync(process, spec, test, artifacts, cancellationToken));
-                }
+                errors.Add(build.TimedOut
+                    ? "dotnet build timed out."
+                    : $"dotnet build failed with exit code {build.ExitCode}:{Environment.NewLine}{Tail(build.Output)}");
             }
-            finally
+            else
             {
-                var keep = _options.KeepArtifacts || errors.Count > 0 || tests.Any(x => x.Status == Status.Failed);
-                if (!keep)
-                    TryDelete(artifacts);
+                foreach (var test in spec.Tests)
+                    tests.Add(await RunTestAsync(process, spec, test, artifacts, cancellationToken));
             }
 
-            return new ConnectorResult(directory, Aggregate(tests, errors), tests, errors,
-                Directory.Exists(artifacts) ? artifacts : null);
+            return new ConnectorResult(spec.Directory, Aggregate(tests, errors), tests, errors);
         }
 
         private async Task<TestResult> RunTestAsync(ConnectorProcess process, ConnectorSpec spec, TestCaseSpec test,
@@ -293,7 +311,7 @@ namespace Airbyte.Cdk.IntegrationTests
             return new StreamResult(spec.Name, errors.Count == 0 ? Status.Passed : Status.Failed, records.Count, errors);
         }
 
-        private static JsonObject BuildConfig(TestCaseSpec test)
+        internal static JsonObject BuildConfig(TestCaseSpec test)
         {
             var config = new JsonObject();
             if (test.Config.ValueKind == JsonValueKind.Object)
@@ -302,7 +320,7 @@ namespace Airbyte.Cdk.IntegrationTests
             return config;
         }
 
-        private static string? WriteState(TestCaseSpec test, string testDirectory)
+        internal static string? WriteState(TestCaseSpec test, string testDirectory)
         {
             var state = new JsonObject();
             foreach (var stream in test.Streams.Where(x => x.State.HasValue))
@@ -345,7 +363,19 @@ namespace Airbyte.Cdk.IntegrationTests
             }
         }
 
-        private static TestResult Redact(TestResult result, IReadOnlyList<string> secretValues)
+        internal static ConnectorResult Redact(ConnectorResult result, IReadOnlyList<string> secretValues)
+        {
+            if (secretValues.Count == 0)
+                return result;
+
+            return result with
+            {
+                Errors = result.Errors.Select(x => Redaction.Apply(x, secretValues)).ToList(),
+                Tests = result.Tests.Select(x => Redact(x, secretValues)).ToList()
+            };
+        }
+
+        internal static TestResult Redact(TestResult result, IReadOnlyList<string> secretValues)
         {
             if (secretValues.Count == 0)
                 return result;
@@ -359,7 +389,7 @@ namespace Airbyte.Cdk.IntegrationTests
             };
         }
 
-        private static bool Succeeded(JsonElement connectionStatus)
+        internal static bool Succeeded(JsonElement connectionStatus)
         {
             if (!connectionStatus.TryGetProperty("connectionStatus", out var status))
                 return false;
@@ -368,10 +398,10 @@ namespace Airbyte.Cdk.IntegrationTests
                    && string.Equals(value.GetString(), "SUCCEEDED", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static TestResult Failed(TestCaseSpec test, IReadOnlyList<string> errors) =>
+        internal static TestResult Failed(TestCaseSpec test, IReadOnlyList<string> errors) =>
             new(test.Name, Status.Failed, Array.Empty<StreamResult>(), errors);
 
-        private static Status Aggregate(IReadOnlyList<TestResult> tests, IReadOnlyList<string> errors)
+        internal static Status Aggregate(IReadOnlyList<TestResult> tests, IReadOnlyList<string> errors)
         {
             if (errors.Count > 0 || tests.Any(x => x.Status == Status.Failed))
                 return Status.Failed;
@@ -380,10 +410,10 @@ namespace Airbyte.Cdk.IntegrationTests
             return Status.Passed;
         }
 
-        private static string Sanitize(string name) =>
+        internal static string Sanitize(string name) =>
             string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 
-        private static string Tail(string output, int lines = 40)
+        internal static string Tail(string output, int lines = 40)
         {
             var split = output.Split('\n');
             return string.Join(Environment.NewLine, split.Skip(Math.Max(0, split.Length - lines)));
