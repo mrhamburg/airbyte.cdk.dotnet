@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Airbyte.Cdk.Models;
 using destination_local_parquet;
+using destination_local_parquet.OpenDal;
 
 namespace Destination.LocalParquet.Tests
 {
@@ -17,10 +19,33 @@ namespace Destination.LocalParquet.Tests
             },"required":["amount","base","date","rates"]}
             """;
 
+        public static readonly IReadOnlyDictionary<string, string> EmptyEnvironment =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+
         public static JsonElement Json(string text) => JsonDocument.Parse(text).RootElement.Clone();
 
-        public static DestinationOptions Options(string root) =>
-            DestinationOptions.FromJson(Json($$"""{"output_path":"{{root}}"}"""));
+        public static DestinationOptions Options(string root, int? flushRowLimit = null,
+            bool? flushOnState = null, string? fileNameTemplate = null)
+        {
+            var properties = new List<string> { $"\"output_path\":{JsonSerializer.Serialize(root)}" };
+            if (flushRowLimit.HasValue)
+                properties.Add($"\"flush_row_limit\":{flushRowLimit.Value}");
+            if (flushOnState.HasValue)
+                properties.Add($"\"flush_on_state\":{(flushOnState.Value ? "true" : "false")}");
+            if (fileNameTemplate is not null)
+                properties.Add($"\"file_name_template\":{JsonSerializer.Serialize(fileNameTemplate)}");
+
+            return OptionsFromJson(Json("{" + string.Join(",", properties) + "}"));
+        }
+
+        public static DestinationOptions OptionsFromJson(JsonElement config) =>
+            DestinationOptions.FromJson(config, EmptyEnvironment, _ => null);
+
+        public static global::destination_local_parquet.LocalParquet Connector(IObjectStore store) => new()
+        {
+            OptionsFactory = OptionsFromJson,
+            StoreFactory = _ => store
+        };
 
         public static ConfiguredAirbyteCatalog Catalog(string streamName, string jsonSchema,
             DestinationSyncMode mode = DestinationSyncMode.overwrite) => new()

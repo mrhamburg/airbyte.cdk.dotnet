@@ -14,7 +14,7 @@ The Airbyte .NET CDK: a framework for building Airbyte source and destination co
 | `Airbyte.Cdk.Tests/` | xUnit test project for the CDK |
 | `tests/Airbyte.Cdk.IntegrationTests/` | Console app that runs a connector against its live API and validates records against its schema |
 | `tests/Airbyte.Cdk.IntegrationTests.Tests/` | xUnit tests for the integration test harness |
-| `airbyte-integrations/connectors/` | Concrete connectors (sources such as `source-exchange-rates-free`, destination `destination-local-parquet`) |
+| `airbyte-integrations/connectors/` | Concrete connectors (sources such as `source-exchange-rates-free`, OpenDAL-backed destination `destination-local-parquet`) |
 | `airbyte-integrations/connector-templates/` | Handlebars (`.hbs`) templates used by `dotnet run init` |
 | `Dockerfile` | Builds/tests the CDK and publishes the NuGet package (multi-stage) |
 | `.github/workflows/` | CI for the CDK and for connector image builds/releases |
@@ -105,5 +105,6 @@ key settings stay host-controlled there.
 - `AirbyteEntrypoint` reads `AIRBYTE_IMPL_PATH` before anything else; local connector runs therefore need the built DLL or must run through the connector project's own `Main`.
 - Docker images pin `mcr.microsoft.com/dotnet/sdk:10.0` and `runtime:10.0`.
 - Some test files are empty placeholders (e.g. `TestHttp.cs`, `TestStreamsCore.cs`). Do not assume they contain coverage.
+- `destination-local-parquet` writes Parquet through `Apache.OpenDAL`. The `fs` service is the default; any OpenDAL service can be selected by inline config, a settings file, or environment variables. The native OpenDAL library requires glibc 2.39 or newer, so the OpenDAL `fs` tests self-skip on older hosts. Run the connector tests in the repository Docker image to execute them.
 - Avoid changing `Airbyte.Cdk/Airbyte.Cdk.nuspec` paths or icon names without verifying the package output, since the package is published from a Docker build context.
 - `Connector.Spec()` defaults a missing `protocol_version` to `0.19.0`; connector `spec.json` files should declare it explicitly.

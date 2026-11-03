@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Airbyte.Cdk\Airbyte.Cdk.csproj" />
+    <PackageReference Include="Apache.OpenDAL" />
     <PackageReference Include="Parquet.Net" />
   </ItemGroup>
 

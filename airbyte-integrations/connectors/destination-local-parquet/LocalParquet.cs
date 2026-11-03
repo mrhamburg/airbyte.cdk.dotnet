@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Airbyte.Cdk;
 using Airbyte.Cdk.Destinations;
 using Airbyte.Cdk.Models;
+using destination_local_parquet.OpenDal;
 using destination_local_parquet.Parquet;
 
 namespace destination_local_parquet
@@ -11,6 +12,13 @@ namespace destination_local_parquet
     public class LocalParquet : AbstractDestination
     {
         private ParquetRecordWriter? _writer;
+        private IObjectStore? _store;
+
+        internal Func<JsonElement, DestinationOptions> OptionsFactory { get; set; } =
+            DestinationOptions.FromJson;
+
+        internal Func<DestinationOptions, IObjectStore> StoreFactory { get; set; } =
+            options => new OpenDalStore(options.OpenDal, options.OutputPrefix);
 
         public static async Task Main(string[] args) => await AirbyteEntrypoint.Main(args);
 
@@ -18,7 +26,9 @@ namespace destination_local_parquet
         {
             try
             {
-                DestinationOptions.FromJson(config).EnsureReady();
+                var options = OptionsFactory(config);
+                using var store = StoreFactory(options);
+                store.EnsureReadyAsync().GetAwaiter().GetResult();
                 return new AirbyteConnectionStatus { Status = Status.SUCCEEDED };
             }
             catch (Exception e)
@@ -32,8 +42,9 @@ namespace destination_local_parquet
         {
             if (_writer is null)
             {
-                var options = DestinationOptions.FromJson(config);
-                _writer = new ParquetRecordWriter(options, catalog, logger, options.FlushRowLimit);
+                var options = OptionsFactory(config);
+                _store = StoreFactory(options);
+                _writer = new ParquetRecordWriter(options, catalog, logger, _store);
             }
 
             await _writer.WriteAsync(msg);
@@ -41,8 +52,17 @@ namespace destination_local_parquet
 
         public override async Task CompleteAsync()
         {
-            if (_writer is not null)
-                await _writer.CompleteAsync();
+            try
+            {
+                if (_writer is not null)
+                    await _writer.CompleteAsync();
+            }
+            finally
+            {
+                _store?.Dispose();
+                _store = null;
+                _writer = null;
+            }
         }
     }
 }

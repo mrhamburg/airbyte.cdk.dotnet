@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
-ARG BUILD_VERSION="0.0.1"
+ARG BUILD_VERSION="0.0.2"
 ENV WORKDIR=/airbyte/build
 WORKDIR $WORKDIR
 
