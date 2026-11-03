@@ -15,17 +15,25 @@ namespace Airbyte.Cdk.IntegrationTests
         }
     }
 
+    public enum ConnectorType
+    {
+        Source,
+        Destination
+    }
+
     /// <summary>
     /// The integration test declaration of a single connector, loaded from <c>integration_tests.yaml</c>.
     /// </summary>
     public sealed class ConnectorSpec
     {
-        public ConnectorSpec(string directory, string module, string projectFile,
-            IReadOnlyDictionary<string, string> secrets, IReadOnlyList<TestCaseSpec> tests)
+        public ConnectorSpec(string directory, string module, string projectFile, ConnectorType type,
+            SourceSpec? source, IReadOnlyDictionary<string, string> secrets, IReadOnlyList<TestCaseSpec> tests)
         {
             Directory = directory;
             Module = module;
             ProjectFile = projectFile;
+            Type = type;
+            Source = source;
             Secrets = secrets;
             Tests = tests;
         }
@@ -36,13 +44,38 @@ namespace Airbyte.Cdk.IntegrationTests
         /// <summary>Name of the <c>Connector</c> subclass, passed as <c>AIRBYTE_IMPL_MODULE</c>.</summary>
         public string Module { get; }
 
-        /// <summary>Absolute path of the connector project file.</summary>
+        /// <summary>
+        /// Absolute path of the connector project file, or empty when a destination declares none.
+        /// </summary>
         public string ProjectFile { get; }
+
+        public ConnectorType Type { get; }
+
+        /// <summary>The source a destination scenario reads from, or null for sources.</summary>
+        public SourceSpec? Source { get; }
 
         /// <summary>Maps a config property to the secret key that supplies its value.</summary>
         public IReadOnlyDictionary<string, string> Secrets { get; }
 
         public IReadOnlyList<TestCaseSpec> Tests { get; }
+    }
+
+    /// <summary>
+    /// The source connector a destination scenario consumes.
+    /// </summary>
+    public sealed class SourceSpec
+    {
+        public SourceSpec(string connectorDirectory, JsonElement config)
+        {
+            ConnectorDirectory = connectorDirectory;
+            Config = config;
+        }
+
+        /// <summary>Absolute source connector directory.</summary>
+        public string ConnectorDirectory { get; }
+
+        /// <summary>Source config values used by the destination scenarios.</summary>
+        public JsonElement Config { get; }
     }
 
     /// <summary>

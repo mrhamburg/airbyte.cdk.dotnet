@@ -54,7 +54,17 @@ namespace Airbyte.Cdk.IntegrationTests
                 throw new ConnectorSpecException(
                     $"{specPath}: set connector.module or declare ENV AIRBYTE_IMPL_MODULE in the connector Dockerfile.");
 
-            var projectFile = ConnectorLocator.ResolveProjectFile(directory, root.Connector?.Project);
+            var type = ParseType(specPath, root.Connector?.Type);
+            var isDestination = type == ConnectorType.Destination;
+
+            if (isDestination && root.Source == null)
+                throw new ConnectorSpecException(
+                    $"{specPath}: destination connectors must declare a source block.");
+            if (isDestination && string.IsNullOrWhiteSpace(root.Source!.Connector))
+                throw new ConnectorSpecException(
+                    $"{specPath}: the source block must declare the source connector path.");
+
+            var projectFile = ResolveProjectFile(directory, root.Connector, isDestination);
 
             var secrets = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var secret in root.Secrets ?? new Dictionary<string, string>())
@@ -70,15 +80,68 @@ namespace Airbyte.Cdk.IntegrationTests
 
             var tests = new List<TestCaseSpec>();
             for (var index = 0; index < root.Tests.Count; index++)
-                tests.Add(ToTest(specPath, index, root.Tests[index]));
+                tests.Add(ToTest(specPath, index, root.Tests[index], isDestination));
 
-            return new ConnectorSpec(directory, module!.Trim(), projectFile, secrets, tests);
+            SourceSpec? source = null;
+            if (isDestination)
+                source = ResolveSource(specPath, directory, root.Source!);
+
+            return new ConnectorSpec(directory, module!.Trim(), projectFile, type, source, secrets, tests);
         }
 
-        private static TestCaseSpec ToTest(string specPath, int index, YamlTest test)
+        private static string ResolveProjectFile(string directory, YamlConnector? connector, bool isDestination)
+        {
+            if (!isDestination || !string.IsNullOrWhiteSpace(connector?.Project))
+                return ConnectorLocator.ResolveProjectFile(directory, connector?.Project);
+
+            var candidates = Directory.GetFiles(directory, "*.csproj");
+            return candidates.Length switch
+            {
+                0 => string.Empty,
+                1 => candidates[0],
+                _ => throw new ConnectorSpecException(
+                    $"{directory} contains several project files; set connector.project in integration_tests.yaml.")
+            };
+        }
+
+        private static ConnectorType ParseType(string specPath, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return ConnectorType.Source;
+
+            return value!.Trim().ToLowerInvariant() switch
+            {
+                "source" => ConnectorType.Source,
+                "destination" => ConnectorType.Destination,
+                _ => throw new ConnectorSpecException(
+                    $"{specPath}: unknown connector type '{value}'. Use source or destination.")
+            };
+        }
+
+        private static SourceSpec ResolveSource(string specPath, string directory, YamlSource source)
+        {
+            var sourceDirectory = Path.GetFullPath(Path.Combine(directory, source.Connector!.Trim()));
+            if (!Directory.Exists(sourceDirectory))
+                throw new ConnectorSpecException(
+                    $"{specPath}: source connector directory not found: {sourceDirectory}");
+            if (string.Equals(sourceDirectory, directory, StringComparison.Ordinal))
+                throw new ConnectorSpecException(
+                    $"{specPath}: the source connector directory must differ from the destination directory.");
+
+            return new SourceSpec(sourceDirectory,
+                source.Config == null ? EmptyObject() : YamlJson.ToJsonElement(source.Config));
+        }
+
+        private static TestCaseSpec ToTest(string specPath, int index, YamlTest test, bool isDestination)
         {
             var name = string.IsNullOrWhiteSpace(test.Name) ? $"test-{index + 1}" : test.Name!.Trim();
             var location = $"{specPath}: test '{name}'";
+
+            if (isDestination && test.Limit.HasValue)
+                throw new ConnectorSpecException($"{location}: a destination scenario cannot declare limit.");
+
+            if (isDestination && test.Socket == false)
+                throw new ConnectorSpecException($"{location}: a destination scenario must run in socket mode.");
 
             if (test.Limit is <= 0)
                 throw new ConnectorSpecException($"{location}: limit must be greater than zero.");
@@ -125,7 +188,7 @@ namespace Airbyte.Cdk.IntegrationTests
                 test.Limit,
                 test.TimeoutSeconds ?? 600,
                 streams,
-                test.Socket);
+                isDestination ? test.Socket ?? true : test.Socket ?? false);
         }
 
         private static JsonElement EmptyObject() => JsonDocument.Parse("{}").RootElement.Clone();
@@ -133,6 +196,7 @@ namespace Airbyte.Cdk.IntegrationTests
         private sealed class YamlRoot
         {
             public YamlConnector? Connector { get; set; }
+            public YamlSource? Source { get; set; }
             public Dictionary<string, string>? Secrets { get; set; }
             public List<YamlTest>? Tests { get; set; }
         }
@@ -141,6 +205,13 @@ namespace Airbyte.Cdk.IntegrationTests
         {
             public string? Module { get; set; }
             public string? Project { get; set; }
+            public string? Type { get; set; }
+        }
+
+        private sealed class YamlSource
+        {
+            public string? Connector { get; set; }
+            public Dictionary<string, object?>? Config { get; set; }
         }
 
         private sealed class YamlTest
@@ -149,7 +220,7 @@ namespace Airbyte.Cdk.IntegrationTests
             public Dictionary<string, object?>? Config { get; set; }
             public int? Limit { get; set; }
             public int? TimeoutSeconds { get; set; }
-            public bool Socket { get; set; }
+            public bool? Socket { get; set; }
             public List<YamlStream>? Streams { get; set; }
         }
 
