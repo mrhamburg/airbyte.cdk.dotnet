@@ -93,6 +93,41 @@ namespace Destination.LocalParquet.Tests
         }
 
         [Fact]
+        public void Test_Convert_FallbackWritesRecordJsonIntoDataColumn()
+        {
+            var schema = StreamSchema.Fallback();
+
+            var row = RecordValueConverter.Convert(schema, Json("""{"a":1}"""));
+
+            row.Keys.ShouldBe(new[] { "data" });
+            row["data"].ShouldBeOfType<ReadOnlyMemory<char>>().ToString().ShouldBe("""{"a":1}""");
+        }
+
+        [Fact]
+        public void Test_Convert_NumberForStringFieldUsesInvariantText()
+        {
+            var schema = ParquetSchemaMapper.FromJsonSchema(Json("""
+                {"type":"object","properties":{"x":{"type":"string"}}}
+                """));
+
+            var row = RecordValueConverter.Convert(schema, Json("""{"x":12}"""));
+
+            row["x"].ShouldBeOfType<ReadOnlyMemory<char>>().ToString().ShouldBe("12");
+        }
+
+        [Fact]
+        public void Test_Convert_ObjectForStringFieldUsesJsonText()
+        {
+            var schema = ParquetSchemaMapper.FromJsonSchema(Json("""
+                {"type":"object","properties":{"x":{"type":"string"}}}
+                """));
+
+            var row = RecordValueConverter.Convert(schema, Json("""{"x":{"a":1}}"""));
+
+            row["x"].ShouldBeOfType<ReadOnlyMemory<char>>().ToString().ShouldBe("""{"a":1}""");
+        }
+
+        [Fact]
         public void Test_Convert_ExtraKeyIsIgnoredWithWarning()
         {
             var schema = ParquetSchemaMapper.FromJsonSchema(Json("""

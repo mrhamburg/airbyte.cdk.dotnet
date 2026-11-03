@@ -14,9 +14,27 @@ namespace destination_local_parquet.Parquet
             if (schema.Shape == RootShape.Struct)
                 return ConvertStruct(schema.Properties, record, warn);
 
+            var mapping = schema.Value!;
+
+            if (schema.Shape == RootShape.Map)
+            {
+                return new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["value"] = ConvertValue(mapping, record, warn)
+                };
+            }
+
+            if (mapping.Name == "data" && mapping.Shape == FieldShape.Scalar)
+            {
+                return new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    [mapping.Name] = record.GetRawText().AsMemory()
+                };
+            }
+
             return new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["value"] = ConvertValue(schema.Value!, record, warn)
+                [mapping.Name] = ConvertValue(mapping, record, warn)
             };
         }
 
@@ -54,10 +72,14 @@ namespace destination_local_parquet.Parquet
 
             if (type == typeof(ReadOnlyMemory<char>))
             {
-                if (value.ValueKind != JsonValueKind.String)
-                    throw Mismatch(mapping.Name, "string", value.ValueKind);
-
-                return value.GetString()!.AsMemory();
+                return value.ValueKind switch
+                {
+                    JsonValueKind.String => value.GetString()!.AsMemory(),
+                    JsonValueKind.Number => value.GetRawText().AsMemory(),
+                    JsonValueKind.True or JsonValueKind.False => value.GetRawText().AsMemory(),
+                    JsonValueKind.Object or JsonValueKind.Array => value.GetRawText().AsMemory(),
+                    _ => null
+                };
             }
 
             if (type == typeof(long))
