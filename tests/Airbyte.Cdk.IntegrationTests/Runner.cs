@@ -99,9 +99,15 @@ namespace Airbyte.Cdk.IntegrationTests
             ConnectorResult result;
             try
             {
-                result = spec.Type == ConnectorType.Destination
-                    ? await DestinationRunner.RunAsync(spec, artifacts, cancellationToken)
-                    : await RunSourceAsync(spec, artifacts, cancellationToken);
+                if (spec.Type == ConnectorType.Destination)
+                {
+                    var secretValues = await ResolveSecretValuesAsync(spec, cancellationToken);
+                    result = await DestinationRunner.RunAsync(spec, artifacts, secretValues, cancellationToken);
+                }
+                else
+                {
+                    result = await RunSourceAsync(spec, artifacts, cancellationToken);
+                }
             }
             catch
             {
@@ -116,6 +122,20 @@ namespace Airbyte.Cdk.IntegrationTests
                 TryDelete(artifacts);
 
             return result with { ArtifactsDirectory = Directory.Exists(artifacts) ? artifacts : null };
+        }
+
+        private async Task<IReadOnlyList<string>> ResolveSecretValuesAsync(ConnectorSpec spec,
+            CancellationToken cancellationToken)
+        {
+            var values = new List<string>();
+            foreach (var secret in spec.Secrets)
+            {
+                var value = await _secrets.GetAsync(secret.Value, cancellationToken);
+                if (!string.IsNullOrEmpty(value))
+                    values.Add(value);
+            }
+
+            return values;
         }
 
         private async Task<ConnectorResult> RunSourceAsync(ConnectorSpec spec, string artifacts,
@@ -360,7 +380,19 @@ namespace Airbyte.Cdk.IntegrationTests
             }
         }
 
-        private static TestResult Redact(TestResult result, IReadOnlyList<string> secretValues)
+        internal static ConnectorResult Redact(ConnectorResult result, IReadOnlyList<string> secretValues)
+        {
+            if (secretValues.Count == 0)
+                return result;
+
+            return result with
+            {
+                Errors = result.Errors.Select(x => Redaction.Apply(x, secretValues)).ToList(),
+                Tests = result.Tests.Select(x => Redact(x, secretValues)).ToList()
+            };
+        }
+
+        internal static TestResult Redact(TestResult result, IReadOnlyList<string> secretValues)
         {
             if (secretValues.Count == 0)
                 return result;

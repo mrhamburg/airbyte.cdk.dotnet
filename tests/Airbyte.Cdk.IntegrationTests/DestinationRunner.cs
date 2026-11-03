@@ -18,6 +18,13 @@ namespace Airbyte.Cdk.IntegrationTests
         private static readonly TimeSpan SpecTimeout = TimeSpan.FromMinutes(10);
 
         public static async Task<ConnectorResult> RunAsync(ConnectorSpec spec, string artifacts,
+            IReadOnlyList<string> secretValues, CancellationToken cancellationToken)
+        {
+            var result = await RunCoreAsync(spec, artifacts, cancellationToken);
+            return Runner.Redact(result, secretValues);
+        }
+
+        private static async Task<ConnectorResult> RunCoreAsync(ConnectorSpec spec, string artifacts,
             CancellationToken cancellationToken)
         {
             var errors = new List<string>();
@@ -166,7 +173,7 @@ namespace Airbyte.Cdk.IntegrationTests
 
             var statePath = Runner.WriteState(test, scenarioDirectory);
 
-            var socketDirectory = Path.Combine(scenarioDirectory, "sockets");
+            var socketDirectory = Path.Combine(Path.GetTempPath(), "ab-" + Guid.NewGuid().ToString("N")[..8]);
             Directory.CreateDirectory(socketDirectory);
             var socketPaths = new[]
             {
@@ -174,74 +181,110 @@ namespace Airbyte.Cdk.IntegrationTests
                 Path.Combine(socketDirectory, "s2.sock")
             };
 
-            var seeded = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var stream in test.Streams)
+            try
             {
-                var streamDirectory = Path.Combine(parquetDirectory, stream.Name);
-                Directory.CreateDirectory(streamDirectory);
-                var stale = Path.Combine(streamDirectory, "stale.parquet");
-                File.WriteAllText(stale, "stale");
-                seeded[stream.Name] = stale;
-            }
-
-            using var sourceRun = sourceProcess.Start("read", sourceConfigPath, catalogPath, statePath,
-                socketPaths, closeStandardInput: false);
-            using var destinationRun = destination.Start("write", configPath, catalogPath, null,
-                socketPaths, closeStandardInput: true);
-
-            var sourceExit = await sourceRun.WaitAsync(timeout);
-            var destinationKilled = false;
-            if (sourceRun.TimedOut || sourceExit != 0)
-            {
-                destinationRun.Kill();
-                destinationKilled = true;
-            }
-
-            var destinationExit = await destinationRun.WaitAsync(timeout);
-
-            if (sourceRun.TimedOut)
-                errors.Add($"source timed out after {test.TimeoutSeconds}s.");
-            else if (sourceExit != 0)
-                errors.Add($"source failed with exit code {sourceExit}:{Environment.NewLine}{Runner.Tail(sourceRun.Output)}");
-
-            if (destinationRun.TimedOut)
-                errors.Add($"destination timed out after {test.TimeoutSeconds}s.");
-            else if (destinationExit != 0 && !destinationKilled)
-                errors.Add($"destination failed with exit code {destinationExit}:{Environment.NewLine}{Runner.Tail(destinationRun.Output)}");
-
-            foreach (var trace in sourceRun.Messages.Where(MessageParser.IsErrorTrace))
-                errors.Add("source emitted an error trace: " + trace.GetRawText());
-
-            foreach (var trace in destinationRun.Messages.Where(MessageParser.IsErrorTrace))
-                errors.Add("destination emitted an error trace: " + trace.GetRawText());
-
-            if (!destinationRun.Messages.Any(x => MessageParser.TypeOf(x) == "STATE"))
-                errors.Add("destination emitted no STATE message.");
-
-            var streamResults = new List<StreamResult>();
-            foreach (var stream in test.Streams)
-            {
-                var parquet = ParquetOutputValidator.Validate(parquetDirectory, stream, discovered);
-                streamResults.Add(new StreamResult(parquet.Name, parquet.Status,
-                    (int)Math.Min(parquet.RowCount, int.MaxValue), parquet.Errors));
-
-                var stale = seeded[stream.Name];
-                if (stream.SyncMode == "incremental")
+                var seeded = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var stream in test.Streams)
                 {
-                    if (!File.Exists(stale))
-                        errors.Add($"append scenario deleted {Path.GetFileName(stale)} for stream '{stream.Name}'.");
+                    var streamDirectory = Path.Combine(parquetDirectory, stream.Name);
+                    Directory.CreateDirectory(streamDirectory);
+                    var stale = Path.Combine(streamDirectory, "stale.parquet");
+                    File.WriteAllText(stale, "stale");
+                    seeded[stream.Name] = stale;
                 }
-                else if (File.Exists(stale))
+
+                using var sourceRun = sourceProcess.Start("read", sourceConfigPath, catalogPath, statePath,
+                    socketPaths, closeStandardInput: false);
+                using var destinationRun = destination.Start("write", configPath, catalogPath, null,
+                    socketPaths, closeStandardInput: true);
+
+                using var scenarioCancellation =
+                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                scenarioCancellation.CancelAfter(timeout);
+
+                var sourceWait = sourceRun.WaitAsync(timeout, scenarioCancellation.Token);
+                var destinationWait = destinationRun.WaitAsync(timeout, scenarioCancellation.Token);
+                var destinationKilled = false;
+                var sourceKilled = false;
+
+                var first = await Task.WhenAny(sourceWait, destinationWait);
+                if (ReferenceEquals(first, destinationWait))
                 {
-                    errors.Add($"overwrite scenario did not delete {Path.GetFileName(stale)} for stream '{stream.Name}'.");
+                    var firstDestinationExit = await destinationWait;
+                    if (destinationRun.TimedOut || firstDestinationExit != 0)
+                    {
+                        sourceRun.Kill();
+                        sourceKilled = true;
+                    }
+                }
+                else
+                {
+                    var firstSourceExit = await sourceWait;
+                    if (sourceRun.TimedOut || firstSourceExit != 0)
+                    {
+                        destinationRun.Kill();
+                        destinationKilled = true;
+                    }
+                }
+
+                var sourceExit = await sourceWait;
+                var destinationExit = await destinationWait;
+
+                if (sourceRun.TimedOut)
+                    errors.Add($"source timed out after {test.TimeoutSeconds}s.");
+                else if (sourceExit != 0 && !sourceKilled)
+                    errors.Add($"source failed with exit code {sourceExit}:{Environment.NewLine}{Runner.Tail(sourceRun.Output)}");
+
+                if (destinationRun.TimedOut)
+                    errors.Add($"destination timed out after {test.TimeoutSeconds}s.");
+                else if (destinationExit != 0 && !destinationKilled)
+                    errors.Add($"destination failed with exit code {destinationExit}:{Environment.NewLine}{Runner.Tail(destinationRun.Output)}");
+
+                foreach (var trace in sourceRun.Messages.Where(MessageParser.IsErrorTrace))
+                    errors.Add("source emitted an error trace: " + trace.GetRawText());
+
+                foreach (var trace in destinationRun.Messages.Where(MessageParser.IsErrorTrace))
+                    errors.Add("destination emitted an error trace: " + trace.GetRawText());
+
+                if (!destinationRun.Messages.Any(x => MessageParser.TypeOf(x) == "STATE"))
+                    errors.Add("destination emitted no STATE message.");
+
+                var streamResults = new List<StreamResult>();
+                foreach (var stream in test.Streams)
+                {
+                    var parquet = ParquetOutputValidator.Validate(parquetDirectory, stream, discovered);
+                    streamResults.Add(new StreamResult(parquet.Name, parquet.Status,
+                        (int)Math.Min(parquet.RowCount, int.MaxValue), parquet.Errors));
+
+                    var stale = seeded[stream.Name];
+                    if (stream.SyncMode == "incremental")
+                    {
+                        if (!File.Exists(stale))
+                            errors.Add($"append scenario deleted {Path.GetFileName(stale)} for stream '{stream.Name}'.");
+                    }
+                    else if (File.Exists(stale))
+                    {
+                        errors.Add($"overwrite scenario did not delete {Path.GetFileName(stale)} for stream '{stream.Name}'.");
+                    }
+                }
+
+                if (streamResults.Any(x => x.Status == Status.Failed))
+                    errors.Add("one or more streams did not produce valid parquet output.");
+
+                return new TestResult(test.Name, errors.Count == 0 ? Status.Passed : Status.Failed, streamResults,
+                    errors);
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(socketDirectory, true);
+                }
+                catch (IOException)
+                {
+                    // Socket files are scratch; failing to delete them must not fail the run.
                 }
             }
-
-            if (streamResults.Any(x => x.Status == Status.Failed))
-                errors.Add("one or more streams did not produce valid parquet output.");
-
-            return new TestResult(test.Name, errors.Count == 0 ? Status.Passed : Status.Failed, streamResults,
-                errors);
         }
     }
 }

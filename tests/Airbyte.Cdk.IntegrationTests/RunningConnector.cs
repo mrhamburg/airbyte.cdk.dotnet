@@ -66,11 +66,11 @@ namespace Airbyte.Cdk.IntegrationTests
             }
         }
 
-        public async Task<int> WaitAsync(TimeSpan timeout)
+        public async Task<int> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
         {
             if (!_process.HasExited)
             {
-                using var cancellation = new CancellationTokenSource();
+                using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cancellation.CancelAfter(timeout);
                 try
                 {

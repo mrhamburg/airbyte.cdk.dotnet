@@ -33,6 +33,11 @@ namespace Airbyte.Cdk.IntegrationTests
                 return Failed(spec.Name, 0, 0,
                     $"stream directory not found: {directory}");
 
+            var temporaryFiles = Directory.GetFiles(directory, "*.parquet.tmp");
+            if (temporaryFiles.Length > 0)
+                return Failed(spec.Name, 0, 0,
+                    $"stream '{spec.Name}' left temporary parquet file(s): {string.Join(", ", temporaryFiles.Select(Path.GetFileName))}");
+
             var files = Directory.GetFiles(directory, "*.parquet")
                 .Where(x => !string.Equals(Path.GetFileName(x), StaleFileName, StringComparison.Ordinal))
                 .OrderBy(x => x, StringComparer.Ordinal)
@@ -64,16 +69,24 @@ namespace Airbyte.Cdk.IntegrationTests
 
         private static long ValidateFile(string file, RootShape shape, List<string> errors)
         {
-            var reader = ParquetReader.CreateAsync(file).GetAwaiter().GetResult();
             try
             {
-                var fields = reader.Schema.Fields;
-                ValidateSchema(Path.GetFileName(file), fields, shape, errors);
-                return reader.Metadata?.RowGroups?.Sum(x => (long)x.NumRows) ?? 0;
+                var reader = ParquetReader.CreateAsync(file).GetAwaiter().GetResult();
+                try
+                {
+                    var fields = reader.Schema.Fields;
+                    ValidateSchema(Path.GetFileName(file), fields, shape, errors);
+                    return reader.Metadata?.RowGroups?.Sum(x => (long)x.NumRows) ?? 0;
+                }
+                finally
+                {
+                    reader.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
             }
-            finally
+            catch (Exception e)
             {
-                reader.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                errors.Add($"{Path.GetFileName(file)} could not be read as parquet: {e.Message}");
+                return 0;
             }
         }
 
@@ -106,8 +119,16 @@ namespace Airbyte.Cdk.IntegrationTests
         private static void ValidateSample(string file, RootShape shape, List<string> errors)
         {
             DeserializationResult<Dictionary<string, object>> result;
-            using (var stream = File.OpenRead(file))
+            try
+            {
+                using var stream = File.OpenRead(file);
                 result = ParquetSerializer.DeserializeUntypedAsync(stream).GetAwaiter().GetResult();
+            }
+            catch (Exception e)
+            {
+                errors.Add($"{Path.GetFileName(file)} could not be sampled: {e.Message}");
+                return;
+            }
 
             var rows = result.Data.Take(SampleRows).ToList();
 

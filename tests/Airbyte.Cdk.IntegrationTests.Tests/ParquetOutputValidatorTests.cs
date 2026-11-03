@@ -81,6 +81,37 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         }
 
         [Fact]
+        public async Task Test_Validate_TemporaryParquetFileFails()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "parquet-validate-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            await WriteFile(root, "latest", 1);
+            File.WriteAllText(Path.Combine(root, "latest", "part.parquet.tmp"), "partial");
+
+            var result = ParquetOutputValidator.Validate(root,
+                new StreamSpec("latest", MinRecords: 1),
+                Discovered("""{"type":"object","properties":{"amount":{"type":"number"},"base":{"type":"string"}},"required":["amount","base"]}"""));
+
+            result.Status.ShouldBe(Status.Failed);
+            result.Errors.ShouldContain(x => x.Contains("parquet.tmp", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Test_Validate_UnreadableParquetFileFailsInsteadOfThrowing()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "parquet-validate-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(root, "latest"));
+            File.WriteAllText(Path.Combine(root, "latest", "broken.parquet"), "not parquet");
+
+            var result = ParquetOutputValidator.Validate(root,
+                new StreamSpec("latest", MinRecords: 1),
+                Discovered("""{"type":"object","properties":{"amount":{"type":"number"},"base":{"type":"string"}},"required":["amount","base"]}"""));
+
+            result.Status.ShouldBe(Status.Failed);
+            result.Errors.ShouldContain(x => x.Contains("could not be read as parquet", StringComparison.Ordinal));
+        }
+
+        [Fact]
         public async Task Test_Validate_SeededStaleFileIsIgnored()
         {
             var root = Path.Combine(Path.GetTempPath(), "parquet-validate-" + Guid.NewGuid().ToString("N"));
