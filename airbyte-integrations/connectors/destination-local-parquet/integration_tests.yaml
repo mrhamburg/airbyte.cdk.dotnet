@@ -1,0 +1,27 @@
+connector:
+  module: LocalParquet
+  type: destination
+
+source:
+  connector: ../source-exchange-rates-free
+  config:
+    start_date: "2026-10-28"
+    base: USD
+
+tests:
+  - name: full refresh overwrite over protobuf
+    timeout_seconds: 600
+    config: {}
+    streams:
+      - name: symbols
+      - name: latest
+
+  - name: incremental append over protobuf
+    timeout_seconds: 600
+    config: {}
+    streams:
+      - name: historical
+        sync_mode: incremental
+        state:
+          historical:
+            USD: "2026-10-28"
