@@ -20,18 +20,7 @@ namespace Airbyte.Cdk.Transport
         public override ValueTask WriteAsync(AirbyteMessage item, CancellationToken cancellationToken = default) =>
             _sink.WriteAsync(item, cancellationToken);
 
-        public override bool TryWrite(AirbyteMessage item)
-        {
-            try
-            {
-                _sink.WriteAsync(item).AsTask().GetAwaiter().GetResult();
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
+        public override bool TryWrite(AirbyteMessage item) => _sink.TryWrite(item);
 
         public override ValueTask<bool> WaitToWriteAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(true);
