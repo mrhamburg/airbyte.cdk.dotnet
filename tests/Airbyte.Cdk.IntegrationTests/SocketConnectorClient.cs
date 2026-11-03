@@ -16,6 +16,7 @@ namespace Airbyte.Cdk.IntegrationTests
     /// </summary>
     public sealed class SocketConnectorClient
     {
+        private const int MaxMessageSize = 64 * 1024 * 1024;
         private static readonly TimeSpan ConnectTimeout = TimeSpan.FromMinutes(15);
 
         private readonly string _socketPath;
@@ -75,27 +76,30 @@ namespace Airbyte.Cdk.IntegrationTests
         private static async Task<AirbyteMessageProtobuf?> ReadDelimitedAsync(Stream stream,
             CancellationToken cancellationToken)
         {
+            var prefix = new byte[5];
+            var prefixLength = 0;
             ulong length = 0;
             var shift = 0;
-            var one = new byte[1];
 
             while (true)
             {
-                var read = await stream.ReadAsync(one.AsMemory(0, 1), cancellationToken);
+                var read = await stream.ReadAsync(prefix.AsMemory(prefixLength, 1), cancellationToken);
                 if (read == 0)
-                    return shift == 0 ? null : throw new EndOfStreamException("Truncated protobuf length prefix");
+                    return prefixLength == 0
+                        ? null
+                        : throw new EndOfStreamException("Truncated protobuf length prefix");
 
-                var value = one[0];
+                var value = prefix[prefixLength++];
                 length |= (ulong)(value & 0x7F) << shift;
                 if ((value & 0x80) == 0)
                     break;
 
                 shift += 7;
-                if (shift > 63)
+                if (shift > 28)
                     throw new InvalidDataException("Invalid protobuf length prefix");
             }
 
-            if (length > int.MaxValue)
+            if (length > MaxMessageSize)
                 throw new InvalidDataException($"Protobuf message is too large: {length}");
 
             var payload = new byte[(int)length];

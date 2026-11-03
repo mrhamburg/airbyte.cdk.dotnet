@@ -15,6 +15,9 @@ namespace Airbyte.Cdk.Protobuf
     /// </summary>
     public static class ProtobufDelimitedCodec
     {
+        /// <summary>Upper bound that stops a corrupt length prefix from allocating unbounded memory.</summary>
+        public const int MaxMessageSize = 64 * 1024 * 1024;
+
         public static async Task WriteAsync(Stream stream, AirbyteMessageProtobuf message,
             CancellationToken cancellationToken = default)
         {
@@ -42,32 +45,33 @@ namespace Airbyte.Cdk.Protobuf
         public static async Task<AirbyteMessageProtobuf?> ReadAsync(Stream stream,
             CancellationToken cancellationToken = default)
         {
+            var prefix = new byte[5];
+            var prefixLength = 0;
             var length = 0UL;
             var shift = 0;
 
             while (true)
             {
-                var buffer = new byte[1];
-                var read = await stream.ReadAsync(buffer.AsMemory(0, 1), cancellationToken);
+                var read = await stream.ReadAsync(prefix.AsMemory(prefixLength, 1), cancellationToken);
                 if (read == 0)
                 {
-                    if (shift == 0)
+                    if (prefixLength == 0)
                         return null;
 
                     throw new EndOfStreamException("Truncated protobuf message length prefix");
                 }
 
-                var value = buffer[0];
+                var value = prefix[prefixLength++];
                 length |= (ulong)(value & 0x7F) << shift;
                 if ((value & 0x80) == 0)
                     break;
 
                 shift += 7;
-                if (shift > 63)
+                if (shift > 28)
                     throw new InvalidDataException("Invalid protobuf message length prefix");
             }
 
-            if (length > int.MaxValue)
+            if (length > MaxMessageSize)
                 throw new InvalidDataException($"Protobuf message is too large: {length} bytes");
 
             var payload = new byte[(int)length];

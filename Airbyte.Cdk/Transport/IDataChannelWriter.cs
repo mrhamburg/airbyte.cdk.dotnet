@@ -14,6 +14,12 @@ namespace Airbyte.Cdk.Transport
     {
         ValueTask WriteAsync(AirbyteMessage message, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Non-blocking write used by the synchronous logger sink. Returns false when the sink
+        /// cannot accept the message without waiting.
+        /// </summary>
+        bool TryWrite(AirbyteMessage message);
+
         Task CompleteAsync(Exception? error = null);
     }
 }

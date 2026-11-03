@@ -33,10 +33,11 @@ namespace Airbyte.Cdk.Transport
         public async IAsyncEnumerable<AirbyteMessage> ReadAllAsync(
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var channel = Channel.CreateUnbounded<AirbyteMessage>(new UnboundedChannelOptions
+            var channel = Channel.CreateBounded<AirbyteMessage>(new BoundedChannelOptions(4_096)
             {
                 SingleReader = true,
-                SingleWriter = false
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
             });
 
             var tasks = new List<Task>(_socketPaths.Count);

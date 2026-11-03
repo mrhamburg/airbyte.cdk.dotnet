@@ -17,8 +17,15 @@ namespace Airbyte.Cdk.Transport
     public sealed class SocketDataChannelWriter : IDataChannelWriter
     {
         private readonly string _socketPath;
-        private readonly Channel<AirbyteMessage> _channel = Channel.CreateUnbounded<AirbyteMessage>(
-            new UnboundedChannelOptions { SingleReader = true });
+        private const int ChannelCapacity = 4_096;
+
+        private readonly Channel<AirbyteMessage> _channel = Channel.CreateBounded<AirbyteMessage>(
+            new BoundedChannelOptions(ChannelCapacity)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
         private readonly TaskCompletionSource<NetworkStream> _connection =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly CancellationTokenSource _cancellation = new();
@@ -48,6 +55,8 @@ namespace Airbyte.Cdk.Transport
             if (_channel.Reader.Completion.IsCompleted)
                 await _channel.Reader.Completion;
         }
+
+        public bool TryWrite(AirbyteMessage message) => _channel.Writer.TryWrite(message);
 
         public async Task CompleteAsync(Exception? error = null)
         {
@@ -97,6 +106,8 @@ namespace Airbyte.Cdk.Transport
                 _listener.Listen(1);
 
                 var socket = await _listener.AcceptAsync(_cancellation.Token);
+                _listener.Dispose();
+                _listener = null;
                 _connection.TrySetResult(new NetworkStream(socket, ownsSocket: true));
             }
             catch (OperationCanceledException)

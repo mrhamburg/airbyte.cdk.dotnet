@@ -66,6 +66,25 @@ namespace Airbyte.Cdk.Transport
             }
         }
 
+        public bool TryWrite(AirbyteMessage message)
+        {
+            if (!_settings.IsSocket)
+                return _stdout.TryWrite(message);
+
+            switch (message.Type)
+            {
+                case Type.RECORD:
+                    return SocketFor(StreamKey(message.Record?.Namespace, message.Record?.Stream))
+                        .TryWrite(message);
+                case Type.STATE:
+                    var stdoutWritten = _stdout.TryWrite(message);
+                    var socketWritten = SocketFor(StateKey(message.State)).TryWrite(message);
+                    return stdoutWritten && socketWritten;
+                default:
+                    return _stdout.TryWrite(message);
+            }
+        }
+
         public async Task CompleteAsync(Exception? error = null)
         {
             if (!_settings.IsSocket)

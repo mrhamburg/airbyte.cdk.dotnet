@@ -26,6 +26,14 @@ namespace Airbyte.Cdk.Transport
             return ValueTask.CompletedTask;
         }
 
+        public bool TryWrite(AirbyteMessage message)
+        {
+            lock (_sync)
+                _output.WriteLine(JsonSerializer.Serialize(message, AirbyteProtocolJson.Options));
+
+            return true;
+        }
+
         public Task CompleteAsync(Exception? error = null) => Task.CompletedTask;
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
