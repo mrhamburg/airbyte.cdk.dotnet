@@ -38,6 +38,21 @@ namespace Airbyte.Cdk.Models
         public AirbyteStateStats? DestinationStats { get; set; }
 
         /// <summary>
+        /// Socket mode partition identifier. The state covers the records stamped with this value.
+        /// </summary>
+        [JsonPropertyName("partition_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? PartitionId { get; set; }
+
+        /// <summary>
+        /// Socket mode state identifier. Sources assign this from a monotonically increasing
+        /// counter so destinations can commit states in order across parallel sockets.
+        /// </summary>
+        [JsonPropertyName("id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Id { get; set; }
+
+        /// <summary>
         /// The protocol documentation describes this discriminator as <c>state_type</c>; the protocol
         /// schema (and the platform) use <c>type</c>. Accept the documentation spelling on input.
         /// </summary>

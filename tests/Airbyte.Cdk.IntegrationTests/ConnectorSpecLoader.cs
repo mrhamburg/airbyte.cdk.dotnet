@@ -124,7 +124,8 @@ namespace Airbyte.Cdk.IntegrationTests
                 test.Config == null ? EmptyObject() : YamlJson.ToJsonElement(test.Config),
                 test.Limit,
                 test.TimeoutSeconds ?? 600,
-                streams);
+                streams,
+                test.Socket);
         }
 
         private static JsonElement EmptyObject() => JsonDocument.Parse("{}").RootElement.Clone();
@@ -148,6 +149,7 @@ namespace Airbyte.Cdk.IntegrationTests
             public Dictionary<string, object?>? Config { get; set; }
             public int? Limit { get; set; }
             public int? TimeoutSeconds { get; set; }
+            public bool Socket { get; set; }
             public List<YamlStream>? Streams { get; set; }
         }
 

@@ -24,11 +24,17 @@
     <PackageReference Include="CliWrap" />
     <PackageReference Include="CommandLineParser" />
     <PackageReference Include="Flurl.Http" />
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="JsonCons.JsonPath" />
     <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="Polly" />
     <PackageReference Include="Spectre.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos\*.proto" ProtoRoot="Protos" GrpcServices="None" />
   </ItemGroup>
 
 </Project>

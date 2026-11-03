@@ -8,6 +8,8 @@
     <PackageVersion Include="CliWrap" Version="3.10.5" />
     <PackageVersion Include="CommandLineParser" Version="2.9.1" />
     <PackageVersion Include="Flurl.Http" Version="4.0.2" />
+    <PackageVersion Include="Google.Protobuf" Version="3.36.2" />
+    <PackageVersion Include="Grpc.Tools" Version="2.85.0" />
     <PackageVersion Include="Handlebars.Net" Version="2.4.3" />
     <PackageVersion Include="JsonCons.JsonPath" Version="1.1.0" />
     <PackageVersion Include="JsonPointer.Net" Version="7.0.4" />

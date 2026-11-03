@@ -15,11 +15,16 @@ namespace Airbyte.Cdk.Sources.Utils
     public class StateEmitter
     {
         private readonly ChannelWriter<AirbyteMessage> _channel;
+        private readonly PartitionTracker? _partitionTracker;
         private readonly Dictionary<string, string> _lastEmitted = new();
         private readonly Dictionary<string, JsonElement> _states = new();
         private readonly object _sync = new();
 
-        public StateEmitter(ChannelWriter<AirbyteMessage> channel) => _channel = channel;
+        public StateEmitter(ChannelWriter<AirbyteMessage> channel, PartitionTracker? partitionTracker = null)
+        {
+            _channel = channel;
+            _partitionTracker = partitionTracker;
+        }
 
         public async Task<bool> EmitAsync(StreamDescriptor descriptor, JsonElement? state, long recordCount = 0)
         {
@@ -41,6 +46,7 @@ namespace Airbyte.Cdk.Sources.Utils
             }
 
             var message = StateMessageFactory.Create(descriptor, state, recordCount);
+            _partitionTracker?.PrepareState(message, descriptor);
             await _channel.WriteAsync(new AirbyteMessage { Type = MessageType.STATE, State = message });
             return true;
         }

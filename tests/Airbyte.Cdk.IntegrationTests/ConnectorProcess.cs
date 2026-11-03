@@ -54,7 +54,7 @@ namespace Airbyte.Cdk.IntegrationTests
                     "build", _projectFile, "-c", "Release", "-o", _buildOutput, "--nologo", "-v", "quiet"
                 },
                 TimeSpan.FromMinutes(10), parseMessages: false, streams: null, recordsPerStream: null,
-                cancellationToken);
+                socketMode: false, cancellationToken);
 
             _assemblyPath = AssemblyPath;
             if (outcome.ExitCode == 0 && !File.Exists(_assemblyPath))
@@ -72,7 +72,7 @@ namespace Airbyte.Cdk.IntegrationTests
         /// </summary>
         public Task<ProcessOutcome> RunAsync(string command, string? configPath, string? catalogPath,
             string? statePath, TimeSpan timeout, CancellationToken cancellationToken,
-            IReadOnlyCollection<string>? streams = null, int? recordsPerStream = null)
+            IReadOnlyCollection<string>? streams = null, int? recordsPerStream = null, bool socketMode = false)
         {
             var arguments = new List<string> { AssemblyPath, "read", "--command", command };
             if (!string.IsNullOrWhiteSpace(configPath))
@@ -94,13 +94,24 @@ namespace Airbyte.Cdk.IntegrationTests
             }
 
             return ExecuteAsync("dotnet", arguments, timeout, parseMessages: true, streams, recordsPerStream,
-                cancellationToken);
+                socketMode, cancellationToken);
         }
 
         private async Task<ProcessOutcome> ExecuteAsync(string fileName, IReadOnlyList<string> arguments,
             TimeSpan timeout, bool parseMessages, IReadOnlyCollection<string>? streams, int? recordsPerStream,
-            CancellationToken cancellationToken)
+            bool socketMode, CancellationToken cancellationToken)
         {
+            var socketDirectory = socketMode
+                ? Path.Combine(Path.GetTempPath(), "ab-" + Guid.NewGuid().ToString("N")[..8])
+                : null;
+            var socketPaths = new List<string>();
+            if (socketDirectory != null)
+            {
+                Directory.CreateDirectory(socketDirectory);
+                socketPaths.Add(Path.Combine(socketDirectory, "s1.sock"));
+                socketPaths.Add(Path.Combine(socketDirectory, "s2.sock"));
+            }
+
             var startInfo = new ProcessStartInfo(fileName)
             {
                 RedirectStandardOutput = true,
@@ -115,6 +126,12 @@ namespace Airbyte.Cdk.IntegrationTests
             startInfo.Environment["AIRBYTE_IMPL_PATH"] = AssemblyPath;
             startInfo.Environment["AIRBYTE_IMPL_MODULE"] = _module;
             SecretEnvironment.RemoveStoreVariables(startInfo.Environment);
+            startInfo.Environment[DataChannelEnvironment.Medium] = socketMode ? "SOCKET" : "STDIO";
+            startInfo.Environment[DataChannelEnvironment.Format] = socketMode ? "PROTOBUF" : "JSONL";
+            if (socketMode)
+                startInfo.Environment[DataChannelEnvironment.SocketPaths] = string.Join(",", socketPaths);
+            else
+                startInfo.Environment.Remove(DataChannelEnvironment.SocketPaths);
 
             using var process = new Process { StartInfo = startInfo };
             process.Start();
@@ -122,30 +139,29 @@ namespace Airbyte.Cdk.IntegrationTests
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutSource.CancelAfter(timeout);
 
+            var gate = new object();
             var messages = new List<JsonElement>();
+            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var seenStates = new HashSet<string>(StringComparer.Ordinal);
             var raw = new StringBuilder();
+            var stopped = false;
             var standardError = process.StandardError.ReadToEndAsync(timeoutSource.Token);
 
-            var readTask = Task.Run(async () =>
+            bool AddMessage(JsonElement message)
             {
-                var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-                while (true)
+                lock (gate)
                 {
-                    var line = await process.StandardOutput.ReadLineAsync(timeoutSource.Token);
-                    if (line == null)
+                    // The source duplicates STATE to stdout (bookkeeper) and sockets (destination).
+                    // Keep one copy so callers see each checkpoint once.
+                    if (MessageParser.TypeOf(message) == "STATE" &&
+                        !seenStates.Add(message.GetRawText()))
                         return false;
-
-                    if (!parseMessages || !MessageParser.TryParse(line, out var message))
-                    {
-                        raw.AppendLine(line);
-                        continue;
-                    }
 
                     if (!recordsPerStream.HasValue || streams == null || streams.Count == 0
                         || !TryRecordStream(message, out var streamName))
                     {
                         messages.Add(message);
-                        continue;
+                        return false;
                     }
 
                     // Keep counting every record so the run ends only when every stream reached the cap, but
@@ -156,12 +172,58 @@ namespace Airbyte.Cdk.IntegrationTests
                         messages.Add(message);
 
                     if (!streams.All(x => counts.TryGetValue(x, out var count) && count >= recordsPerStream.Value))
+                        return false;
+
+                    stopped = true;
+                    return true;
+                }
+            }
+
+            var readTask = Task.Run(async () =>
+            {
+                while (true)
+                {
+                    var line = await process.StandardOutput.ReadLineAsync(timeoutSource.Token);
+                    if (line == null)
+                        return false;
+
+                    if (!parseMessages || !MessageParser.TryParse(line, out var message))
+                    {
+                        lock (gate)
+                            raw.AppendLine(line);
+                        continue;
+                    }
+
+                    if (!AddMessage(message))
                         continue;
 
                     TryKill(process);
                     return true;
                 }
             }, timeoutSource.Token);
+
+            var socketTasks = socketPaths.Select(path => Task.Run(async () =>
+            {
+                try
+                {
+                    var client = new SocketConnectorClient(path);
+                    await client.ReadAsync(message =>
+                    {
+                        if (AddMessage(message))
+                            TryKill(process);
+                        return Task.CompletedTask;
+                    }, timeoutSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // The reader is cancelled together with the process.
+                }
+                catch (Exception e)
+                {
+                    lock (gate)
+                        raw.AppendLine($"socket reader failed ({path}): {e.Message}");
+                }
+            }, timeoutSource.Token)).ToList();
 
             var timedOut = false;
             try
@@ -184,6 +246,23 @@ namespace Airbyte.Cdk.IntegrationTests
                 // The reader is cancelled together with the process.
             }
 
+            if (socketTasks.Count > 0)
+            {
+                try
+                {
+                    await Task.WhenAll(socketTasks);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Socket readers are cancelled together with the process.
+                }
+            }
+
+            lock (gate)
+            {
+                stoppedEarly |= stopped;
+            }
+
             var errors = string.Empty;
             try
             {
@@ -195,7 +274,8 @@ namespace Airbyte.Cdk.IntegrationTests
             }
 
             if (!string.IsNullOrWhiteSpace(errors))
-                raw.AppendLine(errors.TrimEnd());
+                lock (gate)
+                    raw.AppendLine(errors.TrimEnd());
 
             var exitCode = -1;
             if (!timedOut)
@@ -211,7 +291,27 @@ namespace Airbyte.Cdk.IntegrationTests
                 }
             }
 
-            return new ProcessOutcome(exitCode, messages, raw.ToString().TrimEnd(), timedOut, stoppedEarly);
+            if (socketDirectory != null)
+            {
+                try
+                {
+                    Directory.Delete(socketDirectory, true);
+                }
+                catch (IOException)
+                {
+                    // Socket files are scratch; failing to delete them must not fail the run.
+                }
+            }
+
+            List<JsonElement> snapshot;
+            string rawText;
+            lock (gate)
+            {
+                snapshot = messages.ToList();
+                rawText = raw.ToString().TrimEnd();
+            }
+
+            return new ProcessOutcome(exitCode, snapshot, rawText, timedOut, stoppedEarly);
         }
 
         private static bool TryRecordStream(JsonElement message, out string streamName)

@@ -42,5 +42,13 @@ namespace Airbyte.Cdk.Models
         /// </summary>
         [JsonPropertyName("file_reference")]
         public AirbyteRecordMessageFileReference? FileReference { get; set; }
+
+        /// <summary>
+        /// Socket mode partition identifier. Records with the same value belong to the same
+        /// checkpoint segment; the matching state message carries the same value.
+        /// </summary>
+        [JsonPropertyName("partition_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? PartitionId { get; set; }
     }
 }
