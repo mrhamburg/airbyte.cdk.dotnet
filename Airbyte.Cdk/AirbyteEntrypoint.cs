@@ -10,6 +10,7 @@ using Airbyte.Cdk.Destinations;
 using Airbyte.Cdk.Models;
 using Airbyte.Cdk.Sources;
 using Airbyte.Cdk.Sources.Utils;
+using Airbyte.Cdk.Transport;
 using CommandLine;
 using Type = Airbyte.Cdk.Models.Type;
 
@@ -97,6 +98,7 @@ namespace Airbyte.Cdk
         private static async Task Launch()
         {
             var spec = Connector.Spec();
+            var dataChannel = DataChannelSettings.FromEnvironment();
 
             switch (Options.Command.ToLowerInvariant())
             {
@@ -125,6 +127,28 @@ namespace Airbyte.Cdk
                     });
                     break;
                 case "read":
+                    if (dataChannel.IsSocket)
+                    {
+                        var socketReadOptions = Options as ReadOptions;
+                        var source = GetSource();
+                        source.PartitionTracker = new PartitionTracker(true);
+
+                        await using var sink = RoutingDataChannelWriter.Create(dataChannel, Console.Out);
+                        var writer = new SinkChannelWriter(sink);
+                        var sourceLogger = new AirbyteLogger(message => writer.TryWrite(message));
+                        try
+                        {
+                            await source.Read(sourceLogger, writer, GetConfig(spec), GetCatalog(),
+                                GetState(source, socketReadOptions));
+                        }
+                        finally
+                        {
+                            await sink.CompleteAsync();
+                        }
+
+                        break;
+                    }
+
                     Channel<AirbyteMessage> readerChannel = Channel.CreateUnbounded<AirbyteMessage>();
                     var readOptions = Options as ReadOptions;
                     var readtasks = new[]
@@ -172,6 +196,15 @@ namespace Airbyte.Cdk
                     var destination = GetDestination();
                     var config = GetConfig(spec);
                     var catalog = GetCatalog();
+                    if (dataChannel.IsSocket)
+                    {
+                        var reader = new CompositeDataChannelReader(
+                            new StdioDataChannelReader(Console.In, Logger.Warn),
+                            new SocketDataChannelReader(dataChannel.SocketPaths, catalog));
+                        await RunWriteLoop(reader, Console.Out, Logger, destination, config, catalog);
+                        break;
+                    }
+
                     await RunWriteLoop(Console.In, Console.Out, Logger, destination, config, catalog);
                     break;
                 }
@@ -185,25 +218,22 @@ namespace Airbyte.Cdk
         /// Processing is deliberately sequential so a destination failure cannot leave a producer blocked on stdin.
         /// </summary>
         public static async Task RunWriteLoop(TextReader input, TextWriter output, AirbyteLogger logger,
+            Destination destination, JsonElement config, ConfiguredAirbyteCatalog catalog) =>
+            await RunWriteLoop(new StdioDataChannelReader(input, logger.Warn), output, logger, destination, config, catalog);
+
+        /// <summary>
+        /// Consumes the merged data channel. Socket mode supplies records from Unix domain sockets
+        /// and control messages from stdin; STDIO mode supplies a single JSONL reader.
+        /// </summary>
+        public static async Task RunWriteLoop(IDataChannelReader reader, TextWriter output, AirbyteLogger logger,
             Destination destination, JsonElement config, ConfiguredAirbyteCatalog catalog)
         {
-            while (true)
-            {
-                var text = await input.ReadLineAsync();
-                if (text == null)
-                    break;
+            var dispatcher = new DestinationMessageDispatcher(destination, logger, config, catalog, output);
+            await foreach (var msg in reader.ReadAllAsync())
+                await dispatcher.HandleAsync(msg);
 
-                if (!AirbyteProtocolReader.TryParseMessage(text, out var msg))
-                {
-                    logger.Warn("Dropping input that is not a valid AirbyteMessage");
-                    continue;
-                }
-
-                await destination.Write(logger, config, catalog, msg!);
-
-                if (msg!.Type == Type.STATE)
-                    ToConsole(msg, output);
-            }
+            await dispatcher.CompleteAsync();
+            await reader.CompleteAsync();
         }
 
         private static JsonElement GetConfig(ConnectorSpecification spec)

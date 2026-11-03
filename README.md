@@ -35,7 +35,29 @@ Jortt | Source | [source-jortt](airbyte-integrations/connectors/source-jortt) | 
 
 ## Protocol compatibility
 
-The CDK targets the Airbyte protocol **v0.19.0** over the STDIO/JSON transport. Sources emit per-stream `STREAM` state messages (under `state.stream.stream_descriptor` and `state.stream.stream_state`) and include `sourceStats.recordCount`. On input, the `--state` file may contain a legacy stream-name map, a single `STREAM`/`GLOBAL`/`LEGACY` state message, an `AirbyteMessage` envelope, or a list of state messages. The socket/PROTOBUF transport is not implemented yet.
+The CDK targets the Airbyte protocol **v0.19.0**. STDIO/JSON is the default transport. Sources emit per-stream `STREAM` state messages (under `state.stream.stream_descriptor` and `state.stream.stream_state`) and include `sourceStats.recordCount`. On input, the `--state` file may contain a legacy stream-name map, a single `STREAM`/`GLOBAL`/`LEGACY` state message, an `AirbyteMessage` envelope, or a list of state messages.
+
+### Socket mode
+
+Set these environment variables to use the platform's socket data channel:
+
+```bash
+DATA_CHANNEL_MEDIUM=SOCKET
+DATA_CHANNEL_FORMAT=PROTOBUF
+DATA_CHANNEL_SOCKET_PATHS=/var/run/sockets/airbyte_socket_1.sock,/var/run/sockets/airbyte_socket_2.sock
+```
+
+In socket mode the source binds one Unix domain socket per path and the destination connects to them.
+Records and states travel over the sockets as length-delimited Protobuf, while logs, traces and control
+messages stay on stdout. State messages are also copied to stdout for the bookkeeper. Each checkpoint
+segment gets a `partition_id`; records carry it, and the matching state carries it plus an incrementing
+`id`. The destination only commits a state after all records for that partition have been written.
+
+The .NET CDK sends every message through the Protobuf `airbyte_protocol_message` JSON field, which the
+platform destination accepts for record, state and control messages. This keeps record values
+schema-correct without reimplementing the platform's typed value encoder. Typed records produced by
+other CDKs are decoded when the configured catalog provides the stream schema. Without the environment
+variables the CDK keeps using STDIO/JSON and no behavior changes.
 
 Connector specifications should declare `protocol_version`; `Connector.Spec()` defaults it to `0.19.0` when it is absent.
 
@@ -193,6 +215,7 @@ tests:
       start_date: "2026-10-01"
       retries: 3               # unquoted scalars keep their type; quote anything that should stay a string
     limit: 50                  # per stream: the connector is stopped once every listed stream has 50 records
+    socket: false              # optional; true runs the read over Unix domain sockets with Protobuf
     streams:
       - name: latest
       - name: orders

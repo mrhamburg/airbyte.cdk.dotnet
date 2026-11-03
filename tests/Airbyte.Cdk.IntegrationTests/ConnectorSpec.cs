@@ -51,13 +51,14 @@ namespace Airbyte.Cdk.IntegrationTests
     public sealed class TestCaseSpec
     {
         public TestCaseSpec(string name, JsonElement config, int? limit, int timeoutSeconds,
-            IReadOnlyList<StreamSpec> streams)
+            IReadOnlyList<StreamSpec> streams, bool socket = false)
         {
             Name = name;
             Config = config;
             Limit = limit;
             TimeoutSeconds = timeoutSeconds;
             Streams = streams;
+            Socket = socket;
         }
 
         public string Name { get; }
@@ -74,6 +75,9 @@ namespace Airbyte.Cdk.IntegrationTests
         public int TimeoutSeconds { get; }
 
         public IReadOnlyList<StreamSpec> Streams { get; }
+
+        /// <summary>Run the read scenario in socket/Protobuf mode.</summary>
+        public bool Socket { get; }
     }
 
     /// <summary>

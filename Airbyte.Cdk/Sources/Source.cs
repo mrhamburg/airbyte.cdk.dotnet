@@ -1,13 +1,21 @@
+#nullable enable
 ﻿using System.IO;
 using System.Text.Json;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Airbyte.Cdk.Models;
+using Airbyte.Cdk.Sources.Utils;
 
 namespace Airbyte.Cdk.Sources
 {
     public abstract class Source : Connector
     {
+        /// <summary>
+        /// Set by the entry point when the process runs in socket mode. It stamps records and state
+        /// messages with partition and state identifiers.
+        /// </summary>
+        public PartitionTracker? PartitionTracker { get; set; }
+
         /// <summary>
         /// Can be overridden to change an input state
         /// </summary>

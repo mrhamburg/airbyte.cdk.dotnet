@@ -221,7 +221,7 @@ namespace Airbyte.Cdk.IntegrationTests
             var statePath = WriteState(test, testDirectory);
 
             var read = await process.RunAsync("read", configPath, catalogPath, statePath, timeout, cancellationToken,
-                test.Streams.Select(x => x.Name).ToList(), test.Limit);
+                test.Streams.Select(x => x.Name).ToList(), test.Limit, test.Socket);
             if (read.TimedOut)
                 return Failed(test, errors.Append($"read timed out after {test.TimeoutSeconds}s.").ToList());
             if (!read.StoppedEarly && read.ExitCode != 0)

@@ -15,5 +15,19 @@ namespace Airbyte.Cdk.Models
         [JsonPropertyName("stream_state")]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
         public JsonElement? StreamState { get; set; }
+
+        /// <summary>
+        /// Socket mode partition identifier for a stream inside a GLOBAL state.
+        /// </summary>
+        [JsonPropertyName("partition_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? PartitionId { get; set; }
+
+        /// <summary>
+        /// Socket mode state identifier for a stream inside a GLOBAL state.
+        /// </summary>
+        [JsonPropertyName("id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Id { get; set; }
     }
 }

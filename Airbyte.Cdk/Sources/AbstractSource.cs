@@ -99,8 +99,8 @@ namespace Airbyte.Cdk.Sources
             Catalog = catalog;
             State = state;
 
-            var stateEmitter = new StateEmitter(channel);
-            var trackingChannel = new StateTrackingChannelWriter(channel, stateEmitter);
+            var stateEmitter = new StateEmitter(channel, PartitionTracker);
+            var trackingChannel = new StateTrackingChannelWriter(channel, stateEmitter, PartitionTracker);
             Channel = trackingChannel;
 
             // The caller owns the logger. The entry point supplies a channel-backed logger so logs and
@@ -170,6 +170,7 @@ namespace Airbyte.Cdk.Sources
             Logger.Info($"Setting state of {streamname} stream to {stateElement.GetRawText()}");
 
             streaminstance.StateEmitter = stateEmitter;
+            PartitionTracker?.BeginStream(descriptor);
             if (Channel is StateTrackingChannelWriter trackingChannel)
                 trackingChannel.CurrentDescriptor = descriptor;
 
