@@ -44,15 +44,20 @@ namespace Airbyte.Cdk.IntegrationTests
         public string AssemblyPath =>
             _assemblyPath ?? Path.Combine(_buildOutput, Path.GetFileNameWithoutExtension(_projectFile) + ".dll");
 
-        public async Task<ProcessOutcome> BuildAsync(CancellationToken cancellationToken)
+        public async Task<ProcessOutcome> BuildAsync(CancellationToken cancellationToken,
+            IReadOnlyDictionary<string, string>? properties = null)
         {
             Directory.CreateDirectory(_buildOutput);
 
-            var outcome = await ExecuteAsync("dotnet",
-                new[]
-                {
-                    "build", _projectFile, "-c", "Release", "-o", _buildOutput, "--nologo", "-v", "quiet"
-                },
+            var arguments = new List<string>
+            {
+                "build", _projectFile, "-c", "Release", "-o", _buildOutput, "--nologo", "-v", "quiet"
+            };
+            if (properties != null)
+                foreach (var property in properties)
+                    arguments.Add($"-p:{property.Key}={property.Value}");
+
+            var outcome = await ExecuteAsync("dotnet", arguments,
                 TimeSpan.FromMinutes(10), parseMessages: false, streams: null, recordsPerStream: null,
                 socketMode: false, cancellationToken);
 
@@ -72,9 +77,10 @@ namespace Airbyte.Cdk.IntegrationTests
         /// </summary>
         public Task<ProcessOutcome> RunAsync(string command, string? configPath, string? catalogPath,
             string? statePath, TimeSpan timeout, CancellationToken cancellationToken,
-            IReadOnlyCollection<string>? streams = null, int? recordsPerStream = null, bool socketMode = false)
+            IReadOnlyCollection<string>? streams = null, int? recordsPerStream = null, bool socketMode = false,
+            string verb = "read")
         {
-            var arguments = new List<string> { AssemblyPath, "read", "--command", command };
+            var arguments = new List<string> { AssemblyPath, verb, "--command", command };
             if (!string.IsNullOrWhiteSpace(configPath))
             {
                 arguments.Add("--config");
@@ -95,6 +101,78 @@ namespace Airbyte.Cdk.IntegrationTests
 
             return ExecuteAsync("dotnet", arguments, timeout, parseMessages: true, streams, recordsPerStream,
                 socketMode, cancellationToken);
+        }
+
+        /// <summary>
+        /// Starts a connector for a long-running operation such as a socket-mode read/write and returns it
+        /// immediately. The caller owns the process and must wait for it or dispose it.
+        /// </summary>
+        public RunningConnector Start(string verb, string? configPath, string? catalogPath, string? statePath,
+            IReadOnlyList<string> socketPaths, bool closeStandardInput)
+        {
+            var arguments = new List<string> { AssemblyPath, verb, "--command", verb };
+            if (!string.IsNullOrWhiteSpace(configPath))
+            {
+                arguments.Add("--config");
+                arguments.Add(configPath!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(catalogPath))
+            {
+                arguments.Add("--catalog");
+                arguments.Add(catalogPath!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(statePath))
+            {
+                arguments.Add("--state");
+                arguments.Add(statePath!);
+            }
+
+            var startInfo = new ProcessStartInfo("dotnet")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = true,
+                UseShellExecute = false,
+                WorkingDirectory = _connectorDirectory
+            };
+
+            foreach (var argument in arguments)
+                startInfo.ArgumentList.Add(argument);
+
+            ApplyEnvironment(startInfo, socketPaths);
+
+            var process = new Process { StartInfo = startInfo };
+            process.Start();
+
+            try
+            {
+                if (closeStandardInput)
+                    process.StandardInput.Close();
+            }
+            catch
+            {
+                TryKill(process);
+                process.Dispose();
+                throw;
+            }
+
+            return new RunningConnector(process);
+        }
+
+        private void ApplyEnvironment(ProcessStartInfo startInfo, IReadOnlyList<string> socketPaths)
+        {
+            var socketMode = socketPaths.Count > 0;
+            startInfo.Environment["AIRBYTE_IMPL_PATH"] = AssemblyPath;
+            startInfo.Environment["AIRBYTE_IMPL_MODULE"] = _module;
+            SecretEnvironment.RemoveStoreVariables(startInfo.Environment);
+            startInfo.Environment[DataChannelEnvironment.Medium] = socketMode ? "SOCKET" : "STDIO";
+            startInfo.Environment[DataChannelEnvironment.Format] = socketMode ? "PROTOBUF" : "JSONL";
+            if (socketMode)
+                startInfo.Environment[DataChannelEnvironment.SocketPaths] = string.Join(",", socketPaths);
+            else
+                startInfo.Environment.Remove(DataChannelEnvironment.SocketPaths);
         }
 
         private async Task<ProcessOutcome> ExecuteAsync(string fileName, IReadOnlyList<string> arguments,
@@ -123,15 +201,7 @@ namespace Airbyte.Cdk.IntegrationTests
             foreach (var argument in arguments)
                 startInfo.ArgumentList.Add(argument);
 
-            startInfo.Environment["AIRBYTE_IMPL_PATH"] = AssemblyPath;
-            startInfo.Environment["AIRBYTE_IMPL_MODULE"] = _module;
-            SecretEnvironment.RemoveStoreVariables(startInfo.Environment);
-            startInfo.Environment[DataChannelEnvironment.Medium] = socketMode ? "SOCKET" : "STDIO";
-            startInfo.Environment[DataChannelEnvironment.Format] = socketMode ? "PROTOBUF" : "JSONL";
-            if (socketMode)
-                startInfo.Environment[DataChannelEnvironment.SocketPaths] = string.Join(",", socketPaths);
-            else
-                startInfo.Environment.Remove(DataChannelEnvironment.SocketPaths);
+            ApplyEnvironment(startInfo, socketPaths);
 
             using var process = new Process { StartInfo = startInfo };
             process.Start();
