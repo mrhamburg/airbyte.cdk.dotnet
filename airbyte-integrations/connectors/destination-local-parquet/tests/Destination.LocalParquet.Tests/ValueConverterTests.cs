@@ -24,6 +24,7 @@ namespace Destination.LocalParquet.Tests
             var map = row["value"].ShouldBeAssignableTo<System.Collections.IDictionary>()!;
             map.Count.ShouldBe(2);
             map.Keys.Cast<object>().ShouldAllBe(x => x!.GetType() == typeof(ReadOnlyMemory<char>));
+            row["value"].ShouldBeOfType<Dictionary<ReadOnlyMemory<char>, ReadOnlyMemory<char>?>>();
         }
 
         [Fact]
@@ -44,6 +45,7 @@ namespace Destination.LocalParquet.Tests
             row["amount"].ShouldBe(1.5d);
             row["base"].ShouldBeOfType<ReadOnlyMemory<char>>();
             ((System.Collections.IDictionary)row["rates"]!).Count.ShouldBe(2);
+            row["rates"].ShouldBeOfType<Dictionary<ReadOnlyMemory<char>, double?>>();
         }
 
         [Fact]
@@ -67,6 +69,32 @@ namespace Destination.LocalParquet.Tests
                 """));
 
             RecordValueConverter.Convert(schema, Json("{}"))["a"].ShouldBeNull();
+        }
+
+        [Fact]
+        public void Test_Convert_NullForRequiredFieldThrows()
+        {
+            var schema = ParquetSchemaMapper.FromJsonSchema(Json("""
+                {"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}
+                """));
+
+            var error = Should.Throw<FormatException>(() =>
+                RecordValueConverter.Convert(schema, Json("""{"a":null}""")));
+
+            error.Message.ShouldContain("a");
+        }
+
+        [Fact]
+        public void Test_Convert_IntegerOverflowNamesTheField()
+        {
+            var schema = ParquetSchemaMapper.FromJsonSchema(Json("""
+                {"type":"object","properties":{"i":{"type":"integer"}},"required":["i"]}
+                """));
+
+            var error = Should.Throw<FormatException>(() =>
+                RecordValueConverter.Convert(schema, Json("""{"i":1e20}""")));
+
+            error.Message.ShouldContain("i");
         }
 
         [Fact]

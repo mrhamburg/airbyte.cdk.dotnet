@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace Airbyte.Cdk.IntegrationTests
 {
-    public sealed class RunningConnector : IDisposable
+    internal sealed class RunningConnector : IDisposable
     {
         private readonly Process _process;
         private readonly object _gate = new();

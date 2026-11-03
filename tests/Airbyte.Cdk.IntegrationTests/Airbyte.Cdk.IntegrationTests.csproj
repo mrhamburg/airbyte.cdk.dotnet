@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Airbyte.Cdk.IntegrationTests.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Protobuf Include="..\..\Airbyte.Cdk\Protos\*.proto" ProtoRoot="..\..\Airbyte.Cdk\Protos"
               GrpcServices="None" />
   </ItemGroup>

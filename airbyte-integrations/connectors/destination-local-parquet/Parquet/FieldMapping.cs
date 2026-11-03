@@ -15,6 +15,8 @@ namespace destination_local_parquet.Parquet
         public required FieldShape Shape { get; init; }
         public bool IsRequired { get; init; }
         public IReadOnlyList<FieldMapping> Properties { get; init; } = Array.Empty<FieldMapping>();
+        public IReadOnlyDictionary<string, FieldMapping> ByName { get; init; } =
+            new Dictionary<string, FieldMapping>(StringComparer.Ordinal);
         public FieldMapping? Value { get; init; }
     }
 }

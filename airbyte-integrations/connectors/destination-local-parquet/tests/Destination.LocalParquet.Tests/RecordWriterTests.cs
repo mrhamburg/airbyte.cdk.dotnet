@@ -39,6 +39,25 @@ namespace Destination.LocalParquet.Tests
 
             await writer.WriteAsync(Record("latest", """{"amount":1,"base":"USD","date":"2026-11-01","rates":{}}"""));
             await writer.WriteAsync(State());
+            File.Exists(stale).ShouldBeTrue();
+
+            await writer.CompleteAsync();
+
+            File.Exists(stale).ShouldBeFalse();
+        }
+
+        [Fact]
+        public async Task Test_CompleteAsync_EmptyOverwriteDeletesExistingParquetFiles()
+        {
+            using var dir = new TempDirectory();
+            var streamDir = Path.Combine(dir.Path, "latest");
+            Directory.CreateDirectory(streamDir);
+            var stale = Path.Combine(streamDir, "stale.parquet");
+            File.WriteAllText(stale, "old");
+            var writer = new ParquetRecordWriter(Options(dir.Path), Catalog("latest", TestData.Schema),
+                new AirbyteLogger(_ => { }));
+
+            await writer.CompleteAsync();
 
             File.Exists(stale).ShouldBeFalse();
         }
@@ -56,6 +75,7 @@ namespace Destination.LocalParquet.Tests
 
             await writer.WriteAsync(Record("latest", """{"amount":1,"base":"USD","date":"2026-11-01","rates":{}}"""));
             await writer.WriteAsync(State());
+            await writer.CompleteAsync();
 
             File.Exists(stale).ShouldBeTrue();
         }
@@ -119,8 +139,39 @@ namespace Destination.LocalParquet.Tests
             await writer.WriteAsync(Record("../escape", """{"amount":1,"base":"USD","date":"2026-11-01","rates":{}}"""));
             await writer.WriteAsync(State());
 
-            Directory.GetDirectories(dir.Path).ShouldHaveSingleItem();
-            Path.GetFileName(Directory.GetDirectories(dir.Path).Single()).ShouldBe(".._escape");
+            var streamDirectory = Directory.GetDirectories(dir.Path).ShouldHaveSingleItem();
+            Path.GetFullPath(streamDirectory).ShouldStartWith(Path.GetFullPath(dir.Path) + Path.DirectorySeparatorChar);
+            Path.GetFileName(streamDirectory).ShouldNotBe("..");
+        }
+
+        [Fact]
+        public async Task Test_WriteAsync_UnsupportedSyncModeThrows()
+        {
+            using var dir = new TempDirectory();
+
+            var error = Should.Throw<NotSupportedException>(() =>
+                new ParquetRecordWriter(Options(dir.Path),
+                    Catalog("latest", TestData.Schema, DestinationSyncMode.append_dedup),
+                    new AirbyteLogger(_ => { })));
+
+            error.Message.ShouldContain("append_dedup");
+        }
+
+        [Fact]
+        public async Task Test_WriteAsync_CleansOrphanedTemporaryFile()
+        {
+            using var dir = new TempDirectory();
+            var streamDir = Path.Combine(dir.Path, "latest");
+            Directory.CreateDirectory(streamDir);
+            var orphan = Path.Combine(streamDir, "orphan.parquet.tmp");
+            File.WriteAllText(orphan, "partial");
+            var writer = new ParquetRecordWriter(Options(dir.Path), Catalog("latest", TestData.Schema),
+                new AirbyteLogger(_ => { }));
+
+            await writer.WriteAsync(Record("latest", """{"amount":1,"base":"USD","date":"2026-11-01","rates":{}}"""));
+            await writer.WriteAsync(State());
+
+            File.Exists(orphan).ShouldBeFalse();
         }
     }
 }

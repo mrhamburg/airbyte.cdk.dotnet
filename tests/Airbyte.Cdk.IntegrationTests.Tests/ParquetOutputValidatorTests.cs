@@ -68,6 +68,29 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
         }
 
         [Fact]
+        public async Task Test_Validate_WrongColumnTypeFails()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "parquet-validate-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(root, "latest"));
+            var schema = new ParquetSchema(
+                new DataField("amount", typeof(string), isNullable: false),
+                new DataField("base", typeof(string), isNullable: false));
+            var data = new List<IDictionary<string, object?>>
+            {
+                new Dictionary<string, object?> { ["amount"] = "1", ["base"] = "USD" }
+            };
+            await using (var file = File.Create(Path.Combine(root, "latest", "part.parquet")))
+                await ParquetSerializer.SerializeUntypedAsync(data, schema, file);
+
+            var result = ParquetOutputValidator.Validate(root,
+                new StreamSpec("latest", MinRecords: 1),
+                Discovered("""{"type":"object","properties":{"amount":{"type":"number"},"base":{"type":"string"}},"required":["amount","base"]}"""));
+
+            result.Status.ShouldBe(Status.Failed);
+            result.Errors.ShouldContain(x => x.Contains("amount"));
+        }
+
+        [Fact]
         public void Test_Validate_MissingDirectoryFails()
         {
             var root = Path.Combine(Path.GetTempPath(), "parquet-validate-" + Guid.NewGuid().ToString("N"));

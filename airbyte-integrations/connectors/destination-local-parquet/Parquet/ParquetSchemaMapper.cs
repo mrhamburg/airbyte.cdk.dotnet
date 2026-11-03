@@ -8,27 +8,29 @@ namespace destination_local_parquet.Parquet
 {
     internal static class ParquetSchemaMapper
     {
-        public static StreamSchema FromJsonSchema(JsonElement schema)
+        private static readonly JsonElement StringSchema = CreateStringSchema();
+
+        public static StreamSchema FromJsonSchema(JsonElement schema, Action<string>? warn = null)
         {
             if (schema.ValueKind != JsonValueKind.Object)
                 return StreamSchema.Fallback();
 
-            if (TryStruct(schema, out var structSchema))
+            if (TryStruct(schema, warn, out var structSchema))
                 return structSchema;
 
-            if (TryMapRoot(schema, out var mapSchema))
+            if (TryMapRoot(schema, warn, out var mapSchema))
                 return mapSchema;
 
             return StreamSchema.Fallback();
         }
 
-        public static StreamSchema FromRecord(JsonElement record)
+        public static StreamSchema FromRecord(JsonElement record, Action<string>? warn = null)
         {
             if (record.ValueKind != JsonValueKind.Object)
                 return StreamSchema.Fallback();
 
             var properties = record.EnumerateObject()
-                .Select(x => InferField(x.Name, x.Value))
+                .Select(x => InferField(x.Name, x.Value, warn))
                 .ToArray();
 
             if (properties.Length == 0)
@@ -38,11 +40,12 @@ namespace destination_local_parquet.Parquet
             {
                 Parquet = new ParquetSchema(properties.Select(x => x.Field)),
                 Shape = RootShape.Struct,
-                Properties = properties
+                Properties = properties,
+                ByName = properties.ToDictionary(x => x.Name, StringComparer.Ordinal)
             };
         }
 
-        private static bool TryStruct(JsonElement schema, out StreamSchema result)
+        private static bool TryStruct(JsonElement schema, Action<string>? warn, out StreamSchema result)
         {
             result = null!;
             if (!schema.TryGetProperty("properties", out var properties)
@@ -52,25 +55,26 @@ namespace destination_local_parquet.Parquet
 
             var required = RequiredNames(schema);
             var fields = properties.EnumerateObject()
-                .Select(x => BuildField(x.Name, x.Value, required.Contains(x.Name)))
+                .Select(x => BuildField(x.Name, x.Value, required.Contains(x.Name), warn))
                 .ToArray();
 
             result = new StreamSchema
             {
                 Parquet = new ParquetSchema(fields.Select(x => x.Field)),
                 Shape = RootShape.Struct,
-                Properties = fields
+                Properties = fields,
+                ByName = fields.ToDictionary(x => x.Name, StringComparer.Ordinal)
             };
             return true;
         }
 
-        private static bool TryMapRoot(JsonElement schema, out StreamSchema result)
+        private static bool TryMapRoot(JsonElement schema, Action<string>? warn, out StreamSchema result)
         {
             result = null!;
             if (!TryMapValueSchema(schema, out var valueSchema))
                 return false;
 
-            var value = BuildField("value", valueSchema, required: false);
+            var value = BuildField("value", valueSchema, required: false, warn);
             var key = new DataField("key", typeof(string), isNullable: false);
             var map = new MapField("value", key, value.Field);
 
@@ -89,18 +93,23 @@ namespace destination_local_parquet.Parquet
             return true;
         }
 
-        private static FieldMapping BuildField(string name, JsonElement schema, bool required)
+        private static FieldMapping BuildField(string name, JsonElement schema, bool required,
+            Action<string>? warn)
         {
             var (type, nullableUnion) = TypeOf(schema);
 
-            if (TryStructField(name, schema, required, out var structField))
+            if (TryStructField(name, schema, required, warn, out var structField))
                 return structField;
 
             if (TryMapValueSchema(schema, out var mapValueSchema))
-                return BuildMapField(name, mapValueSchema, required);
+                return BuildMapField(name, mapValueSchema, required, warn);
 
-            if (TryListField(name, schema, required, out var listField))
+            if (TryListField(name, schema, required, warn, out var listField))
                 return listField;
+
+            if (type is not ("string" or "integer" or "number" or "boolean"))
+                warn?.Invoke(
+                    $"Field '{name}' has an unsupported or missing JSON type; writing it as a string.");
 
             return BuildScalarField(name, type, required, nullableUnion);
         }
@@ -125,7 +134,8 @@ namespace destination_local_parquet.Parquet
             };
         }
 
-        private static bool TryStructField(string name, JsonElement schema, bool required, out FieldMapping result)
+        private static bool TryStructField(string name, JsonElement schema, bool required,
+            Action<string>? warn, out FieldMapping result)
         {
             result = null!;
             if (!schema.TryGetProperty("properties", out var properties)
@@ -135,7 +145,7 @@ namespace destination_local_parquet.Parquet
 
             var requiredNames = RequiredNames(schema);
             var children = properties.EnumerateObject()
-                .Select(x => BuildField(x.Name, x.Value, requiredNames.Contains(x.Name)))
+                .Select(x => BuildField(x.Name, x.Value, requiredNames.Contains(x.Name), warn))
                 .ToArray();
 
             result = new FieldMapping
@@ -144,14 +154,16 @@ namespace destination_local_parquet.Parquet
                 Field = new StructField(name, children.Select(x => x.Field).ToArray()),
                 Shape = FieldShape.Struct,
                 IsRequired = required,
-                Properties = children
+                Properties = children,
+                ByName = children.ToDictionary(x => x.Name, StringComparer.Ordinal)
             };
             return true;
         }
 
-        private static FieldMapping BuildMapField(string name, JsonElement valueSchema, bool required)
+        private static FieldMapping BuildMapField(string name, JsonElement valueSchema, bool required,
+            Action<string>? warn)
         {
-            var value = BuildField("value", valueSchema, required: false);
+            var value = BuildField("value", valueSchema, required: false, warn);
             var key = new DataField("key", typeof(string), isNullable: false);
             return new FieldMapping
             {
@@ -163,13 +175,14 @@ namespace destination_local_parquet.Parquet
             };
         }
 
-        private static bool TryListField(string name, JsonElement schema, bool required, out FieldMapping result)
+        private static bool TryListField(string name, JsonElement schema, bool required,
+            Action<string>? warn, out FieldMapping result)
         {
             result = null!;
             if (!schema.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Object)
                 return false;
 
-            var item = BuildField("element", items, required: false);
+            var item = BuildField("element", items, required: false, warn);
             result = new FieldMapping
             {
                 Name = name,
@@ -195,19 +208,19 @@ namespace destination_local_parquet.Parquet
 
             if (additional.ValueKind == JsonValueKind.True)
             {
-                valueSchema = JsonDocument.Parse("""{"type":"string"}""").RootElement.Clone();
+                valueSchema = StringSchema;
                 return true;
             }
 
             return false;
         }
 
-        private static FieldMapping InferField(string name, JsonElement value)
+        private static FieldMapping InferField(string name, JsonElement value, Action<string>? warn)
         {
             if (value.ValueKind == JsonValueKind.Object)
             {
                 var children = value.EnumerateObject()
-                    .Select(x => InferField(x.Name, x.Value))
+                    .Select(x => InferField(x.Name, x.Value, warn))
                     .ToArray();
 
                 if (children.Length == 0)
@@ -218,7 +231,8 @@ namespace destination_local_parquet.Parquet
                     Name = name,
                     Field = new StructField(name, children.Select(x => x.Field).ToArray()),
                     Shape = FieldShape.Struct,
-                    Properties = children
+                    Properties = children,
+                    ByName = children.ToDictionary(x => x.Name, StringComparer.Ordinal)
                 };
             }
 
@@ -227,7 +241,7 @@ namespace destination_local_parquet.Parquet
                 var first = value.EnumerateArray().FirstOrDefault(x => x.ValueKind != JsonValueKind.Null);
                 var item = first.ValueKind == JsonValueKind.Undefined
                     ? BuildScalarField("element", "string", required: false, nullableUnion: true)
-                    : InferField("element", first);
+                    : InferField("element", first, warn);
 
                 return new FieldMapping
                 {
@@ -281,6 +295,12 @@ namespace destination_local_parquet.Parquet
             var first = types.FirstOrDefault(x => !string.Equals(x, "null", StringComparison.Ordinal));
             var nullable = types.Any(x => string.Equals(x, "null", StringComparison.Ordinal));
             return (first, nullable);
+        }
+
+        private static JsonElement CreateStringSchema()
+        {
+            using var document = JsonDocument.Parse("""{"type":"string"}""");
+            return document.RootElement.Clone();
         }
     }
 }

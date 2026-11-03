@@ -40,6 +40,21 @@ namespace Destination.LocalParquet.Tests
         }
 
         [Fact]
+        public void Test_FromJson_ReadsFlushRowLimit()
+        {
+            var options = DestinationOptions.FromJson(Json("""{"output_path":"/tmp/parquet-out","flush_row_limit":10}"""));
+
+            options.FlushRowLimit.ShouldBe(10);
+        }
+
+        [Fact]
+        public void Test_FromJson_InvalidFlushRowLimit_Throws()
+        {
+            Should.Throw<ArgumentException>(() =>
+                DestinationOptions.FromJson(Json("""{"output_path":"/tmp/parquet-out","flush_row_limit":0}""")));
+        }
+
+        [Fact]
         public void Test_Check_ReturnsSucceeded()
         {
             var root = Path.Combine(Path.GetTempPath(), "parquet-check-" + Guid.NewGuid().ToString("N"));
@@ -77,6 +92,14 @@ namespace Destination.LocalParquet.Tests
             Path.GetFullPath(escape).ShouldStartWith(Path.GetFullPath(root) + Path.DirectorySeparatorChar);
             Path.GetFullPath(dotdot).ShouldStartWith(Path.GetFullPath(root) + Path.DirectorySeparatorChar);
             Path.GetFileName(dotdot).ShouldNotBe("..");
+        }
+
+        [Fact]
+        public void Test_StreamDirectory_DoesNotCollideForEscapedNames()
+        {
+            var options = DestinationOptions.FromJson(Json("""{"output_path":"/tmp/parquet-out"}"""));
+
+            options.StreamDirectory(null, "a/b").ShouldNotBe(options.StreamDirectory(null, "a_b"));
         }
     }
 }

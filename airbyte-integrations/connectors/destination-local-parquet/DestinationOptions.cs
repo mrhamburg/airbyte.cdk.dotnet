@@ -8,10 +8,17 @@ namespace destination_local_parquet
     internal sealed class DestinationOptions
     {
         private const string ProbeFileName = ".airbyte-write-test";
+        private const int DefaultFlushRowLimit = 50_000;
 
-        private DestinationOptions(string outputPath) => OutputPath = outputPath;
+        private DestinationOptions(string outputPath, int flushRowLimit)
+        {
+            OutputPath = outputPath;
+            FlushRowLimit = flushRowLimit;
+        }
 
         public string OutputPath { get; }
+
+        public int FlushRowLimit { get; }
 
         public static DestinationOptions FromJson(JsonElement config)
         {
@@ -21,7 +28,16 @@ namespace destination_local_parquet
                 || string.IsNullOrWhiteSpace(value.GetString()))
                 throw new ArgumentException("Config property 'output_path' is required.");
 
-            return new DestinationOptions(Path.GetFullPath(value.GetString()!));
+            var flushRowLimit = DefaultFlushRowLimit;
+            if (config.TryGetProperty("flush_row_limit", out var limit))
+            {
+                if (limit.ValueKind != JsonValueKind.Number
+                    || !limit.TryGetInt32(out flushRowLimit)
+                    || flushRowLimit < 1)
+                    throw new ArgumentException("Config property 'flush_row_limit' must be a positive integer.");
+            }
+
+            return new DestinationOptions(Path.GetFullPath(value.GetString()!), flushRowLimit);
         }
 
         public void EnsureReady()
@@ -52,14 +68,11 @@ namespace destination_local_parquet
 
         private static string Sanitize(string value)
         {
-            var characters = value.Replace('/', '_').Replace('\\', '_').ToArray();
+            var result = Uri.EscapeDataString(value).Trim();
             foreach (var invalid in Path.GetInvalidFileNameChars())
-                for (var index = 0; index < characters.Length; index++)
-                    if (characters[index] == invalid)
-                        characters[index] = '_';
+                result = result.Replace(invalid, '_');
 
-            var result = new string(characters).Trim();
-            return string.IsNullOrWhiteSpace(result) || result == ".." || result == "." ? "stream" : result;
+            return string.IsNullOrWhiteSpace(result) || result == "." || result == ".." ? "stream" : result;
         }
     }
 }

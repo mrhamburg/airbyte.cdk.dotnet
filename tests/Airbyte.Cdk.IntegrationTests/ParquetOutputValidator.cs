@@ -10,7 +10,7 @@ using Parquet.Serialization;
 
 namespace Airbyte.Cdk.IntegrationTests
 {
-    public sealed record ParquetStreamResult(
+    internal sealed record ParquetStreamResult(
         string Name,
         Status Status,
         int FileCount,
@@ -21,7 +21,7 @@ namespace Airbyte.Cdk.IntegrationTests
     /// Validates the Parquet files a destination wrote for one configured stream against the
     /// stream's discovered JSON schema.
     /// </summary>
-    public static class ParquetOutputValidator
+    internal static class ParquetOutputValidator
     {
         private const string StaleFileName = "stale.parquet";
         private const int SampleRows = 100;
@@ -95,10 +95,20 @@ namespace Airbyte.Cdk.IntegrationTests
         {
             if (shape.Properties != null)
             {
-                var names = fields.Select(x => x.Name).ToHashSet(StringComparer.Ordinal);
-                foreach (var property in shape.Properties)
-                    if (!names.Contains(property))
+                foreach (var (property, schema) in shape.Properties)
+                {
+                    var field = fields.FirstOrDefault(x => string.Equals(x.Name, property, StringComparison.Ordinal));
+                    if (field is null)
+                    {
                         errors.Add($"{fileName} has no field for discovered property '{property}'.");
+                        continue;
+                    }
+
+                    var expected = ExpectedType(schema);
+                    if (!MatchesType(field, expected))
+                        errors.Add(
+                            $"{fileName} field '{property}' is {field.SchemaType} but the schema expects {expected}.");
+                }
 
                 return;
             }
@@ -150,7 +160,8 @@ namespace Airbyte.Cdk.IntegrationTests
                 && properties.ValueKind == JsonValueKind.Object)
                 return new RootShape
                 {
-                    Properties = properties.EnumerateObject().Select(x => x.Name).ToList(),
+                    Properties = properties.EnumerateObject()
+                        .ToDictionary(x => x.Name, x => x.Value.Clone(), StringComparer.Ordinal),
                     Required = RequiredNames(schema)
                 };
 
@@ -201,9 +212,62 @@ namespace Airbyte.Cdk.IntegrationTests
         private static ParquetStreamResult Failed(string name, int fileCount, long rowCount, string error) =>
             new(name, Status.Failed, fileCount, rowCount, new[] { error });
 
+        private static string ExpectedType(JsonElement schema)
+        {
+            if (schema.TryGetProperty("properties", out var properties)
+                && properties.ValueKind == JsonValueKind.Object)
+                return "struct";
+
+            if (IsMap(schema))
+                return "map";
+
+            if (schema.TryGetProperty("items", out _))
+                return "list";
+
+            return TypeOf(schema) switch
+            {
+                "integer" => "long",
+                "number" => "double",
+                "boolean" => "boolean",
+                _ => "string"
+            };
+        }
+
+        private static bool MatchesType(Field field, string expected)
+        {
+            return expected switch
+            {
+                "struct" => field is StructField,
+                "map" => field is MapField,
+                "list" => field is ListField,
+                "long" => field is DataField { ClrType: var type } && type == typeof(long),
+                "double" => field is DataField { ClrType: var type } && type == typeof(double),
+                "boolean" => field is DataField { ClrType: var type } && type == typeof(bool),
+                "string" => field is DataField { ClrType: var type } && type == typeof(ReadOnlyMemory<char>),
+                _ => false
+            };
+        }
+
+        private static string? TypeOf(JsonElement schema)
+        {
+            if (!schema.TryGetProperty("type", out var type))
+                return null;
+
+            if (type.ValueKind == JsonValueKind.String)
+                return type.GetString();
+
+            if (type.ValueKind != JsonValueKind.Array)
+                return null;
+
+            return type.EnumerateArray()
+                .Where(x => x.ValueKind == JsonValueKind.String)
+                .Select(x => x.GetString())
+                .FirstOrDefault(x => !string.Equals(x, "null", StringComparison.Ordinal));
+        }
+
         private sealed class RootShape
         {
-            public IReadOnlyList<string>? Properties { get; init; }
+            public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
             public HashSet<string> Required { get; init; } = new(StringComparer.Ordinal);
             public bool IsMap { get; init; }
         }

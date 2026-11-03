@@ -100,10 +100,7 @@ namespace Airbyte.Cdk.IntegrationTests
             try
             {
                 if (spec.Type == ConnectorType.Destination)
-                {
-                    var secretValues = await ResolveSecretValuesAsync(spec, cancellationToken);
-                    result = await DestinationRunner.RunAsync(spec, artifacts, secretValues, cancellationToken);
-                }
+                    result = await DestinationRunner.RunAsync(spec, artifacts, _secrets, cancellationToken);
                 else
                 {
                     result = await RunSourceAsync(spec, artifacts, cancellationToken);
@@ -122,20 +119,6 @@ namespace Airbyte.Cdk.IntegrationTests
                 TryDelete(artifacts);
 
             return result with { ArtifactsDirectory = Directory.Exists(artifacts) ? artifacts : null };
-        }
-
-        private async Task<IReadOnlyList<string>> ResolveSecretValuesAsync(ConnectorSpec spec,
-            CancellationToken cancellationToken)
-        {
-            var values = new List<string>();
-            foreach (var secret in spec.Secrets)
-            {
-                var value = await _secrets.GetAsync(secret.Value, cancellationToken);
-                if (!string.IsNullOrEmpty(value))
-                    values.Add(value);
-            }
-
-            return values;
         }
 
         private async Task<ConnectorResult> RunSourceAsync(ConnectorSpec spec, string artifacts,

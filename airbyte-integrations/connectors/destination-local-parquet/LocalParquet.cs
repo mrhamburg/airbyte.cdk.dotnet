@@ -30,8 +30,19 @@ namespace destination_local_parquet
         public override async Task Write(AirbyteLogger logger, JsonElement config, ConfiguredAirbyteCatalog catalog,
             AirbyteMessage msg)
         {
-            var writer = _writer ??= new ParquetRecordWriter(DestinationOptions.FromJson(config), catalog, logger);
-            await writer.WriteAsync(msg);
+            if (_writer is null)
+            {
+                var options = DestinationOptions.FromJson(config);
+                _writer = new ParquetRecordWriter(options, catalog, logger, options.FlushRowLimit);
+            }
+
+            await _writer.WriteAsync(msg);
+        }
+
+        public override async Task CompleteAsync()
+        {
+            if (_writer is not null)
+                await _writer.CompleteAsync();
         }
     }
 }

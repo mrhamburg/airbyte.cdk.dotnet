@@ -80,25 +80,7 @@ namespace Airbyte.Cdk.IntegrationTests
             IReadOnlyCollection<string>? streams = null, int? recordsPerStream = null, bool socketMode = false,
             string verb = "read")
         {
-            var arguments = new List<string> { AssemblyPath, verb, "--command", command };
-            if (!string.IsNullOrWhiteSpace(configPath))
-            {
-                arguments.Add("--config");
-                arguments.Add(configPath!);
-            }
-
-            if (!string.IsNullOrWhiteSpace(catalogPath))
-            {
-                arguments.Add("--catalog");
-                arguments.Add(catalogPath!);
-            }
-
-            if (!string.IsNullOrWhiteSpace(statePath))
-            {
-                arguments.Add("--state");
-                arguments.Add(statePath!);
-            }
-
+            var arguments = BuildArguments(verb, configPath, catalogPath, statePath, command);
             return ExecuteAsync("dotnet", arguments, timeout, parseMessages: true, streams, recordsPerStream,
                 socketMode, cancellationToken);
         }
@@ -107,28 +89,10 @@ namespace Airbyte.Cdk.IntegrationTests
         /// Starts a connector for a long-running operation such as a socket-mode read/write and returns it
         /// immediately. The caller owns the process and must wait for it or dispose it.
         /// </summary>
-        public RunningConnector Start(string verb, string? configPath, string? catalogPath, string? statePath,
+        internal RunningConnector Start(string verb, string? configPath, string? catalogPath, string? statePath,
             IReadOnlyList<string> socketPaths, bool closeStandardInput)
         {
-            var arguments = new List<string> { AssemblyPath, verb, "--command", verb };
-            if (!string.IsNullOrWhiteSpace(configPath))
-            {
-                arguments.Add("--config");
-                arguments.Add(configPath!);
-            }
-
-            if (!string.IsNullOrWhiteSpace(catalogPath))
-            {
-                arguments.Add("--catalog");
-                arguments.Add(catalogPath!);
-            }
-
-            if (!string.IsNullOrWhiteSpace(statePath))
-            {
-                arguments.Add("--state");
-                arguments.Add(statePath!);
-            }
-
+            var arguments = BuildArguments(verb, configPath, catalogPath, statePath);
             var startInfo = new ProcessStartInfo("dotnet")
             {
                 RedirectStandardOutput = true,
@@ -144,10 +108,9 @@ namespace Airbyte.Cdk.IntegrationTests
             ApplyEnvironment(startInfo, socketPaths);
 
             var process = new Process { StartInfo = startInfo };
-            process.Start();
-
             try
             {
+                process.Start();
                 if (closeStandardInput)
                     process.StandardInput.Close();
             }
@@ -159,6 +122,31 @@ namespace Airbyte.Cdk.IntegrationTests
             }
 
             return new RunningConnector(process);
+        }
+
+        private List<string> BuildArguments(string verb, string? configPath, string? catalogPath,
+            string? statePath, string? command = null)
+        {
+            var arguments = new List<string> { AssemblyPath, verb, "--command", command ?? verb };
+            if (!string.IsNullOrWhiteSpace(configPath))
+            {
+                arguments.Add("--config");
+                arguments.Add(configPath!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(catalogPath))
+            {
+                arguments.Add("--catalog");
+                arguments.Add(catalogPath!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(statePath))
+            {
+                arguments.Add("--state");
+                arguments.Add(statePath!);
+            }
+
+            return arguments;
         }
 
         private void ApplyEnvironment(ProcessStartInfo startInfo, IReadOnlyList<string> socketPaths)

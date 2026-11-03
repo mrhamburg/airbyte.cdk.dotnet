@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using Parquet.Schema;
 
@@ -9,10 +9,14 @@ namespace destination_local_parquet.Parquet
 {
     internal static class RecordValueConverter
     {
-        public static Dictionary<string, object?> Convert(StreamSchema schema, JsonElement record, Action<string>? warn = null)
+        private static readonly ConcurrentDictionary<Field, Type> IdealTypes =
+            new(ReferenceEqualityComparer.Instance);
+
+        public static Dictionary<string, object?> Convert(StreamSchema schema, JsonElement record,
+            Action<string>? warn = null)
         {
             if (schema.Shape == RootShape.Struct)
-                return ConvertStruct(schema.Properties, record, warn);
+                return ConvertStruct(schema.Properties, schema.ByName, record, warn);
 
             var mapping = schema.Value!;
 
@@ -24,17 +28,9 @@ namespace destination_local_parquet.Parquet
                 };
             }
 
-            if (mapping.Name == "data" && mapping.Shape == FieldShape.Scalar)
-            {
-                return new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    [mapping.Name] = record.GetRawText().AsMemory()
-                };
-            }
-
             return new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                [mapping.Name] = ConvertValue(mapping, record, warn)
+                [mapping.Name] = record.GetRawText().AsMemory()
             };
         }
 
@@ -43,14 +39,16 @@ namespace destination_local_parquet.Parquet
             return mapping.Shape switch
             {
                 FieldShape.Scalar => ConvertScalar(mapping, value),
-                FieldShape.Struct => ConvertStruct(mapping.Properties, value, warn),
+                FieldShape.Struct => ConvertStruct(mapping.Properties, mapping.ByName, value, warn, mapping.Name),
                 FieldShape.Map => ConvertMap(mapping, value, warn),
                 FieldShape.List => ConvertList(mapping, value, warn),
                 _ => throw new NotSupportedException($"Unsupported field shape '{mapping.Shape}'.")
             };
         }
 
-        public static Type IdealType(Field field)
+        public static Type IdealType(Field field) => IdealTypes.GetOrAdd(field, ComputeIdealType);
+
+        private static Type ComputeIdealType(Field field)
         {
             return field switch
             {
@@ -64,10 +62,16 @@ namespace destination_local_parquet.Parquet
 
         private static object? ConvertScalar(FieldMapping mapping, JsonElement value)
         {
-            if (value.ValueKind == JsonValueKind.Null)
-                return null;
-
             var field = (DataField)mapping.Field;
+
+            if (value.ValueKind == JsonValueKind.Null)
+            {
+                if (!field.IsNullable)
+                    throw new FormatException($"Field '{mapping.Name}' is required and cannot be null.");
+
+                return null;
+            }
+
             var type = field.ClrType;
 
             if (type == typeof(ReadOnlyMemory<char>))
@@ -84,8 +88,12 @@ namespace destination_local_parquet.Parquet
 
             if (type == typeof(long))
             {
-                if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var number))
+                if (value.ValueKind != JsonValueKind.Number)
                     throw Mismatch(mapping.Name, "integer", value.ValueKind);
+
+                if (!value.TryGetInt64(out var number))
+                    throw new FormatException(
+                        $"Field '{mapping.Name}' value '{value.GetRawText()}' does not fit a 64-bit integer.");
 
                 return number;
             }
@@ -111,17 +119,17 @@ namespace destination_local_parquet.Parquet
         }
 
         private static Dictionary<string, object?> ConvertStruct(
-            IReadOnlyList<FieldMapping> properties, JsonElement value, Action<string>? warn)
+            IReadOnlyList<FieldMapping> properties, IReadOnlyDictionary<string, FieldMapping> byName,
+            JsonElement value, Action<string>? warn, string? name = null)
         {
             if (value.ValueKind != JsonValueKind.Object)
-                throw Mismatch("object", value.ValueKind);
+                throw Mismatch(name ?? "record", "object", value.ValueKind);
 
             var result = new Dictionary<string, object?>(StringComparer.Ordinal);
 
             foreach (var property in value.EnumerateObject())
             {
-                var mapping = properties.FirstOrDefault(x => x.Name == property.Name);
-                if (mapping is null)
+                if (!byName.TryGetValue(property.Name, out var mapping))
                 {
                     warn?.Invoke($"Ignoring extra field '{property.Name}'.");
                     continue;
@@ -180,11 +188,6 @@ namespace destination_local_parquet.Parquet
         {
             return new FormatException(
                 $"Field '{name}' expected {expected} but got {actual}.");
-        }
-
-        private static FormatException Mismatch(string expected, JsonValueKind actual)
-        {
-            return new FormatException($"Expected {expected} but got {actual}.");
         }
     }
 }

@@ -2,20 +2,32 @@
   "documentationUrl": "https://github.com/mrhamburg/airbyte.cdk.dotnet",
   "protocol_version": "0.19.0",
   "supportsIncremental": true,
-  "supported_destination_sync_modes": ["append", "overwrite"],
+  "supported_destination_sync_modes": [
+    "append",
+    "overwrite"
+  ],
   "supportsNormalization": false,
   "supportsDBT": false,
   "connectionSpecification": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Local Parquet Destination Spec",
     "type": "object",
-    "required": ["output_path"],
+    "required": [
+      "output_path"
+    ],
     "additionalProperties": false,
     "properties": {
       "output_path": {
         "type": "string",
         "title": "Output path",
         "description": "Directory that receives the Parquet files. It is created when missing."
+      },
+      "flush_row_limit": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 50000,
+        "title": "Flush row limit",
+        "description": "Maximum number of buffered rows per stream before a Parquet file is written."
       }
     }
   }

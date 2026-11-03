@@ -18,9 +18,9 @@ namespace destination_local_parquet.Parquet
         private const string DestinationName = "local-parquet";
 
         private readonly DestinationOptions _options;
-        private readonly ConfiguredAirbyteCatalog _catalog;
         private readonly AirbyteLogger _logger;
         private readonly int _flushRowLimit;
+        private readonly Dictionary<(string? Namespace, string Stream), ConfiguredAirbyteStream> _streams = new();
         private readonly Dictionary<(string? Namespace, string Stream), StreamBuffer> _buffers = new();
         private int _sequence;
 
@@ -28,9 +28,24 @@ namespace destination_local_parquet.Parquet
             AirbyteLogger logger, int flushRowLimit = DefaultFlushRowLimit)
         {
             _options = options;
-            _catalog = catalog;
             _logger = logger;
             _flushRowLimit = flushRowLimit;
+
+            foreach (var configured in catalog.Streams)
+            {
+                var stream = configured.Stream
+                    ?? throw new InvalidOperationException("Catalog stream has no stream definition.");
+                if (string.IsNullOrWhiteSpace(stream.Name))
+                    throw new InvalidOperationException("Catalog stream has no name.");
+
+                if (configured.DestinationSyncMode is not (DestinationSyncMode.append
+                    or DestinationSyncMode.overwrite))
+                    throw new NotSupportedException(
+                        $"Stream '{stream.Name}' uses destination sync mode " +
+                        $"'{configured.DestinationSyncMode}'. Supported modes: append, overwrite.");
+
+                _streams[(stream.Namespace, stream.Name)] = configured;
+            }
         }
 
         public async Task WriteAsync(AirbyteMessage message)
@@ -41,8 +56,37 @@ namespace destination_local_parquet.Parquet
                     await WriteRecordAsync(message);
                     break;
                 case Type.STATE:
-                    await FlushAllAsync();
+                    await CommitStateAsync(message.State);
                     break;
+            }
+        }
+
+        public async Task CompleteAsync()
+        {
+            foreach (var buffer in _buffers.Values)
+                await FlushAsync(buffer);
+
+            foreach (var (key, configured) in _streams)
+            {
+                var stream = configured.Stream!;
+                var directory = _options.StreamDirectory(stream.Namespace, stream.Name!);
+                Directory.CreateDirectory(directory);
+
+                if (configured.DestinationSyncMode == DestinationSyncMode.overwrite)
+                {
+                    var written = _buffers.TryGetValue(key, out var buffer)
+                        ? buffer.WrittenFiles
+                        : new HashSet<string>(StringComparer.Ordinal);
+
+                    foreach (var file in Directory.GetFiles(directory, "*.parquet"))
+                    {
+                        if (!written.Contains(Path.GetFullPath(file)))
+                            File.Delete(file);
+                    }
+                }
+
+                foreach (var temporary in Directory.GetFiles(directory, "*.parquet.tmp"))
+                    File.Delete(temporary);
             }
         }
 
@@ -51,75 +95,87 @@ namespace destination_local_parquet.Parquet
             var record = message.Record
                 ?? throw new InvalidOperationException("RECORD message has no record payload.");
 
-            var configured = FindStream(record);
+            var key = (record.Namespace, record.Stream ?? string.Empty);
+            if (!_streams.TryGetValue(key, out var configured))
+                throw new InvalidOperationException(
+                    $"Stream '{record.Stream}' in namespace '{record.Namespace}' is not configured.");
+
             var stream = configured.Stream!;
-            var buffer = GetBuffer(configured);
-            var directory = _options.StreamDirectory(stream.Namespace, stream.Name!);
+            if (!_buffers.TryGetValue(key, out var buffer))
+            {
+                buffer = new StreamBuffer(configured, _options.StreamDirectory(stream.Namespace, stream.Name!));
+                _buffers[key] = buffer;
+            }
 
-            Directory.CreateDirectory(directory);
-            ApplyOverwrite(configured, directory, buffer);
-
+            EnsureDirectory(buffer);
             buffer.Schema ??= ResolveSchema(stream, record.Data);
-            buffer.Rows.Add(RecordValueConverter.Convert(buffer.Schema, record.Data, _logger.Warn));
+            buffer.Rows.Add(RecordValueConverter.Convert(buffer.Schema, record.Data, WarningFor(buffer)));
 
             if (buffer.Rows.Count >= _flushRowLimit)
                 await FlushAsync(buffer);
         }
 
-        private ConfiguredAirbyteStream FindStream(AirbyteRecordMessage record)
+        private Action<string> WarningFor(StreamBuffer buffer)
         {
-            foreach (var configured in _catalog.Streams)
+            return message =>
             {
-                var stream = configured.Stream;
-                if (stream is null)
-                    continue;
-
-                if (string.Equals(stream.Name, record.Stream, StringComparison.Ordinal)
-                    && string.Equals(stream.Namespace, record.Namespace, StringComparison.Ordinal))
-                    return configured;
-            }
-
-            throw new InvalidOperationException(
-                $"Stream '{record.Stream}' in namespace '{record.Namespace}' is not configured.");
+                if (buffer.WarnedFields.Add(message))
+                    _logger.Warn($"[{buffer.Configured.Stream!.Name}] {message}");
+            };
         }
 
-        private StreamBuffer GetBuffer(ConfiguredAirbyteStream configured)
+        private static void EnsureDirectory(StreamBuffer buffer)
         {
-            var stream = configured.Stream!;
-            var key = (stream.Namespace, stream.Name!);
-            if (!_buffers.TryGetValue(key, out var buffer))
-            {
-                buffer = new StreamBuffer(configured);
-                _buffers[key] = buffer;
-            }
-
-            return buffer;
-        }
-
-        private static void ApplyOverwrite(ConfiguredAirbyteStream configured, string directory, StreamBuffer buffer)
-        {
-            if (configured.DestinationSyncMode != DestinationSyncMode.overwrite || buffer.OverwriteApplied)
+            if (buffer.DirectoryReady)
                 return;
 
-            foreach (var file in Directory.GetFiles(directory, "*.parquet"))
-                File.Delete(file);
+            Directory.CreateDirectory(buffer.Directory);
+            foreach (var temporary in Directory.GetFiles(buffer.Directory, "*.parquet.tmp"))
+                File.Delete(temporary);
 
-            buffer.OverwriteApplied = true;
+            buffer.DirectoryReady = true;
         }
 
-        private static StreamSchema ResolveSchema(AirbyteStream stream, JsonElement data)
+        private StreamSchema ResolveSchema(AirbyteStream stream, JsonElement data)
         {
             var schema = stream.JsonSchema;
             if (schema.ValueKind != JsonValueKind.Object || !schema.EnumerateObject().Any())
-                return ParquetSchemaMapper.FromRecord(data);
+                return ParquetSchemaMapper.FromRecord(data, _logger.Warn);
 
-            return ParquetSchemaMapper.FromJsonSchema(schema);
+            return ParquetSchemaMapper.FromJsonSchema(schema, _logger.Warn);
         }
 
-        private async Task FlushAllAsync()
+        private async Task CommitStateAsync(AirbyteStateMessage? state)
         {
-            foreach (var buffer in _buffers.Values)
-                await FlushAsync(buffer);
+            var keys = StateKeys(state);
+            if (keys.Count == 0)
+            {
+                foreach (var buffer in _buffers.Values)
+                    await FlushAsync(buffer);
+                return;
+            }
+
+            foreach (var key in keys)
+                if (_buffers.TryGetValue(key, out var buffer))
+                    await FlushAsync(buffer);
+        }
+
+        private static List<(string? Namespace, string Stream)> StateKeys(AirbyteStateMessage? state)
+        {
+            var keys = new List<(string? Namespace, string Stream)>();
+
+            if (state?.Stream?.StreamDescriptor is { } descriptor)
+            {
+                keys.Add((descriptor.Namespace, descriptor.Name));
+                return keys;
+            }
+
+            if (state?.Global?.StreamStates is { } streamStates)
+                foreach (var streamState in streamStates)
+                    if (streamState.StreamDescriptor is { } globalDescriptor)
+                        keys.Add((globalDescriptor.Namespace, globalDescriptor.Name));
+
+            return keys;
         }
 
         private async Task FlushAsync(StreamBuffer buffer)
@@ -127,13 +183,12 @@ namespace destination_local_parquet.Parquet
             if (buffer.Rows.Count == 0)
                 return;
 
+            EnsureDirectory(buffer);
             var stream = buffer.Configured.Stream!;
-            var directory = _options.StreamDirectory(stream.Namespace, stream.Name!);
-            Directory.CreateDirectory(directory);
 
             var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff", CultureInfo.InvariantCulture);
             var sequence = _sequence++.ToString("D4", CultureInfo.InvariantCulture);
-            var finalPath = Path.Combine(directory, $"part-{timestamp}-{sequence}.parquet");
+            var finalPath = Path.Combine(buffer.Directory, $"part-{timestamp}-{sequence}.parquet");
             var temporaryPath = finalPath + ".tmp";
 
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -150,9 +205,11 @@ namespace destination_local_parquet.Parquet
                 {
                     await ParquetSerializer.SerializeUntypedAsync(
                         buffer.Rows, buffer.Schema!.Parquet, file, null, metadata);
+                    file.Flush(flushToDisk: true);
                 }
 
                 File.Move(temporaryPath, finalPath);
+                buffer.WrittenFiles.Add(Path.GetFullPath(finalPath));
                 buffer.Rows.Clear();
             }
             catch
@@ -165,12 +222,19 @@ namespace destination_local_parquet.Parquet
 
         private sealed class StreamBuffer
         {
-            public StreamBuffer(ConfiguredAirbyteStream configured) => Configured = configured;
+            public StreamBuffer(ConfiguredAirbyteStream configured, string directory)
+            {
+                Configured = configured;
+                Directory = directory;
+            }
 
             public ConfiguredAirbyteStream Configured { get; }
+            public string Directory { get; }
+            public bool DirectoryReady { get; set; }
             public StreamSchema? Schema { get; set; }
             public List<IDictionary<string, object?>> Rows { get; } = new();
-            public bool OverwriteApplied { get; set; }
+            public HashSet<string> WarnedFields { get; } = new(StringComparer.Ordinal);
+            public HashSet<string> WrittenFiles { get; } = new(StringComparer.Ordinal);
         }
     }
 }

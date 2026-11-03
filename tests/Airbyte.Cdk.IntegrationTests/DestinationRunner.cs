@@ -3,7 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,14 +21,32 @@ namespace Airbyte.Cdk.IntegrationTests
         private static readonly TimeSpan SpecTimeout = TimeSpan.FromMinutes(10);
 
         public static async Task<ConnectorResult> RunAsync(ConnectorSpec spec, string artifacts,
-            IReadOnlyList<string> secretValues, CancellationToken cancellationToken)
+            ISecretSource secrets, CancellationToken cancellationToken)
         {
-            var result = await RunCoreAsync(spec, artifacts, cancellationToken);
+            ConnectorSpec source;
+            try
+            {
+                source = ConnectorSpecLoader.Load(spec.Source!.ConnectorDirectory);
+            }
+            catch (ConnectorSpecException e)
+            {
+                return new ConnectorResult(spec.Directory, Status.Failed, Array.Empty<TestResult>(),
+                    new[] { ConnectorResult.SpecErrorPrefix + e.Message });
+            }
+
+            if (source.Type != ConnectorType.Source)
+                return new ConnectorResult(spec.Directory, Status.Failed, Array.Empty<TestResult>(),
+                    new[] { $"{source.Directory} is declared as a {source.Type}; a destination scenario needs a source." });
+
+            var secretValues = await ResolveSecretValuesAsync(spec, secrets, cancellationToken);
+            secretValues.AddRange(await ResolveSecretValuesAsync(source, secrets, cancellationToken));
+
+            var result = await RunCoreAsync(spec, source, artifacts, secrets, cancellationToken);
             return Runner.Redact(result, secretValues);
         }
 
-        private static async Task<ConnectorResult> RunCoreAsync(ConnectorSpec spec, string artifacts,
-            CancellationToken cancellationToken)
+        private static async Task<ConnectorResult> RunCoreAsync(ConnectorSpec spec, ConnectorSpec source,
+            string artifacts, ISecretSource secrets, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
             var tests = new List<TestResult>();
@@ -53,21 +74,6 @@ namespace Airbyte.Cdk.IntegrationTests
             if (errors.Count > 0)
                 return new ConnectorResult(spec.Directory, Status.Failed, tests, errors);
 
-            ConnectorSpec source;
-            try
-            {
-                source = ConnectorSpecLoader.Load(spec.Source!.ConnectorDirectory);
-            }
-            catch (ConnectorSpecException e)
-            {
-                return new ConnectorResult(spec.Directory, Status.Failed, tests,
-                    new[] { ConnectorResult.SpecErrorPrefix + e.Message });
-            }
-
-            if (source.Type != ConnectorType.Source)
-                return new ConnectorResult(spec.Directory, Status.Failed, tests,
-                    new[] { $"{source.Directory} is declared as a {source.Type}; a destination scenario needs a source." });
-
             var sourceProcess = new ConnectorProcess(source.Directory, source.ProjectFile, source.Module,
                 Path.Combine(artifacts, "source"));
             var sourceBuild = await sourceProcess.BuildAsync(cancellationToken,
@@ -81,15 +87,15 @@ namespace Airbyte.Cdk.IntegrationTests
             }
 
             foreach (var test in spec.Tests)
-                tests.Add(await RunScenarioAsync(destination, sourceProcess, spec, test, artifacts,
-                    cancellationToken));
+                tests.Add(await RunScenarioAsync(destination, sourceProcess, spec, source, test, artifacts,
+                    secrets, cancellationToken));
 
             return new ConnectorResult(spec.Directory, Runner.Aggregate(tests, errors), tests, errors);
         }
 
         private static async Task<TestResult> RunScenarioAsync(ConnectorProcess destination,
-            ConnectorProcess sourceProcess, ConnectorSpec spec, TestCaseSpec test, string artifacts,
-            CancellationToken cancellationToken)
+            ConnectorProcess sourceProcess, ConnectorSpec spec, ConnectorSpec source, TestCaseSpec test,
+            string artifacts, ISecretSource secrets, CancellationToken cancellationToken)
         {
             var scenarioDirectory = Path.Combine(artifacts, Runner.Sanitize(test.Name));
             Directory.CreateDirectory(scenarioDirectory);
@@ -100,7 +106,12 @@ namespace Airbyte.Cdk.IntegrationTests
             Directory.CreateDirectory(parquetDirectory);
 
             var config = Runner.BuildConfig(test);
+            var missing = await MergeSecretsAsync(config, spec.Secrets, secrets, cancellationToken);
+            if (missing.Count > 0)
+                return Skipped(test, missing);
+
             config["output_path"] = parquetDirectory;
+            ReplaceRelativeDates(config, DateTime.UtcNow);
             var configPath = Path.Combine(scenarioDirectory, "config.json");
             File.WriteAllText(configPath, config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
@@ -122,8 +133,14 @@ namespace Airbyte.Cdk.IntegrationTests
             if (errors.Count > 0)
                 return Runner.Failed(test, errors);
 
+            var sourceConfig = JsonNode.Parse(spec.Source!.Config.GetRawText()) as JsonObject ?? new JsonObject();
+            var sourceMissing = await MergeSecretsAsync(sourceConfig, source.Secrets, secrets, cancellationToken);
+            if (sourceMissing.Count > 0)
+                return Skipped(test, sourceMissing);
+
+            ReplaceRelativeDates(sourceConfig, DateTime.UtcNow);
             var sourceConfigPath = Path.Combine(scenarioDirectory, "source_config.json");
-            File.WriteAllText(sourceConfigPath, spec.Source!.Config.GetRawText());
+            File.WriteAllText(sourceConfigPath, sourceConfig.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
             var sourceCheck = await sourceProcess.RunAsync("check", sourceConfigPath, null, null, timeout,
                 cancellationToken);
@@ -172,6 +189,7 @@ namespace Airbyte.Cdk.IntegrationTests
             File.WriteAllText(catalogPath, catalogJson);
 
             var statePath = Runner.WriteState(test, scenarioDirectory);
+            ReplaceRelativeDatesInFile(statePath, DateTime.UtcNow);
 
             var socketDirectory = Path.Combine(Path.GetTempPath(), "ab-" + Guid.NewGuid().ToString("N")[..8]);
             Directory.CreateDirectory(socketDirectory);
@@ -280,11 +298,101 @@ namespace Airbyte.Cdk.IntegrationTests
                 {
                     Directory.Delete(socketDirectory, true);
                 }
-                catch (IOException)
+                catch (Exception)
                 {
                     // Socket files are scratch; failing to delete them must not fail the run.
                 }
             }
+        }
+
+        private static async Task<List<string>> ResolveSecretValuesAsync(ConnectorSpec spec,
+            ISecretSource secrets, CancellationToken cancellationToken)
+        {
+            var values = new List<string>();
+            foreach (var secret in spec.Secrets)
+            {
+                var value = await secrets.GetAsync(secret.Value, cancellationToken);
+                if (!string.IsNullOrEmpty(value))
+                    values.Add(value);
+            }
+
+            return values;
+        }
+
+        private static async Task<List<string>> MergeSecretsAsync(JsonObject config,
+            IReadOnlyDictionary<string, string> secretMap, ISecretSource secrets,
+            CancellationToken cancellationToken)
+        {
+            var missing = new List<string>();
+            foreach (var secret in secretMap)
+            {
+                var value = await secrets.GetAsync(secret.Value, cancellationToken);
+                if (string.IsNullOrEmpty(value))
+                {
+                    missing.Add($"{secret.Key} ({secret.Value})");
+                    continue;
+                }
+
+                config[secret.Key] = value;
+            }
+
+            return missing;
+        }
+
+        private static TestResult Skipped(TestCaseSpec test, IReadOnlyList<string> missing)
+        {
+            var reason = "missing secrets: " + string.Join(", ", missing);
+            return new TestResult(test.Name, Status.Skipped, Array.Empty<StreamResult>(),
+                new[] { reason }, reason);
+        }
+
+        private static void ReplaceRelativeDatesInFile(string? path, DateTime today)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return;
+
+            var node = JsonNode.Parse(File.ReadAllText(path));
+            ReplaceRelativeDates(node, today);
+            File.WriteAllText(path, node?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? "{}");
+        }
+
+        private static void ReplaceRelativeDates(JsonNode? node, DateTime today)
+        {
+            switch (node)
+            {
+                case JsonObject obj:
+                    foreach (var key in obj.Select(x => x.Key).ToList())
+                        ReplaceRelativeDatesValue(obj, key, today);
+                    break;
+                case JsonArray array:
+                    for (var index = 0; index < array.Count; index++)
+                    {
+                        if (array[index] is JsonValue value && value.TryGetValue<string>(out var text))
+                            array[index] = ReplaceRelativeDate(text, today);
+                        else
+                            ReplaceRelativeDates(array[index], today);
+                    }
+
+                    break;
+            }
+        }
+
+        private static void ReplaceRelativeDatesValue(JsonObject obj, string key, DateTime today)
+        {
+            if (obj[key] is JsonValue value && value.TryGetValue<string>(out var text))
+                obj[key] = ReplaceRelativeDate(text, today);
+            else
+                ReplaceRelativeDates(obj[key], today);
+        }
+
+        private static string ReplaceRelativeDate(string text, DateTime today)
+        {
+            var match = Regex.Match(text, @"^\{\{today-(\d+)\}\}$");
+            if (!match.Success)
+                return text;
+
+            var days = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            return today.AddDays(-days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
     }
 }

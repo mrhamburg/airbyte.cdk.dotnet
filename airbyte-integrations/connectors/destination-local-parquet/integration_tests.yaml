@@ -5,7 +5,7 @@ connector:
 source:
   connector: ../source-exchange-rates-free
   config:
-    start_date: "2026-10-28"
+    start_date: "{{today-7}}"
     base: USD
 
 tests:
@@ -24,4 +24,4 @@ tests:
         sync_mode: incremental
         state:
           historical:
-            USD: "2026-10-28"
+            USD: "{{today-3}}"

@@ -20,5 +20,11 @@ namespace Airbyte.Cdk.Destinations
         /// </summary>
         public abstract Task Write(AirbyteLogger logger, JsonElement config,
             ConfiguredAirbyteCatalog catalog, AirbyteMessage msg);
+
+        /// <summary>
+        /// Called once after the input stream ends. Destinations that buffer data or defer cleanup can
+        /// use this to finish the last flush and commit the sync.
+        /// </summary>
+        public virtual Task CompleteAsync() => Task.CompletedTask;
     }
 }

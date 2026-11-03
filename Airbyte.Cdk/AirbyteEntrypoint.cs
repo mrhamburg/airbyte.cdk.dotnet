@@ -233,6 +233,7 @@ namespace Airbyte.Cdk
                 await dispatcher.HandleAsync(msg);
 
             await dispatcher.CompleteAsync();
+            await destination.CompleteAsync();
             await reader.CompleteAsync();
         }
 
