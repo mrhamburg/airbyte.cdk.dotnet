@@ -142,6 +142,7 @@ namespace Airbyte.Cdk.IntegrationTests
             var gate = new object();
             var messages = new List<JsonElement>();
             var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var seenStates = new HashSet<string>(StringComparer.Ordinal);
             var raw = new StringBuilder();
             var stopped = false;
             var standardError = process.StandardError.ReadToEndAsync(timeoutSource.Token);
@@ -150,6 +151,12 @@ namespace Airbyte.Cdk.IntegrationTests
             {
                 lock (gate)
                 {
+                    // The source duplicates STATE to stdout (bookkeeper) and sockets (destination).
+                    // Keep one copy so callers see each checkpoint once.
+                    if (MessageParser.TypeOf(message) == "STATE" &&
+                        !seenStates.Add(message.GetRawText()))
+                        return false;
+
                     if (!recordsPerStream.HasValue || streams == null || streams.Count == 0
                         || !TryRecordStream(message, out var streamName))
                     {

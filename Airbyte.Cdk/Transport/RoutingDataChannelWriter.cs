@@ -42,21 +42,27 @@ namespace Airbyte.Cdk.Transport
             return new RoutingDataChannelWriter(settings, new StdioDataChannelWriter(stdout), sockets);
         }
 
-        public ValueTask WriteAsync(AirbyteMessage message, CancellationToken cancellationToken = default)
+        public async ValueTask WriteAsync(AirbyteMessage message, CancellationToken cancellationToken = default)
         {
             if (!_settings.IsSocket)
-                return _stdout.WriteAsync(message, cancellationToken);
+            {
+                await _stdout.WriteAsync(message, cancellationToken);
+                return;
+            }
 
             switch (message.Type)
             {
                 case Type.RECORD:
-                    return SocketFor(StreamKey(message.Record?.Namespace, message.Record?.Stream))
+                    await SocketFor(StreamKey(message.Record?.Namespace, message.Record?.Stream))
                         .WriteAsync(message, cancellationToken);
+                    return;
                 case Type.STATE:
-                    _stdout.WriteAsync(message, cancellationToken);
-                    return SocketFor(StateKey(message.State)).WriteAsync(message, cancellationToken);
+                    await _stdout.WriteAsync(message, cancellationToken);
+                    await SocketFor(StateKey(message.State)).WriteAsync(message, cancellationToken);
+                    return;
                 default:
-                    return _stdout.WriteAsync(message, cancellationToken);
+                    await _stdout.WriteAsync(message, cancellationToken);
+                    return;
             }
         }
 

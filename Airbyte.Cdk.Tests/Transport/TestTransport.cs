@@ -134,6 +134,45 @@ namespace Airbyte.Cdk.Tests.Transport
             decoded.Record.Data.GetProperty("id").GetInt32().ShouldBe(42);
         }
 
+        [Fact]
+        public void Test_FromProtobuf_FormatsTypedTimesWithSevenFractionalDigits()
+        {
+            var time = new TimeSpan(12, 34, 56).Add(TimeSpan.FromTicks(1_234_567));
+            var nanosOfDay = (ulong)(time.Ticks * 100);
+            var record = new AirbyteRecordMessageProtobuf
+            {
+                StreamName = "users",
+                EmittedAtMs = 10
+            };
+            record.Data.Add(new AirbyteValueProtobuf { TimeWithoutTimezone = nanosOfDay });
+            record.Data.Add(new AirbyteValueProtobuf
+            {
+                TimeWithTimezone = new OffsetTime { NanosOfDay = nanosOfDay, OffsetSeconds = 3600 }
+            });
+            var message = new AirbyteMessageProtobuf { Record = record };
+            var catalog = new ConfiguredAirbyteCatalog
+            {
+                Streams = new[]
+                {
+                    new ConfiguredAirbyteStream
+                    {
+                        Stream = new AirbyteStream
+                        {
+                            Name = "users",
+                            JsonSchema = JsonDocument.Parse(
+                                "{\"type\":\"object\",\"properties\":{\"t\":{},\"z\":{}}}")
+                                .RootElement.Clone()
+                        }
+                    }
+                }
+            };
+
+            var decoded = AirbyteProtobufMapper.FromProtobuf(message, catalog);
+
+            decoded!.Record!.Data.GetProperty("t").GetString().ShouldBe("12:34:56.1234567");
+            decoded.Record.Data.GetProperty("z").GetString().ShouldBe("12:34:56.1234567+01:00");
+        }
+
         private static AirbyteMessage Record(string stream, int id) => new()
         {
             Type = Type.RECORD,
@@ -367,6 +406,45 @@ namespace Airbyte.Cdk.Tests.Transport
                 if (File.Exists(path))
                     File.Delete(path);
             }
+        }
+
+        [Fact]
+        public void Test_FromProtobuf_FormatsTypedTimesWithSevenFractionalDigits()
+        {
+            var time = new TimeSpan(12, 34, 56).Add(TimeSpan.FromTicks(1_234_567));
+            var nanosOfDay = (ulong)(time.Ticks * 100);
+            var record = new AirbyteRecordMessageProtobuf
+            {
+                StreamName = "users",
+                EmittedAtMs = 10
+            };
+            record.Data.Add(new AirbyteValueProtobuf { TimeWithoutTimezone = nanosOfDay });
+            record.Data.Add(new AirbyteValueProtobuf
+            {
+                TimeWithTimezone = new OffsetTime { NanosOfDay = nanosOfDay, OffsetSeconds = 3600 }
+            });
+            var message = new AirbyteMessageProtobuf { Record = record };
+            var catalog = new ConfiguredAirbyteCatalog
+            {
+                Streams = new[]
+                {
+                    new ConfiguredAirbyteStream
+                    {
+                        Stream = new AirbyteStream
+                        {
+                            Name = "users",
+                            JsonSchema = JsonDocument.Parse(
+                                "{\"type\":\"object\",\"properties\":{\"t\":{},\"z\":{}}}")
+                                .RootElement.Clone()
+                        }
+                    }
+                }
+            };
+
+            var decoded = AirbyteProtobufMapper.FromProtobuf(message, catalog);
+
+            decoded!.Record!.Data.GetProperty("t").GetString().ShouldBe("12:34:56.1234567");
+            decoded.Record.Data.GetProperty("z").GetString().ShouldBe("12:34:56.1234567+01:00");
         }
 
         private static AirbyteMessage Record(string stream, int id) => new()

@@ -128,7 +128,7 @@ namespace Airbyte.Cdk.Protobuf
         {
             var ticks = (long)(nanosOfDay / 100);
             var time = TimeSpan.FromTicks(ticks);
-            return $"{time.Hours:D2}:{time.Minutes:D2}:{time.Seconds:D2}.{time.Milliseconds:D3}{time.Ticks % TimeSpan.TicksPerSecond / 10:D4}";
+            return $"{time.Hours:D2}:{time.Minutes:D2}:{time.Seconds:D2}.{time.Milliseconds:D3}{time.Ticks % TimeSpan.TicksPerMillisecond:D4}";
         }
 
         private static string FormatOffsetTime(OffsetTime value)
@@ -138,7 +138,7 @@ namespace Airbyte.Cdk.Protobuf
             var offset = TimeSpan.FromSeconds(value.OffsetSeconds);
             var suffix = offset < TimeSpan.Zero ? "-" : "+";
             var absolute = offset.Duration();
-            return $"{time.Hours:D2}:{time.Minutes:D2}:{time.Seconds:D2}.{time.Milliseconds:D3}{time.Ticks % TimeSpan.TicksPerSecond / 10:D4}{suffix}{absolute.Hours:D2}:{absolute.Minutes:D2}";
+            return $"{time.Hours:D2}:{time.Minutes:D2}:{time.Seconds:D2}.{time.Milliseconds:D3}{time.Ticks % TimeSpan.TicksPerMillisecond:D4}{suffix}{absolute.Hours:D2}:{absolute.Minutes:D2}";
         }
     }
 }
