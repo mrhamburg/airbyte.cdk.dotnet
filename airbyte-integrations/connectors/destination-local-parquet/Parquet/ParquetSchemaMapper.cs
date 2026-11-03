@@ -240,7 +240,7 @@ namespace destination_local_parquet.Parquet
 
             var type = value.ValueKind switch
             {
-                JsonValueKind.Number => value.TryGetInt64(out _) ? "integer" : "number",
+                JsonValueKind.Number => "number",
                 JsonValueKind.True or JsonValueKind.False => "boolean",
                 _ => "string"
             };

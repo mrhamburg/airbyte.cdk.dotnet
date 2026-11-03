@@ -126,6 +126,14 @@ namespace Destination.LocalParquet.Tests
         }
 
         [Fact]
+        public void Test_FromRecord_NumberInfersDouble()
+        {
+            var schema = ParquetSchemaMapper.FromRecord(Json("""{"b":2}"""));
+
+            ((DataField)schema.Properties.Single(x => x.Name == "b").Field).ClrType.ShouldBe(typeof(double));
+        }
+
+        [Fact]
         public void Test_FromJsonSchema_EmptyFallsBackToDataColumn()
         {
             var schema = ParquetSchemaMapper.FromJsonSchema(Json("{}"));
