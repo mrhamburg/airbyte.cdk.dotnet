@@ -125,27 +125,14 @@ namespace Airbyte.Cdk.IntegrationTests
             if (message.TypeCase != AirbyteMessageProtobuf.TypeOneofCase.Record)
                 return false;
 
-            using var buffer = new MemoryStream();
-            using (var writer = new Utf8JsonWriter(buffer))
-            {
-                writer.WriteStartObject();
-                writer.WriteString("type", "RECORD");
-                writer.WriteStartObject("record");
-                writer.WriteString("stream", message.Record.StreamName);
-                if (!string.IsNullOrEmpty(message.Record.StreamNamespace))
-                    writer.WriteString("namespace", message.Record.StreamNamespace);
-                writer.WriteNumber("emitted_at", message.Record.EmittedAtMs);
-                if (!string.IsNullOrEmpty(message.Record.PartitionId))
-                    writer.WriteString("partition_id", message.Record.PartitionId);
-                writer.WriteStartObject("data");
-                writer.WriteEndObject();
-                writer.WriteEndObject();
-                writer.WriteEndObject();
-            }
+            // The .NET CDK sends records through airbyte_protocol_message, so this branch only
+            // triggers for another CDK's typed records. The harness deliberately does not reference
+            // the connector assembly, so it has no schema to turn a positional data list into named
+            // fields. Fail loudly instead of validating an empty record object.
+            throw new NotSupportedException(
+                "Typed Protobuf records require the stream schema; this CDK emits records through airbyte_protocol_message");
 
-            using var parsed = JsonDocument.Parse(buffer.ToArray());
-            result = parsed.RootElement.Clone();
-            return true;
+
         }
     }
 }

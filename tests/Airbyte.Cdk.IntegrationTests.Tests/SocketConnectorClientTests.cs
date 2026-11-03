@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,15 +40,6 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
                 });
                 await WriteDelimitedAsync(stream, new AirbyteMessageProtobuf
                 {
-                    Record = new AirbyteRecordMessageProtobuf
-                    {
-                        StreamName = "users",
-                        EmittedAtMs = 5,
-                        PartitionId = "p1"
-                    }
-                });
-                await WriteDelimitedAsync(stream, new AirbyteMessageProtobuf
-                {
                     Probe = new AirbyteProbeMessageProtobuf()
                 });
             });
@@ -64,10 +54,50 @@ namespace Airbyte.Cdk.IntegrationTests.Tests
                     return Task.CompletedTask;
                 }, CancellationToken.None);
 
-                messages.Count.ShouldBe(2);
+                messages.Count.ShouldBe(1);
                 messages[0].GetProperty("type").GetString().ShouldBe("STATE");
-                messages[1].GetProperty("type").GetString().ShouldBe("RECORD");
-                messages[1].GetProperty("record").GetProperty("partition_id").GetString().ShouldBe("p1");
+            }
+            finally
+            {
+                await server;
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
+        public async Task Test_ReadAsync_RejectsTypedRecordWithoutSchema()
+        {
+            if (OperatingSystem.IsWindows())
+                return;
+
+            var directory = Path.Combine(Path.GetTempPath(), "ab-" + Guid.NewGuid().ToString("N")[..8]);
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, "s1.sock");
+
+            using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            listener.Bind(new UnixDomainSocketEndPoint(path));
+            listener.Listen(1);
+
+            var server = Task.Run(async () =>
+            {
+                using var accepted = await listener.AcceptAsync();
+                await using var stream = new NetworkStream(accepted, ownsSocket: false);
+                await WriteDelimitedAsync(stream, new AirbyteMessageProtobuf
+                {
+                    Record = new AirbyteRecordMessageProtobuf
+                    {
+                        StreamName = "users",
+                        EmittedAtMs = 5,
+                        PartitionId = "p1"
+                    }
+                });
+            });
+
+            try
+            {
+                var client = new SocketConnectorClient(path);
+                await Should.ThrowAsync<NotSupportedException>(() =>
+                    client.ReadAsync(_ => Task.CompletedTask, CancellationToken.None));
             }
             finally
             {
