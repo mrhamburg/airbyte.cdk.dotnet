@@ -29,3 +29,8 @@ Run the black-box integration test from the repository root:
 dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- \
   run --connector airbyte-integrations/connectors/destination-local-parquet
 ```
+
+The destination declares two scenarios in `integration_tests.yaml`: a full refresh with `overwrite` and an
+incremental read with `append`, both fed by `source-exchange-rates-free` over Protobuf Unix domain sockets.
+The project temporarily references `Airbyte.Cdk` as a `ProjectReference` until the next CDK release ships the
+socket transport; the harness builds the source with `-p:UseLocalCdk=true` for the same reason.

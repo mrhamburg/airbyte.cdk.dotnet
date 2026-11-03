@@ -32,6 +32,7 @@ Component | Type |Code | Installation | Version
 Airbyte CDK | CDK | [Airbyte.Cdk](Airbyte.Cdk) | `dotnet add package Airbyte.Cdk` |[![NetMQ NuGet version](https://img.shields.io/nuget/v/Airbyte.Cdk.svg)](https://www.nuget.org/packages/Airbyte.Cdk/)
 Exchange Rates Free | Source | [source-exchange-rates-free](airbyte-integrations/connectors/source-exchange-rates-free) | `docker pull airbytedotnet/source-exchange-rates-free` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-exchange-rates-free?sort=semver&style=flat)
 Jortt | Source | [source-jortt](airbyte-integrations/connectors/source-jortt) | `docker pull airbytedotnet/source-jortt` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/source-jortt?sort=semver&style=flat)
+Local Parquet | Destination | [destination-local-parquet](airbyte-integrations/connectors/destination-local-parquet) | `docker pull airbytedotnet/destination-local-parquet` | ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/airbytedotnet/destination-local-parquet?sort=semver&style=flat)
 
 ## Protocol compatibility
 
@@ -244,6 +245,12 @@ still fetched in full until the later ones reach the cap; the retained slice kee
 
 An `incremental` scenario must also emit at least one `STATE` message, so a connector that degrades to a full
 refresh cannot pass quietly.
+
+Destination connectors use a different scenario shape. Set `connector.type: destination` and add a `source`
+block naming the source connector directory and its config. The harness builds that source with
+`-p:UseLocalCdk=true` until the next CDK release ships the Protobuf socket transport. Destination scenarios run
+over Protobuf sockets only and cannot declare `limit` or `socket: false`; the harness injects `output_path` into
+the destination config for each scenario and validates the files it writes.
 
 Secrets are resolved through the `ISecretSource` seam. Three implementations ship:
 

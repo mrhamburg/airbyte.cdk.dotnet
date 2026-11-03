@@ -14,7 +14,7 @@ The Airbyte .NET CDK: a framework for building Airbyte source and destination co
 | `Airbyte.Cdk.Tests/` | xUnit test project for the CDK |
 | `tests/Airbyte.Cdk.IntegrationTests/` | Console app that runs a connector against its live API and validates records against its schema |
 | `tests/Airbyte.Cdk.IntegrationTests.Tests/` | xUnit tests for the integration test harness |
-| `airbyte-integrations/connectors/` | Concrete connectors (e.g. `source-exchange-rates-free`) |
+| `airbyte-integrations/connectors/` | Concrete connectors (sources such as `source-exchange-rates-free`, destination `destination-local-parquet`) |
 | `airbyte-integrations/connector-templates/` | Handlebars (`.hbs`) templates used by `dotnet run init` |
 | `Dockerfile` | Builds/tests the CDK and publishes the NuGet package (multi-stage) |
 | `.github/workflows/` | CI for the CDK and for connector image builds/releases |
@@ -71,6 +71,8 @@ dotnet run -- read --command read --config sample_files/config.json --catalog sa
 4. Set the Docker runtime contract in the connector `Dockerfile`: `AIRBYTE_IMPL_PATH` must point at the built `.dll`, and `AIRBYTE_IMPL_MODULE` must match the `Connector` subclass name.
 5. Declare live scenarios in `integration_tests.yaml` (streams, optional secrets, optional state). `dotnet run --project tests/Airbyte.Cdk.IntegrationTests -- run --connector <path>` builds the connector and validates every record against the stream schema.
 6. Add the connector to the table in `README.md` and bump the version in the connector's `CHANGELOG.md` (SemVer). The release workflow reads the highest version from that file and refuses to overwrite an existing image tag.
+
+Destination scenarios set `connector.type: destination` and declare the feeding connector in a `source` block. The harness builds that source with `-p:UseLocalCdk=true` so it picks up the in-repo CDK.
 
 ## Release and CI
 
