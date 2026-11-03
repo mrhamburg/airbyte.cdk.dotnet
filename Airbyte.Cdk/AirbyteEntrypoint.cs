@@ -75,6 +75,7 @@ namespace Airbyte.Cdk
 
         private static Connector LoadConnector(string implPath, string implModule, string role)
         {
+            implPath = Path.GetFullPath(implPath);
             if (!File.Exists(implPath))
                 throw new FileNotFoundException($"Cannot find {role.ToLowerInvariant()} implementation binary {implPath}");
 
