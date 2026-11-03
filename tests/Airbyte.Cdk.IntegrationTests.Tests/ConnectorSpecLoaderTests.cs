@@ -281,6 +281,7 @@ tests:
             var destination = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "destination-example");
             var source = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "source-example");
             File.WriteAllText(Path.Combine(destination, "integration_tests.yaml"), DestinationSpec);
+            File.WriteAllText(Path.Combine(destination, "destination_example.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
             File.WriteAllText(Path.Combine(source, "Dockerfile"), "ENV AIRBYTE_IMPL_MODULE=\"ExchangeRates\"\n");
             File.WriteAllText(Path.Combine(source, "source_example.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
 
@@ -290,6 +291,20 @@ tests:
             spec.Source!.ConnectorDirectory.ShouldBe(Path.GetFullPath(source));
             spec.Source.Config.GetProperty("base").GetString().ShouldBe("USD");
             spec.Tests[0].Socket.ShouldBeTrue();
+        }
+
+        [Fact]
+        public void Test_Load_DestinationWithoutProject_Throws()
+        {
+            var repo = new TempRepository("destination-example", "source-example");
+            var destination = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "destination-example");
+            var source = Path.Combine(repo.Root, "airbyte-integrations", "connectors", "source-example");
+            File.WriteAllText(Path.Combine(destination, "integration_tests.yaml"), DestinationSpec);
+            File.WriteAllText(Path.Combine(source, "Dockerfile"), "ENV AIRBYTE_IMPL_MODULE=\"ExchangeRates\"\n");
+            File.WriteAllText(Path.Combine(source, "source_example.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+            var error = Should.Throw<ConnectorSpecException>(() => ConnectorSpecLoader.Load(destination));
+            error.Message.ShouldContain("No .csproj found");
         }
 
         [Fact]

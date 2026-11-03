@@ -64,7 +64,7 @@ namespace Airbyte.Cdk.IntegrationTests
                 throw new ConnectorSpecException(
                     $"{specPath}: the source block must declare the source connector path.");
 
-            var projectFile = ResolveProjectFile(directory, root.Connector, isDestination);
+            var projectFile = ConnectorLocator.ResolveProjectFile(directory, root.Connector?.Project);
 
             var secrets = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var secret in root.Secrets ?? new Dictionary<string, string>())
@@ -87,21 +87,6 @@ namespace Airbyte.Cdk.IntegrationTests
                 source = ResolveSource(specPath, directory, root.Source!);
 
             return new ConnectorSpec(directory, module!.Trim(), projectFile, type, source, secrets, tests);
-        }
-
-        private static string ResolveProjectFile(string directory, YamlConnector? connector, bool isDestination)
-        {
-            if (!isDestination || !string.IsNullOrWhiteSpace(connector?.Project))
-                return ConnectorLocator.ResolveProjectFile(directory, connector?.Project);
-
-            var candidates = Directory.GetFiles(directory, "*.csproj");
-            return candidates.Length switch
-            {
-                0 => string.Empty,
-                1 => candidates[0],
-                _ => throw new ConnectorSpecException(
-                    $"{directory} contains several project files; set connector.project in integration_tests.yaml.")
-            };
         }
 
         private static ConnectorType ParseType(string specPath, string? value)

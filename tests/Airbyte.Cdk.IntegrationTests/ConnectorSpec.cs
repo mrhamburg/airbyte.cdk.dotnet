@@ -44,9 +44,7 @@ namespace Airbyte.Cdk.IntegrationTests
         /// <summary>Name of the <c>Connector</c> subclass, passed as <c>AIRBYTE_IMPL_MODULE</c>.</summary>
         public string Module { get; }
 
-        /// <summary>
-        /// Absolute path of the connector project file, or empty when a destination declares none.
-        /// </summary>
+        /// <summary>Absolute path of the connector project file.</summary>
         public string ProjectFile { get; }
 
         public ConnectorType Type { get; }
