@@ -64,5 +64,19 @@ namespace Destination.LocalParquet.Tests
             status.Status.ShouldBe(Airbyte.Cdk.Models.Status.FAILED);
             status.Message.ShouldNotBeNullOrWhiteSpace();
         }
+
+        [Fact]
+        public void Test_StreamDirectory_SanitizesTraversal()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "parquet-check-" + Guid.NewGuid().ToString("N"));
+            var options = DestinationOptions.FromJson(Json($$"""{"output_path":"{{root}}"}"""));
+
+            var escape = options.StreamDirectory(null, "../escape");
+            var dotdot = options.StreamDirectory(null, "../..");
+
+            Path.GetFullPath(escape).ShouldStartWith(Path.GetFullPath(root) + Path.DirectorySeparatorChar);
+            Path.GetFullPath(dotdot).ShouldStartWith(Path.GetFullPath(root) + Path.DirectorySeparatorChar);
+            Path.GetFileName(dotdot).ShouldNotBe("..");
+        }
     }
 }

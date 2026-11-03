@@ -30,9 +30,16 @@ namespace destination_local_parquet
                 throw new IOException($"output_path '{OutputPath}' is a file, not a directory.");
 
             Directory.CreateDirectory(OutputPath);
-            var probe = Path.Combine(OutputPath, ProbeFileName);
-            File.WriteAllText(probe, "airbyte");
-            File.Delete(probe);
+            var probe = Path.Combine(OutputPath, $"{ProbeFileName}-{Guid.NewGuid():N}");
+            try
+            {
+                File.WriteAllText(probe, "airbyte");
+            }
+            finally
+            {
+                if (File.Exists(probe))
+                    File.Delete(probe);
+            }
         }
 
         public string StreamDirectory(string? ns, string stream)
