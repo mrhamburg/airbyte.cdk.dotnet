@@ -1,0 +1,7 @@
+# Changelog
+
+## 0.0.1
+Initial release. Writes Airbyte records to typed Parquet files under `output_path`.
+
+Follow-up: switch the `ProjectReference` to `Airbyte.Cdk` back to the NuGet package after the next CDK
+release that contains the Protobuf socket transport.
