@@ -19,7 +19,7 @@ The Airbyte .NET CDK: a framework for building Airbyte source and destination co
 | `Dockerfile` | Builds/tests the CDK and publishes the NuGet package (multi-stage) |
 | `.github/workflows/` | CI for the CDK and for connector image builds/releases |
 
-There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk`, `Airbyte.Cdk.Tests`, and the two projects under `tests/`. Connector directories have their own solution/project files and reference the published `Airbyte.Cdk` NuGet package, not a `ProjectReference`.
+There is a single solution, `Airbyte.Cdk.sln`, containing `Airbyte.Cdk`, `Airbyte.Cdk.Tests`, and the two projects under `tests/`. Connector directories have their own solution/project files and normally reference the published `Airbyte.Cdk` NuGet package. `destination-local-parquet` temporarily uses a `ProjectReference` to the CDK until the next CDK release; the Exchange Rates source keeps the package by default and uses the local project only when built with `-p:UseLocalCdk=true` for the destination e2e.
 
 ## Prerequisites and commands
 
@@ -81,7 +81,7 @@ Destination scenarios set `connector.type: destination` and declare the feeding 
 - CI paths are narrow: CDK changes trigger `build.yml` (`Airbyte.Cdk/**`, `Airbyte.Cdk.Tests/**`); connector changes trigger `build-connector.yml` (`airbyte-integrations/connectors/**`) and `integration-tests.yml`, which runs only the connectors touched by the change.
 - `integration-tests.yml` runs on pushes to `main` and manual runs only — never on `pull_request`, because that event runs the pull request's copy of the workflow. The credentialed job references the `integration` GitHub environment, whose deployment branch policy allows `main` only, so GitHub refuses the secret store to any other ref. Do not move the secrets back to repository level.
 - The secret store is reachable only through NetBird. The job joins the network with `Alemiz112/netbird-connect` (pinned to a commit) and the `NETBIRD_SETUP_KEY` environment secret, accepts the advertised routes with `netbird routes select all` (`netbird up` has no route flag), and runs `netbird down` in an `always()` step.
-- Connector integration tests live in `tests/Airbyte.Cdk.IntegrationTests`. It builds a connector and drives it through `check`/`discover`/`read`, so it never references the connector project and always exercises the `Airbyte.Cdk` version the connector restores from nuget.org.
+- Connector integration tests live in `tests/Airbyte.Cdk.IntegrationTests`. Source scenarios build a connector and drive it through `check`/`discover`/`read`, so they never reference the connector project and exercise the `Airbyte.Cdk` version the connector restores from nuget.org. Destination scenarios run the source and destination as two processes connected by Protobuf Unix domain sockets; they build the source with `-p:UseLocalCdk=true` until the socket transport is released.
 - `.github/workflows/pr-agent.yml` runs PR-Agent against OpenRouter on every pull request — advisory review only, not a merge gate.
 
 ### AI pull request review

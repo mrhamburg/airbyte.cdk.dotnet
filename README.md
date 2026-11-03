@@ -250,7 +250,8 @@ Destination connectors use a different scenario shape. Set `connector.type: dest
 block naming the source connector directory and its config. The harness builds that source with
 `-p:UseLocalCdk=true` until the next CDK release ships the Protobuf socket transport. Destination scenarios run
 over Protobuf sockets only and cannot declare `limit` or `socket: false`; the harness injects `output_path` into
-the destination config for each scenario and validates the files it writes.
+the destination config for each scenario and validates the files it writes. Source config and state values
+may use `{{today-N}}` (for example `{{today-7}}`) to keep a live scenario bounded as time passes.
 
 Secrets are resolved through the `ISecretSource` seam. Three implementations ship:
 
