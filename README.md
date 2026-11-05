@@ -170,6 +170,29 @@ var lineItems = UrlBase.HttpStream()
   key is merged into whatever `StreamSlices` returns.
 - **Nested substreams are rejected** with an explicit message: a substream cannot itself be the parent of another.
 
+### Concurrent stream reads
+
+By default streams are read one after another. A source can read independent streams concurrently by overriding
+`MaxConcurrency`:
+
+```csharp
+public class MySource : AbstractSource
+{
+    public override int MaxConcurrency => 4;
+
+    // ...
+}
+```
+
+The internal `_concurrency` config key overrides the property when the source is called directly, for example from
+a test harness. Published connectors should use `MaxConcurrency`, because the entry point validates the config
+against the connector spec and rejects unknown keys.
+
+Streams that share a parent (`SubstreamDependency`) form one group and are read in order, so the parent is still
+read once and its records feed every substream. Different groups run in parallel, up to the limit. Each stream
+keeps its own state, trace status, and partition attribution; records from different streams may interleave in the
+output. Keep the limit conservative for APIs with strict rate limits; HTTP streams still retry on 429 and 5xx.
+
 ### Practical Tips
 
 Airbyte recommends using the CDK template generator to develop with the CDK. The template generates created all the required scaffolding, with convenient TODOs, allowing developers to truly focus on implementing the API.
@@ -241,8 +264,9 @@ than drift. Schemas composed with `allOf`/`anyOf`/`oneOf` or `$ref` are left ope
 branch would reject the fields declared by its siblings.
 
 A scenario with `limit` stops the connector once **each** listed stream has produced that many records, and keeps
-at most that many records per stream for validation. Streams are read one after another, so the first stream is
-still fetched in full until the later ones reach the cap; the retained slice keeps memory bounded regardless.
+at most that many records per stream for validation. Unless a connector overrides `MaxConcurrency`, streams are
+read one after another, so the first stream is still fetched in full until the later ones reach the cap; the
+retained slice keeps memory bounded regardless.
 
 An `incremental` scenario must also emit at least one `STATE` message, so a connector that degrades to a full
 refresh cannot pass quietly.
