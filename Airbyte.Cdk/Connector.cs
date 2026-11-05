@@ -1,3 +1,4 @@
+#nullable enable
 ﻿using System;
 using System.IO;
 using System.Text.Json;
@@ -7,6 +8,12 @@ namespace Airbyte.Cdk
 {
     public abstract class Connector
     {
+        /// <summary>
+        /// Assembly that contains this connector. Defaults to <c>AIRBYTE_IMPL_PATH</c> when unset.
+        /// The combined source/destination runner sets it for the destination assembly.
+        /// </summary>
+        public string? ImplPath { get; set; }
+
         /// <summary>
         /// Persist config in temporary directory to run the Source job
         /// </summary>
@@ -26,7 +33,8 @@ namespace Airbyte.Cdk
         /// <returns></returns>
         public virtual ConnectorSpecification Spec()
         {
-            var filepath = Path.Join(Path.GetDirectoryName(AirbyteEntrypoint.AirbyteImplPath), "spec.json");
+            var implPath = ImplPath ?? AirbyteEntrypoint.AirbyteImplPath;
+            var filepath = Path.Join(Path.GetDirectoryName(implPath), "spec.json");
             if (!File.Exists(filepath))
                 throw new FileNotFoundException("Unable to find spec.json");
             var rawspec = ReadConfig(filepath);

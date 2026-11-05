@@ -69,6 +69,29 @@ namespace Airbyte.Cdk.Tests
             }
         }
 
+        [Fact]
+        public void TestSpec_UsesImplPathOverride()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "airbyte-cdk-test-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "spec.json"),
+                "{\"connectionSpecification\":{\"type\":\"object\"},\"protocol_version\":\"0.19.0\"}");
+
+            try
+            {
+                var spec = new TestConnectorImplementation
+                {
+                    ImplPath = Path.Combine(directory, "destination.dll")
+                }.Spec();
+
+                spec.ProtocolVersion.ShouldBe("0.19.0");
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
         private class TestConnectorImplementation : Connector
         {
             public override AirbyteConnectionStatus Check(AirbyteLogger logger, JsonElement config) =>

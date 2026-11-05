@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -34,9 +35,10 @@ namespace Airbyte.Cdk
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
-            Parser.Default.ParseArguments<ReadOptions, WriteOptions, InitOptions, PublishOptions>(args)
+            Parser.Default.ParseArguments<ReadOptions, WriteOptions, SyncOptions, InitOptions, PublishOptions>(args)
                 .WithParsed<ReadOptions>(options => Options = options)
                 .WithParsed<WriteOptions>(options => Options = options)
+                .WithParsed<SyncOptions>(options => Options = options)
                 .WithParsed<InitOptions>(options => Options = options)
                 .WithParsed<PublishOptions>(options => Options = options)
                 .WithNotParsed(_ => Environment.Exit(1));
@@ -54,19 +56,7 @@ namespace Airbyte.Cdk
             }
 
             string implModule = Environment.GetEnvironmentVariable("AIRBYTE_IMPL_MODULE");
-
-            if (!File.Exists(AirbyteImplPath))
-                throw new FileNotFoundException($"Cannot find implementation binary {AirbyteImplPath}");
-
-            var implementation = Assembly.LoadFile(AirbyteImplPath).GetTypes().Where(x => typeof(Connector).IsAssignableFrom(x) && !x.IsAbstract && !x.IsInterface)
-                .FirstOrDefault(x => x.Name.Equals(implModule, StringComparison.OrdinalIgnoreCase));
-
-            if (implementation == null)
-                throw new Exception("Source implementation not found!");
-            if (Activator.CreateInstance(implementation) is not Connector instance)
-                throw new Exception("Implementation provided does not implement Connector class!");
-
-            Connector = instance;
+            Connector = LoadConnector(AirbyteImplPath, implModule ?? string.Empty, "Source");
             try
             {
                 await Launch();
@@ -81,6 +71,37 @@ namespace Airbyte.Cdk
             }
         }
 
+        private static readonly Dictionary<string, Assembly> LoadedAssemblies = new(StringComparer.Ordinal);
+
+        private static Connector LoadConnector(string implPath, string implModule, string role)
+        {
+            implPath = Path.GetFullPath(implPath);
+            if (!File.Exists(implPath))
+                throw new FileNotFoundException($"Cannot find {role.ToLowerInvariant()} implementation binary {implPath}");
+
+            Assembly assembly;
+            lock (LoadedAssemblies)
+            {
+                if (!LoadedAssemblies.TryGetValue(implPath, out assembly!))
+                {
+                    assembly = Assembly.LoadFile(implPath);
+                    LoadedAssemblies[implPath] = assembly;
+                }
+            }
+
+            var implementation = assembly.GetTypes()
+                .Where(x => typeof(Connector).IsAssignableFrom(x) && !x.IsAbstract && !x.IsInterface)
+                .FirstOrDefault(x => x.Name.Equals(implModule, StringComparison.OrdinalIgnoreCase));
+
+            if (implementation == null)
+                throw new Exception($"{role} implementation not found in {implPath}!");
+            if (Activator.CreateInstance(implementation) is not Connector instance)
+                throw new Exception($"Implementation provided for {role.ToLowerInvariant()} does not implement Connector class!");
+
+            instance.ImplPath = implPath;
+            return instance;
+        }
+
         private static Source GetSource()
         {
             if (Connector is not Source source)
@@ -92,6 +113,14 @@ namespace Airbyte.Cdk
         {
             if (Connector is not Destination destination)
                 throw new Exception($"Could not instantiate Destination as current type ({Connector.GetType().Name}) is not implementing {nameof(Destination)}");
+            return destination;
+        }
+
+        private static Destination GetDestination(string implPath, string implModule)
+        {
+            var connector = LoadConnector(implPath, implModule, "Destination");
+            if (connector is not Destination destination)
+                throw new Exception($"Destination implementation {implModule} does not implement {nameof(Destination)}");
             return destination;
         }
 
@@ -208,6 +237,26 @@ namespace Airbyte.Cdk
                     await RunWriteLoop(Console.In, Console.Out, Logger, destination, config, catalog);
                     break;
                 }
+                case "sync":
+                {
+                    var syncOptions = (SyncOptions)Options;
+                    var source = GetSource();
+                    var destinationPath = string.IsNullOrWhiteSpace(syncOptions.DestinationImplPath)
+                        ? AirbyteImplPath
+                        : syncOptions.DestinationImplPath;
+                    var destination = GetDestination(destinationPath, syncOptions.DestinationImplModule);
+                    var destinationSpec = destination.Spec();
+                    var sourceConfig = GetConfig(spec);
+                    var destinationConfigPath = string.IsNullOrWhiteSpace(syncOptions.DestinationConfig)
+                        ? Options.Config
+                        : syncOptions.DestinationConfig;
+                    var destinationConfig = GetConfig(destinationConfigPath, destinationSpec, destinationPath,
+                        "Destination config");
+
+                    await InMemoryDataChannel.RunAsync(source, destination, Logger, sourceConfig, destinationConfig,
+                        GetCatalog(), GetState(source, syncOptions.State), syncOptions.ChannelCapacity, Console.Out);
+                    break;
+                }
                 default:
                     throw new NotImplementedException($"Unexpected command: {Options.Command}");
             }
@@ -237,23 +286,25 @@ namespace Airbyte.Cdk
             await reader.CompleteAsync();
         }
 
-        private static JsonElement GetConfig(ConnectorSpecification spec)
-        {
-            var contents = string.IsNullOrWhiteSpace(Options.Config) ? throw new Exception("Config is undefined!")
-                : !TryGetPath(Options.Config, out var filepath) ? throw new FileNotFoundException("Could not find config file: " + filepath)
-                : File.ReadAllText(filepath);
+        private static JsonElement GetConfig(ConnectorSpecification spec) =>
+            GetConfig(Options.Config, spec, AirbyteImplPath, "Config");
 
+        private static JsonElement GetConfig(string configPath, ConnectorSpecification spec, string implPath, string label)
+        {
+            if (string.IsNullOrWhiteSpace(configPath))
+                throw new Exception($"{label} is undefined!");
+            if (!TryGetPath(configPath, implPath, out var filepath))
+                throw new FileNotFoundException($"Could not find {label.ToLowerInvariant()} file: {configPath}");
+
+            var contents = File.ReadAllText(filepath);
             if (string.IsNullOrWhiteSpace(contents))
-                throw new Exception("Config file is empty!");
+                throw new Exception($"{label} file is empty!");
 
             var toreturn = contents.AsJsonElement();
-
             if (!ResourceSchemaLoader.TryCheckConfigAgainstSpecOrExit(toreturn, spec, out var exc))
-                throw new Exception($"Config does not match spec schema: {exc.Message}");
+                throw new Exception($"{label} does not match spec schema: {exc.Message}");
 
-            Logger.Info($"Found config file at location: {filepath}");
-            //Logger.Debug($"Config file contents: {toreturn.RootElement}");
-
+            Logger.Info($"Found {label.ToLowerInvariant()} file at location: {filepath}");
             return toreturn;
         }
 
@@ -266,24 +317,32 @@ namespace Airbyte.Cdk
             return AirbyteProtocolReader.ReadCatalog(filepath);
         }
 
-        private static JsonElement GetState(Source source, ReadOptions readoptions)
+        private static JsonElement GetState(Source source, ReadOptions readoptions) =>
+            GetState(source, readoptions.State);
+
+        private static JsonElement GetState(Source source, string statePath)
         {
-            if (TryGetPath(readoptions.State, out var filepath))
+            if (TryGetPath(statePath, out var filepath))
                 Logger.Info($"Found state file at location: {filepath}");
             else
-                Logger.Warn($"Could not find state file, config reported state file location: {readoptions.State}");
+                Logger.Warn($"Could not find state file, config reported state file location: {statePath}");
 
             var contents = source.ReadState(filepath);
             Logger.Debug($"State file contents: {contents.GetRawText()}");
             return contents;
         }
 
-        public static bool TryGetPath(string filename, out string filepath)
+        public static bool TryGetPath(string filename, out string filepath) =>
+            TryGetPath(filename, AirbyteImplPath, out filepath);
+
+        public static bool TryGetPath(string filename, string implPath, out string filepath)
         {
             filepath = string.Empty;
             if (string.IsNullOrWhiteSpace(filename))
                 return false;
-            foreach (var path in new[] { Path.Join(Path.GetDirectoryName(AirbyteImplPath), filename), filename, Path.Join(Directory.GetCurrentDirectory(), filename) })
+
+            var implDirectory = Path.GetDirectoryName(implPath) ?? string.Empty;
+            foreach (var path in new[] { Path.Join(implDirectory, filename), filename, Path.Join(Directory.GetCurrentDirectory(), filename) })
                 if (File.Exists(path))
                 {
                     filepath = path;

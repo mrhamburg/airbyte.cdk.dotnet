@@ -62,6 +62,29 @@ variables the CDK keeps using STDIO/JSON and no behavior changes.
 
 Connector specifications should declare `protocol_version`; `Connector.Spec()` defaults it to `0.19.0` when it is absent.
 
+### Combined source and destination
+
+For local runs or a single package that contains both connectors, the `sync` verb runs the source and
+destination in one process over an in-memory channel. Records and states are handed over as
+`AirbyteMessage` objects, so nothing is serialized to stdout JSON or socket Protobuf.
+
+```bash
+dotnet run -- sync \
+  --config source-config.json \
+  --catalog configured_catalog.json \
+  --destination-impl-module MyDestination \
+  [--destination-impl-path path/to/destination.dll] \
+  [--destination-config destination-config.json] \
+  [--channel-capacity 4096] \
+  [--state state.json]
+```
+
+The destination assembly defaults to `AIRBYTE_IMPL_PATH` and the destination config defaults to the
+source config, so a package with both `Connector` subclasses needs only
+`--destination-impl-module`. Source logs and traces stay on stdout; records and state messages travel
+only through the bounded channel. The channel applies backpressure and a destination failure aborts a
+source that is blocked on a full channel.
+
 ### Migration notes
 
 - Sources now emit per-stream `STREAM` state instead of legacy `{"state":{"data":...}}` messages. Legacy state files are still accepted on input.
