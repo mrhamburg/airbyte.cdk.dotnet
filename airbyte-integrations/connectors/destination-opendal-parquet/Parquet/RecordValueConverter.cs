@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using Parquet.Schema;
 
-namespace destination_local_parquet.Parquet
+namespace destination_opendal_parquet.Parquet
 {
     internal static class RecordValueConverter
     {

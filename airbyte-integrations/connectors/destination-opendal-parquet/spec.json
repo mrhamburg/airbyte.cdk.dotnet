@@ -1,0 +1,97 @@
+{
+  "documentationUrl": "https://github.com/mrhamburg/airbyte.cdk.dotnet",
+  "protocol_version": "0.19.0",
+  "supportsIncremental": true,
+  "supported_destination_sync_modes": [
+    "append",
+    "overwrite"
+  ],
+  "supportsNormalization": false,
+  "supportsDBT": false,
+  "connectionSpecification": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "OpenDAL Parquet Destination Spec",
+    "type": "object",
+    "required": [
+      "output_path"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "output_path": {
+        "type": "string",
+        "title": "Output path",
+        "description": "Service-relative key prefix that receives the Parquet files. For the fs service with root '/', an absolute path is accepted."
+      },
+      "service": {
+        "type": "string",
+        "title": "OpenDAL service",
+        "description": "OpenDAL scheme, for example fs, s3, gcs, azblob, sftp, or memory. Defaults to fs."
+      },
+      "settings_file": {
+        "type": "string",
+        "title": "OpenDAL settings file",
+        "description": "JSON file with service, options, and optional Parquet settings. Relative paths resolve from the process working directory."
+      },
+      "options": {
+        "type": "object",
+        "title": "OpenDAL options",
+        "description": "Service-specific OpenDAL options. Values are converted to strings. Inline values override environment variables and the settings file.",
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "flush_row_limit": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 50000,
+        "title": "Flush row limit",
+        "description": "Maximum number of buffered rows per stream before a Parquet object is written."
+      },
+      "flush_on_state": {
+        "type": "boolean",
+        "default": true,
+        "title": "Flush on state",
+        "description": "Flush buffered rows when a state message arrives. Keep enabled unless you accept that acknowledged state can arrive before the records are written."
+      },
+      "file_name_template": {
+        "type": "string",
+        "default": "part-{timestamp}-{sequence}.parquet",
+        "title": "File name template",
+        "description": "Parquet object file name. Supported placeholders: {timestamp}, {sequence}, {uuid}, {stream}, and {namespace}. The name must end in .parquet and contain {sequence} or {uuid} so flushes do not overwrite each other."
+      },
+      "parquet": {
+        "type": "object",
+        "title": "Parquet options",
+        "additionalProperties": false,
+        "properties": {
+          "compression": {
+            "type": "string",
+            "enum": [
+              "none",
+              "snappy",
+              "gzip",
+              "lzo",
+              "brotli",
+              "lz4",
+              "lz4_raw",
+              "zstd"
+            ],
+            "title": "Compression",
+            "description": "Parquet compression codec. Defaults to the Parquet.Net default (snappy)."
+          },
+          "row_group_size": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Row group size",
+            "description": "Maximum number of rows per Parquet row group. Defaults to the Parquet.Net default."
+          }
+        }
+      }
+    }
+  }
+}

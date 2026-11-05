@@ -1,35 +1,34 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Airbyte.Cdk;
 using Airbyte.Cdk.Models;
+using destination_opendal_parquet.OpenDal;
 using Parquet.Serialization;
 using Type = Airbyte.Cdk.Models.Type;
 
-namespace destination_local_parquet.Parquet
+namespace destination_opendal_parquet.Parquet
 {
     internal sealed class ParquetRecordWriter
     {
-        private const int DefaultFlushRowLimit = 50_000;
-        private const string DestinationName = "local-parquet";
+        private const string DestinationName = "opendal-parquet";
 
         private readonly DestinationOptions _options;
         private readonly AirbyteLogger _logger;
-        private readonly int _flushRowLimit;
+        private readonly IObjectStore _store;
         private readonly Dictionary<(string? Namespace, string Stream), ConfiguredAirbyteStream> _streams = new();
         private readonly Dictionary<(string? Namespace, string Stream), StreamBuffer> _buffers = new();
         private int _sequence;
 
         public ParquetRecordWriter(DestinationOptions options, ConfiguredAirbyteCatalog catalog,
-            AirbyteLogger logger, int flushRowLimit = DefaultFlushRowLimit)
+            AirbyteLogger logger, IObjectStore store)
         {
             _options = options;
             _logger = logger;
-            _flushRowLimit = flushRowLimit;
+            _store = store;
 
             foreach (var configured in catalog.Streams)
             {
@@ -66,27 +65,22 @@ namespace destination_local_parquet.Parquet
             foreach (var buffer in _buffers.Values)
                 await FlushAsync(buffer);
 
-            foreach (var (key, configured) in _streams)
+            foreach (var configured in _streams.Values)
             {
+                if (configured.DestinationSyncMode != DestinationSyncMode.overwrite)
+                    continue;
+
                 var stream = configured.Stream!;
-                var directory = _options.StreamDirectory(stream.Namespace, stream.Name!);
-                Directory.CreateDirectory(directory);
+                var key = (stream.Namespace, stream.Name!);
+                var prefix = _options.StreamPrefix(stream.Namespace, stream.Name!);
+                var written = _buffers.TryGetValue(key, out var buffer)
+                    ? buffer.WrittenFiles
+                    : new HashSet<string>(StringComparer.Ordinal);
 
-                if (configured.DestinationSyncMode == DestinationSyncMode.overwrite)
-                {
-                    var written = _buffers.TryGetValue(key, out var buffer)
-                        ? buffer.WrittenFiles
-                        : new HashSet<string>(StringComparer.Ordinal);
-
-                    foreach (var file in Directory.GetFiles(directory, "*.parquet"))
-                    {
-                        if (!written.Contains(Path.GetFullPath(file)))
-                            File.Delete(file);
-                    }
-                }
-
-                foreach (var temporary in Directory.GetFiles(directory, "*.parquet.tmp"))
-                    File.Delete(temporary);
+                foreach (var file in await _store.ListFilesAsync(prefix))
+                    if (file.EndsWith(".parquet.tmp", StringComparison.Ordinal)
+                        || (file.EndsWith(".parquet", StringComparison.Ordinal) && !written.Contains(file)))
+                        await _store.DeleteAsync(file);
             }
         }
 
@@ -103,15 +97,14 @@ namespace destination_local_parquet.Parquet
             var stream = configured.Stream!;
             if (!_buffers.TryGetValue(key, out var buffer))
             {
-                buffer = new StreamBuffer(configured, _options.StreamDirectory(stream.Namespace, stream.Name!));
+                buffer = new StreamBuffer(configured, _options.StreamPrefix(stream.Namespace, stream.Name!));
                 _buffers[key] = buffer;
             }
 
-            EnsureDirectory(buffer);
             buffer.Schema ??= ResolveSchema(stream, record.Data);
             buffer.Rows.Add(RecordValueConverter.Convert(buffer.Schema, record.Data, WarningFor(buffer)));
 
-            if (buffer.Rows.Count >= _flushRowLimit)
+            if (buffer.Rows.Count >= _options.FlushRowLimit)
                 await FlushAsync(buffer);
         }
 
@@ -122,18 +115,6 @@ namespace destination_local_parquet.Parquet
                 if (buffer.WarnedFields.Add(message))
                     _logger.Warn($"[{buffer.Configured.Stream!.Name}] {message}");
             };
-        }
-
-        private static void EnsureDirectory(StreamBuffer buffer)
-        {
-            if (buffer.DirectoryReady)
-                return;
-
-            Directory.CreateDirectory(buffer.Directory);
-            foreach (var temporary in Directory.GetFiles(buffer.Directory, "*.parquet.tmp"))
-                File.Delete(temporary);
-
-            buffer.DirectoryReady = true;
         }
 
         private StreamSchema ResolveSchema(AirbyteStream stream, JsonElement data)
@@ -147,6 +128,9 @@ namespace destination_local_parquet.Parquet
 
         private async Task CommitStateAsync(AirbyteStateMessage? state)
         {
+            if (!_options.FlushOnState)
+                return;
+
             var keys = StateKeys(state);
             if (keys.Count == 0)
             {
@@ -183,57 +167,47 @@ namespace destination_local_parquet.Parquet
             if (buffer.Rows.Count == 0)
                 return;
 
-            EnsureDirectory(buffer);
             var stream = buffer.Configured.Stream!;
 
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff", CultureInfo.InvariantCulture);
-            var sequence = _sequence++.ToString("D4", CultureInfo.InvariantCulture);
-            var finalPath = Path.Combine(buffer.Directory, $"part-{timestamp}-{sequence}.parquet");
-            var temporaryPath = finalPath + ".tmp";
+            var fileName = _options.FileName(stream.Namespace, stream.Name!, _sequence++, DateTime.UtcNow);
+            var key = _options.KeyFor(buffer.Prefix, fileName);
 
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["airbyte.stream"] = stream.Name ?? string.Empty,
                 ["airbyte.namespace"] = stream.Namespace ?? string.Empty,
                 ["airbyte.sync_mode"] = buffer.Configured.DestinationSyncMode.ToString(),
-                ["airbyte.destination"] = DestinationName
+                ["airbyte.destination"] = DestinationName,
+                ["airbyte.opendal.service"] = _options.OpenDal.Service
             };
 
-            try
-            {
-                await using (var file = File.Create(temporaryPath))
-                {
-                    await ParquetSerializer.SerializeUntypedAsync(
-                        buffer.Rows, buffer.Schema!.Parquet, file, null, metadata);
-                    file.Flush(flushToDisk: true);
-                }
+            using var payload = new MemoryStream();
+            await ParquetSerializer.SerializeUntypedAsync(
+                buffer.Rows, buffer.Schema!.Parquet, payload, _options.Parquet.ToParquetOptions(), metadata);
 
-                File.Move(temporaryPath, finalPath);
-                buffer.WrittenFiles.Add(Path.GetFullPath(finalPath));
-                buffer.Rows.Clear();
-            }
-            catch
-            {
-                if (File.Exists(temporaryPath))
-                    File.Delete(temporaryPath);
-                throw;
-            }
+            await _store.WriteAsync(key, payload.ToArray());
+            buffer.WrittenFiles.Add(key);
+            buffer.Rows.Clear();
         }
 
         private sealed class StreamBuffer
         {
-            public StreamBuffer(ConfiguredAirbyteStream configured, string directory)
+            public StreamBuffer(ConfiguredAirbyteStream configured, string prefix)
             {
                 Configured = configured;
-                Directory = directory;
+                Prefix = prefix;
             }
 
             public ConfiguredAirbyteStream Configured { get; }
-            public string Directory { get; }
-            public bool DirectoryReady { get; set; }
+
+            public string Prefix { get; }
+
             public StreamSchema? Schema { get; set; }
+
             public List<IDictionary<string, object?>> Rows { get; } = new();
+
             public HashSet<string> WarnedFields { get; } = new(StringComparer.Ordinal);
+
             public HashSet<string> WrittenFiles { get; } = new(StringComparer.Ordinal);
         }
     }

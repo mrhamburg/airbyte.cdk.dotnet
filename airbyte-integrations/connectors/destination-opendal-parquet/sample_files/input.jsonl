@@ -1,0 +1,2 @@
+{"type":"RECORD","record":{"stream":"latest","emitted_at":0,"data":{"amount":1,"base":"USD","date":"2026-11-01","rates":{}}}}
+{"type":"STATE","state":{}}

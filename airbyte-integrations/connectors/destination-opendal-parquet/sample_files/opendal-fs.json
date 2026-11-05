@@ -1,0 +1,6 @@
+{
+  "service": "fs",
+  "options": {
+    "root": "/tmp/airbyte-opendal"
+  }
+}

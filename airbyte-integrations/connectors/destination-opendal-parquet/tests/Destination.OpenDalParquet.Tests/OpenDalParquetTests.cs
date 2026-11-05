@@ -5,18 +5,18 @@ using Airbyte.Cdk;
 using Airbyte.Cdk.Models;
 using Shouldly;
 using Xunit;
-using static Destination.LocalParquet.Tests.TestData;
-using LocalParquetConnector = destination_local_parquet.LocalParquet;
+using static Destination.OpenDalParquet.Tests.TestData;
+using OpenDalParquetConnector = destination_opendal_parquet.OpenDalParquet;
 
-namespace Destination.LocalParquet.Tests
+namespace Destination.OpenDalParquet.Tests
 {
-    public class LocalParquetTests
+    public class OpenDalParquetTests
     {
-        [Fact]
+        [OpenDalAvailableFact]
         public async Task Test_Write_RecordThenState_WritesParquetFile()
         {
             using var dir = new TempDirectory();
-            var connector = new LocalParquetConnector();
+            var connector = new OpenDalParquetConnector();
             var config = TestData.Json($$"""{"output_path":"{{dir.Path}}"}""");
             var catalog = new ConfiguredAirbyteCatalog
             {
@@ -51,6 +51,29 @@ namespace Destination.LocalParquet.Tests
                 new AirbyteMessage { Type = Airbyte.Cdk.Models.Type.STATE, State = new AirbyteStateMessage() });
 
             Directory.GetFiles(Path.Combine(dir.Path, "latest"), "*.parquet").ShouldHaveSingleItem();
+        }
+
+        [Fact]
+        public async Task Test_Write_WithInjectedStore_WritesObject()
+        {
+            using var dir = new TempDirectory();
+            var store = new InMemoryObjectStore();
+            var connector = new OpenDalParquetConnector
+            {
+                OptionsFactory = TestData.OptionsFromJson,
+                StoreFactory = _ => store
+            };
+            var config = TestData.Json($$"""{"output_path":"{{dir.Path}}"}""");
+            var catalog = TestData.Catalog("latest", TestData.Schema);
+            var logger = new AirbyteLogger(_ => { });
+
+            await connector.Write(logger, config, catalog,
+                TestData.Record("latest", """{"amount":1,"base":"USD","date":"2026-11-01","rates":{}}"""));
+            await connector.Write(logger, config, catalog, TestData.State());
+            await connector.CompleteAsync();
+
+            store.Keys.ShouldHaveSingleItem();
+            store.Keys[0].ShouldEndWith(".parquet");
         }
     }
 }

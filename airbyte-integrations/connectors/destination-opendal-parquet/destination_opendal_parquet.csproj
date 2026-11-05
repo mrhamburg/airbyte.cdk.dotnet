@@ -8,11 +8,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Airbyte.Cdk\Airbyte.Cdk.csproj" />
+    <PackageReference Include="Apache.OpenDAL" />
     <PackageReference Include="Parquet.Net" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Destination.LocalParquet.Tests" />
+    <InternalsVisibleTo Include="Destination.OpenDalParquet.Tests" />
     <Compile Remove="tests\**" />
     <None Remove="tests\**" />
   </ItemGroup>

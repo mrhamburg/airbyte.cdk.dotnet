@@ -261,7 +261,7 @@ tests:
 
         private const string DestinationSpec = @"
 connector:
-  module: LocalParquet
+  module: OpenDalParquet
   type: destination
 source:
   connector: ../source-example
@@ -311,7 +311,7 @@ tests:
         public void Test_Load_DestinationWithoutSource_Throws()
         {
             using var connector = new TempConnector("destination-example")
-                .WithDockerfile("LocalParquet")
+                .WithDockerfile("OpenDalParquet")
                 .WithProject("destination_example.csproj")
                 .WithSpec(@"
 connector:
@@ -330,7 +330,7 @@ tests:
         public void Test_Load_DestinationWithLimit_Throws()
         {
             using var connector = new TempConnector("destination-example")
-                .WithDockerfile("LocalParquet")
+                .WithDockerfile("OpenDalParquet")
                 .WithProject("destination_example.csproj")
                 .WithSpec(@"
 connector:
@@ -352,7 +352,7 @@ tests:
         public void Test_Load_DestinationWithSocketFalse_Throws()
         {
             using var connector = new TempConnector("destination-example")
-                .WithDockerfile("LocalParquet")
+                .WithDockerfile("OpenDalParquet")
                 .WithProject("destination_example.csproj")
                 .WithSpec(@"
 connector:
@@ -374,7 +374,7 @@ tests:
         public void Test_Load_UnknownConnectorType_Throws()
         {
             using var connector = new TempConnector("destination-example")
-                .WithDockerfile("LocalParquet")
+                .WithDockerfile("OpenDalParquet")
                 .WithProject()
                 .WithSpec(@"
 connector:

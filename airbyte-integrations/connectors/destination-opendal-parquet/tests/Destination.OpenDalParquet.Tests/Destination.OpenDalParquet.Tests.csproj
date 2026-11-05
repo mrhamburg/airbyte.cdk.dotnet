@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\destination_local_parquet.csproj" />
+    <ProjectReference Include="..\..\destination_opendal_parquet.csproj" />
   </ItemGroup>
 
 </Project>

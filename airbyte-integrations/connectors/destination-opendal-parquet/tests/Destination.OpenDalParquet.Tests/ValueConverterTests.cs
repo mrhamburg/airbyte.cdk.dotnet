@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using destination_local_parquet.Parquet;
+using destination_opendal_parquet.Parquet;
 using Shouldly;
 using Xunit;
 
-namespace Destination.LocalParquet.Tests
+namespace Destination.OpenDalParquet.Tests
 {
     public class ValueConverterTests
     {

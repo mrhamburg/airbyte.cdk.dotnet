@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Parquet.Schema;
 
-namespace destination_local_parquet.Parquet
+namespace destination_opendal_parquet.Parquet
 {
     internal enum FieldShape { Scalar, Struct, Map, List }
 
