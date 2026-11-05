@@ -121,21 +121,23 @@ namespace Airbyte.Cdk.Sources
 
             logger.Info($"Starting syncing {Name}");
             var streamsInstances = Streams(config);
-            var configuredStreams = ResolveStreams(catalog, streamsInstances);
             var concurrency = Concurrency(config);
 
             if (concurrency <= 1)
             {
                 var parentRecords = new Dictionary<string, IReadOnlyList<JsonElement>>(StringComparer.Ordinal);
-                foreach (var configuredStream in configuredStreams)
-                    await ReadStreamSafely(logger, configuredStream.Stream, configuredStream.Configured,
+                foreach (var configuredStream in catalog.Streams)
+                {
+                    var streamInstance = ResolveStream(configuredStream, streamsInstances);
+                    await ReadStreamSafely(logger, streamInstance, configuredStream,
                         streamsInstances, parentRecords, stateManager, stateEmitter, trackingChannel);
+                }
 
                 return;
             }
 
-            await ReadConcurrently(logger, configuredStreams, streamsInstances, stateManager, stateEmitter,
-                channel, concurrency);
+            await ReadConcurrently(logger, ResolveStreams(catalog, streamsInstances), streamsInstances,
+                stateManager, stateEmitter, channel, concurrency);
         }
 
         private int Concurrency(JsonElement config) =>
@@ -148,22 +150,25 @@ namespace Airbyte.Cdk.Sources
         {
             var resolved = new List<ResolvedStream>(catalog.Streams.Length);
             foreach (var configuredStream in catalog.Streams)
-            {
-                if (configuredStream.Stream == null)
-                    throw new Exception("The configured catalog contains a stream without a stream definition");
-
-                var streamInstance = streamsInstances.FirstOrDefault(x =>
-                    x.Name == configuredStream.Stream.Name &&
-                    string.Equals(x.Namespace ?? string.Empty,
-                        configuredStream.Stream.Namespace ?? string.Empty, StringComparison.Ordinal));
-                if (streamInstance == null)
-                    throw new Exception(
-                        $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {string.Join(", ", streamsInstances.Select(x => x.Name))}");
-
-                resolved.Add(new ResolvedStream(streamInstance, configuredStream));
-            }
+                resolved.Add(new ResolvedStream(ResolveStream(configuredStream, streamsInstances), configuredStream));
 
             return resolved;
+        }
+
+        private static Stream ResolveStream(ConfiguredAirbyteStream configuredStream, Stream[] streamsInstances)
+        {
+            if (configuredStream.Stream == null)
+                throw new Exception("The configured catalog contains a stream without a stream definition");
+
+            var streamInstance = streamsInstances.FirstOrDefault(x =>
+                x.Name == configuredStream.Stream.Name &&
+                string.Equals(x.Namespace ?? string.Empty,
+                    configuredStream.Stream.Namespace ?? string.Empty, StringComparison.Ordinal));
+            if (streamInstance == null)
+                throw new Exception(
+                    $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {string.Join(", ", streamsInstances.Select(x => x.Name))}");
+
+            return streamInstance;
         }
 
         private async Task ReadConcurrently(AirbyteLogger logger, List<ResolvedStream> configuredStreams,
