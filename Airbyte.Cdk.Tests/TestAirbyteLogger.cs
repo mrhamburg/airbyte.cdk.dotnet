@@ -30,9 +30,9 @@ namespace Airbyte.Cdk.Tests
 
             messages.Count.ShouldBe(1);
             messages[0].Type.ShouldBe(MessageType.LOG);
-            messages[0].Log.Level.ShouldBe(Level.ERROR);
-            messages[0].Log.Message.ShouldBe("boom");
-            messages[0].Log.StackTrace.ShouldNotBeNullOrWhiteSpace();
+            messages[0].Log!.Level.ShouldBe(Level.ERROR);
+            messages[0].Log!.Message.ShouldBe("boom");
+            messages[0].Log!.StackTrace.ShouldNotBeNullOrWhiteSpace();
         }
 
         [Fact]
@@ -46,12 +46,12 @@ namespace Airbyte.Cdk.Tests
 
             messages.Count.ShouldBe(1);
             messages[0].Type.ShouldBe(MessageType.TRACE);
-            messages[0].Trace.Type.ShouldBe(AirbyteTraceType.ERROR);
-            messages[0].Trace.Error.Message.ShouldBe("Your API key is invalid");
-            messages[0].Trace.Error.InternalMessage.ShouldBe("401");
-            messages[0].Trace.Error.StackTrace.ShouldBe("at ...");
-            messages[0].Trace.Error.FailureType.ShouldBe(AirbyteFailureType.config_error);
-            messages[0].Trace.Error.StreamDescriptor.Name.ShouldBe("users");
+            messages[0].Trace!.Type.ShouldBe(AirbyteTraceType.ERROR);
+            messages[0].Trace!.Error!.Message.ShouldBe("Your API key is invalid");
+            messages[0].Trace!.Error!.InternalMessage.ShouldBe("401");
+            messages[0].Trace!.Error!.StackTrace.ShouldBe("at ...");
+            messages[0].Trace!.Error!.FailureType.ShouldBe(AirbyteFailureType.config_error);
+            messages[0].Trace!.Error!.StreamDescriptor!.Name.ShouldBe("users");
         }
 
         [Fact]
@@ -63,12 +63,12 @@ namespace Airbyte.Cdk.Tests
             logger.TraceEstimate(AirbyteEstimateType.STREAM, "users", "public", 100, 2048);
 
             messages.Count.ShouldBe(1);
-            messages[0].Trace.Type.ShouldBe(AirbyteTraceType.ESTIMATE);
-            messages[0].Trace.Estimate.Type.ShouldBe(AirbyteEstimateType.STREAM);
-            messages[0].Trace.Estimate.Name.ShouldBe("users");
-            messages[0].Trace.Estimate.Namespace.ShouldBe("public");
-            messages[0].Trace.Estimate.RowEstimate.ShouldBe(100);
-            messages[0].Trace.Estimate.ByteEstimate.ShouldBe(2048);
+            messages[0].Trace!.Type.ShouldBe(AirbyteTraceType.ESTIMATE);
+            messages[0].Trace!.Estimate!.Type.ShouldBe(AirbyteEstimateType.STREAM);
+            messages[0].Trace!.Estimate!.Name.ShouldBe("users");
+            messages[0].Trace!.Estimate!.Namespace.ShouldBe("public");
+            messages[0].Trace!.Estimate!.RowEstimate.ShouldBe(100);
+            messages[0].Trace!.Estimate!.ByteEstimate.ShouldBe(2048);
         }
 
         [Fact]
@@ -80,9 +80,9 @@ namespace Airbyte.Cdk.Tests
             logger.TraceStreamStatus(new StreamDescriptor { Name = "users" }, AirbyteStreamStatus.RUNNING);
 
             messages.Count.ShouldBe(1);
-            messages[0].Trace.Type.ShouldBe(AirbyteTraceType.STREAM_STATUS);
-            messages[0].Trace.StreamStatus.Status.ShouldBe(AirbyteStreamStatus.RUNNING);
-            messages[0].Trace.StreamStatus.StreamDescriptor.Name.ShouldBe("users");
+            messages[0].Trace!.Type.ShouldBe(AirbyteTraceType.STREAM_STATUS);
+            messages[0].Trace!.StreamStatus!.Status.ShouldBe(AirbyteStreamStatus.RUNNING);
+            messages[0].Trace!.StreamStatus!.StreamDescriptor.Name.ShouldBe("users");
         }
 
         [Fact]
@@ -94,9 +94,9 @@ namespace Airbyte.Cdk.Tests
             logger.TraceAnalytics("sql-source-used-cursor-count-indexed", "2");
 
             messages.Count.ShouldBe(1);
-            messages[0].Trace.Type.ShouldBe(AirbyteTraceType.ANALYTICS);
-            messages[0].Trace.Analytics.Type.ShouldBe("sql-source-used-cursor-count-indexed");
-            messages[0].Trace.Analytics.Value.ShouldBe("2");
+            messages[0].Trace!.Type.ShouldBe(AirbyteTraceType.ANALYTICS);
+            messages[0].Trace!.Analytics!.Type.ShouldBe("sql-source-used-cursor-count-indexed");
+            messages[0].Trace!.Analytics!.Value.ShouldBe("2");
         }
 
         [Fact]
@@ -109,8 +109,8 @@ namespace Airbyte.Cdk.Tests
 
             messages.Count.ShouldBe(1);
             messages[0].Type.ShouldBe(MessageType.CONTROL);
-            messages[0].Control.Type.ShouldBe(AirbyteControlType.CONNECTOR_CONFIG);
-            messages[0].Control.ConnectorConfig.Config.Value.GetProperty("api_key").GetString().ShouldBe("new");
+            messages[0].Control!.Type.ShouldBe(AirbyteControlType.CONNECTOR_CONFIG);
+            messages[0].Control!.ConnectorConfig!.Config!.Value.GetProperty("api_key").GetString().ShouldBe("new");
         }
     }
 }

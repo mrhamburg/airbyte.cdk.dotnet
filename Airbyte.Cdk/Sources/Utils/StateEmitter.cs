@@ -16,8 +16,8 @@ namespace Airbyte.Cdk.Sources.Utils
     {
         private readonly ChannelWriter<AirbyteMessage> _channel;
         private readonly PartitionTracker? _partitionTracker;
-        private readonly Dictionary<string, string> _lastEmitted = new();
-        private readonly Dictionary<string, JsonElement> _states = new();
+        private readonly Dictionary<StreamKey, string> _lastEmitted = new();
+        private readonly Dictionary<StreamKey, JsonElement> _states = new();
         private readonly object _sync = new();
 
         public StateEmitter(ChannelWriter<AirbyteMessage> channel, PartitionTracker? partitionTracker = null)
@@ -28,7 +28,7 @@ namespace Airbyte.Cdk.Sources.Utils
 
         public async Task<bool> EmitAsync(StreamDescriptor descriptor, JsonElement? state, long recordCount = 0)
         {
-            var key = Key(descriptor);
+            var key = StreamKey.From(descriptor);
             var stateJson = state?.GetRawText() ?? "null";
 
             lock (_sync)
@@ -59,7 +59,7 @@ namespace Airbyte.Cdk.Sources.Utils
         {
             lock (_sync)
             {
-                if (_states.TryGetValue(Key(descriptor), out state))
+                if (_states.TryGetValue(StreamKey.From(descriptor), out state))
                     return true;
             }
 
@@ -73,16 +73,14 @@ namespace Airbyte.Cdk.Sources.Utils
         public void MarkEmitted(StreamDescriptor descriptor)
         {
             lock (_sync)
-                _lastEmitted[Key(descriptor)] = "\u0000observed";
+                _lastEmitted[StreamKey.From(descriptor)] = "\u0000observed";
         }
 
         public bool HasEmitted(StreamDescriptor descriptor)
         {
             lock (_sync)
-                return _lastEmitted.ContainsKey(Key(descriptor));
+                return _lastEmitted.ContainsKey(StreamKey.From(descriptor));
         }
 
-        private static string Key(StreamDescriptor descriptor) =>
-            descriptor.Name + "\u0000" + (descriptor.Namespace ?? string.Empty);
     }
 }

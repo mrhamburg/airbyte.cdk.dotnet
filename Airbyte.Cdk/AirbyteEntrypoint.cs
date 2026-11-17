@@ -1,215 +1,68 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Airbyte.Cdk.Destinations;
 using Airbyte.Cdk.Models;
-using Airbyte.Cdk.Sources;
-using Airbyte.Cdk.Sources.Utils;
 using Airbyte.Cdk.Transport;
 using CommandLine;
-using Type = Airbyte.Cdk.Models.Type;
 
 namespace Airbyte.Cdk
 {
+    /// <summary>
+    /// Process entry point. Parses the command line, loads the connector implementation, and hands
+    /// the command to <see cref="CommandDispatcher"/>.
+    /// </summary>
     public class AirbyteEntrypoint
     {
-        static Connector Connector { get; set; }
-
-        static Options Options { get; set; }
-
-        static AirbyteLogger Logger { get; } = new();
-
-        public static string AirbyteImplPath
-        {
-            get => Environment.GetEnvironmentVariable("AIRBYTE_IMPL_PATH");
-        }
+        public static string AirbyteImplPath =>
+            Environment.GetEnvironmentVariable("AIRBYTE_IMPL_PATH") ?? string.Empty;
 
         public static async Task Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
+            Options? options = null;
             Parser.Default.ParseArguments<ReadOptions, WriteOptions, InitOptions, PublishOptions>(args)
-                .WithParsed<ReadOptions>(options => Options = options)
-                .WithParsed<WriteOptions>(options => Options = options)
-                .WithParsed<InitOptions>(options => Options = options)
-                .WithParsed<PublishOptions>(options => Options = options)
+                .WithParsed<ReadOptions>(value => options = value)
+                .WithParsed<WriteOptions>(value => options = value)
+                .WithParsed<InitOptions>(value => options = value)
+                .WithParsed<PublishOptions>(value => options = value)
                 .WithNotParsed(_ => Environment.Exit(1));
 
-            //Check if this is an init
-            if (Options is InitOptions)
+            if (options is InitOptions)
             {
                 await InitCli.Process();
                 return;
             }
-            if (Options is PublishOptions publishOptions)
+
+            if (options is PublishOptions publishOptions)
             {
                 await Publish.Process(publishOptions);
                 return;
             }
 
-            string implModule = Environment.GetEnvironmentVariable("AIRBYTE_IMPL_MODULE");
+            if (options is null)
+                return;
 
-            if (!File.Exists(AirbyteImplPath))
-                throw new FileNotFoundException($"Cannot find implementation binary {AirbyteImplPath}");
-
-            var implementation = Assembly.LoadFile(AirbyteImplPath).GetTypes().Where(x => typeof(Connector).IsAssignableFrom(x) && !x.IsAbstract && !x.IsInterface)
-                .FirstOrDefault(x => x.Name.Equals(implModule, StringComparison.OrdinalIgnoreCase));
-
-            if (implementation == null)
-                throw new Exception("Source implementation not found!");
-            if (Activator.CreateInstance(implementation) is not Connector instance)
-                throw new Exception("Implementation provided does not implement Connector class!");
-
-            Connector = instance;
+            var logger = new AirbyteLogger();
             try
             {
-                await Launch();
+                var connector = ConnectorLoader.Load(AirbyteImplPath,
+                    Environment.GetEnvironmentVariable("AIRBYTE_IMPL_MODULE"));
+                var context = new CliContext(options, connector, logger);
+                await CommandDispatcher.LaunchAsync(context);
             }
             catch (Exception e)
             {
                 if (!e.Data.Contains(AirbyteLogger.TraceEmittedDataKey))
-                    Logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
+                    logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
                         e.StackTrace, AirbyteFailureType.system_error);
-                Logger.Fatal($"Exception ({e.GetType()}): {e.Message}");
+                logger.Fatal($"Exception ({e.GetType()}): {e.Message}");
                 Environment.ExitCode = 1;
-            }
-        }
-
-        private static Source GetSource()
-        {
-            if (Connector is not Source source)
-                throw new Exception($"Could not instantiate Source as current type ({Connector.GetType().Name}) is not implementing {nameof(Source)}");
-            return source;
-        }
-
-        private static Destination GetDestination()
-        {
-            if (Connector is not Destination destination)
-                throw new Exception($"Could not instantiate Destination as current type ({Connector.GetType().Name}) is not implementing {nameof(Destination)}");
-            return destination;
-        }
-
-        private static async Task Launch()
-        {
-            var spec = Connector.Spec();
-            var dataChannel = DataChannelSettings.FromEnvironment();
-
-            switch (Options.Command.ToLowerInvariant())
-            {
-                case "spec":
-                    ToConsole(new AirbyteMessage
-                    {
-                        Type = Type.SPEC,
-                        Spec = spec
-                    });
-                    break;
-                case "check":
-                    var result = Connector.Check(Logger, GetConfig(spec));
-                    if (result.Status == Status.SUCCEEDED) Logger.Info("Check succeeded");
-                    else Logger.Error("Check failed");
-                    ToConsole(new AirbyteMessage
-                    {
-                        Type = Type.CONNECTION_STATUS,
-                        ConnectionStatus = result
-                    });
-                    break;
-                case "discover":
-                    ToConsole(new AirbyteMessage
-                    {
-                        Type = Type.CATALOG,
-                        Catalog = GetSource().Discover(Logger, GetConfig(spec))
-                    });
-                    break;
-                case "read":
-                    if (dataChannel.IsSocket)
-                    {
-                        var socketReadOptions = Options as ReadOptions;
-                        var source = GetSource();
-                        source.PartitionTracker = new PartitionTracker(true);
-
-                        await using var sink = RoutingDataChannelWriter.Create(dataChannel, Console.Out);
-                        var writer = new SinkChannelWriter(sink);
-                        var sourceLogger = new AirbyteLogger(message => writer.TryWrite(message));
-                        try
-                        {
-                            await source.Read(sourceLogger, writer, GetConfig(spec), GetCatalog(),
-                                GetState(source, socketReadOptions));
-                        }
-                        finally
-                        {
-                            await sink.CompleteAsync();
-                        }
-
-                        break;
-                    }
-
-                    Channel<AirbyteMessage> readerChannel = Channel.CreateUnbounded<AirbyteMessage>();
-                    var readOptions = Options as ReadOptions;
-                    var readtasks = new[]
-                    {
-                        Task.Run(async () =>
-                        {
-                            var writer = readerChannel.Writer;
-                            try
-                            {
-                                var source = GetSource();
-                                var state = GetState(source, readOptions);
-                                var config = GetConfig(spec);
-                                var catalog = GetCatalog();
-
-                                // Keep source logs/traces ordered with records and state.
-                                var sourceLogger = new AirbyteLogger(message => writer.TryWrite(message));
-                                await source.Read(sourceLogger, writer, config, catalog, state);
-                            }
-                            catch (Exception e)
-                            {
-                                Logger.Exception(e);
-                                if (!e.Data.Contains(AirbyteLogger.TraceEmittedDataKey))
-                                    Logger.TraceError("The connector failed",
-                                        $"{e.GetType().Name}: {e.Message}", e.StackTrace,
-                                        AirbyteFailureType.system_error);
-                                Logger.Fatal("Could not process data due to exception: " + e.Message);
-                                Environment.ExitCode = 1;
-                            }
-                            finally
-                            {
-                                writer.Complete();
-                            }
-                        }),
-                        Task.Run(async () =>
-                        {
-                            await foreach (var msg in readerChannel.Reader.ReadAllAsync())
-                                ToConsole(msg);
-                        })
-                    };
-
-                    await Task.WhenAll(readtasks);
-                    break;
-                case "write":
-                {
-                    var destination = GetDestination();
-                    var config = GetConfig(spec);
-                    var catalog = GetCatalog();
-                    if (dataChannel.IsSocket)
-                    {
-                        var reader = new CompositeDataChannelReader(
-                            new StdioDataChannelReader(Console.In, Logger.Warn),
-                            new SocketDataChannelReader(dataChannel.SocketPaths, catalog));
-                        await RunWriteLoop(reader, Console.Out, Logger, destination, config, catalog);
-                        break;
-                    }
-
-                    await RunWriteLoop(Console.In, Console.Out, Logger, destination, config, catalog);
-                    break;
-                }
-                default:
-                    throw new ArgumentException($"Unexpected command: {Options.Command}", nameof(Options.Command));
             }
         }
 
@@ -219,7 +72,8 @@ namespace Airbyte.Cdk
         /// </summary>
         public static async Task RunWriteLoop(TextReader input, TextWriter output, AirbyteLogger logger,
             Destination destination, JsonElement config, ConfiguredAirbyteCatalog catalog) =>
-            await RunWriteLoop(new StdioDataChannelReader(input, logger.Warn), output, logger, destination, config, catalog);
+            await RunWriteLoop(new StdioDataChannelReader(input, logger.Warn), output, logger, destination, config,
+                catalog);
 
         /// <summary>
         /// Consumes the merged data channel. Socket mode supplies records from Unix domain sockets
@@ -237,68 +91,12 @@ namespace Airbyte.Cdk
             await reader.CompleteAsync();
         }
 
-        private static JsonElement GetConfig(ConnectorSpecification spec)
-        {
-            var contents = string.IsNullOrWhiteSpace(Options.Config) ? throw new Exception("Config is undefined!")
-                : !TryGetPath(Options.Config, out var filepath) ? throw new FileNotFoundException("Could not find config file: " + Options.Config, Options.Config)
-                : File.ReadAllText(filepath);
-
-            if (string.IsNullOrWhiteSpace(contents))
-                throw new Exception("Config file is empty!");
-
-            var toreturn = contents.AsJsonElement();
-
-            if (!ResourceSchemaLoader.TryCheckConfigAgainstSpecOrExit(toreturn, spec, out var exc))
-                throw new Exception($"Config does not match spec schema: {exc.Message}");
-
-            Logger.Info($"Found config file at location: {filepath}");
-            //Logger.Debug($"Config file contents: {toreturn.RootElement}");
-
-            return toreturn;
-        }
-
-        private static ConfiguredAirbyteCatalog GetCatalog()
-        {
-            if (!TryGetPath(Options.Catalog, out var filepath))
-                throw new FileNotFoundException("Cannot find catalog file: " + Options.Catalog);
-
-            Logger.Info($"Found catalog at location: {filepath}");
-            return AirbyteProtocolReader.ReadCatalog(filepath);
-        }
-
-        private static JsonElement GetState(Source source, ReadOptions readoptions)
-        {
-            if (TryGetPath(readoptions.State, out var filepath))
-                Logger.Info($"Found state file at location: {filepath}");
-            else
-                Logger.Warn($"Could not find state file, config reported state file location: {readoptions.State}");
-
-            var contents = source.ReadState(filepath);
-            Logger.Debug($"State file contents: {contents.GetRawText()}");
-            return contents;
-        }
-
-        public static bool TryGetPath(string filename, out string filepath)
-        {
-            filepath = string.Empty;
-            if (string.IsNullOrWhiteSpace(filename))
-                return false;
-            foreach (var path in new[] { Path.Join(Path.GetDirectoryName(AirbyteImplPath), filename), filename, Path.Join(Directory.GetCurrentDirectory(), filename) })
-                if (File.Exists(path))
-                {
-                    filepath = path;
-                    break;
-                }
-
-            return !string.IsNullOrWhiteSpace(filepath);
-        }
+        public static bool TryGetPath(string filename, out string filepath) =>
+            InputFileResolver.TryGetPath(filename, AirbyteImplPath, out filepath);
 
         public static void ToConsole<T>(T item) where T : AirbyteMessage => ToConsole(item, Console.Out);
 
         public static void ToConsole<T>(T item, TextWriter writer) where T : AirbyteMessage =>
             writer.WriteLine(JsonSerializer.Serialize(item, AirbyteProtocolJson.Options));
-
     }
 }
-
-

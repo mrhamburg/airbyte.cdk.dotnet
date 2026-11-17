@@ -1,10 +1,11 @@
-﻿using System.Text.Json.Serialization;
+﻿using System;
+using System.Text.Json.Serialization;
 
 namespace Airbyte.Cdk.Models
 {
     public class ConfiguredAirbyteCatalog
     {
         [JsonPropertyName("streams")]
-        public ConfiguredAirbyteStream[] Streams { get; set; }
+        public ConfiguredAirbyteStream[] Streams { get; set; } = Array.Empty<ConfiguredAirbyteStream>();
     }
 }

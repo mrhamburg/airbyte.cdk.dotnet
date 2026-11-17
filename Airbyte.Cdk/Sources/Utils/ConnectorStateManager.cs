@@ -93,24 +93,5 @@ namespace Airbyte.Cdk.Sources.Utils
             long recordCount = 0) => CreateStateMessage(
             new StreamDescriptor { Name = name, Namespace = ns }, state, recordCount);
 
-        private readonly struct StreamKey : IEquatable<StreamKey>
-        {
-            public StreamKey(string name, string? ns)
-            {
-                Name = name;
-                Namespace = ns;
-            }
-
-            public string Name { get; }
-            private string? Namespace { get; }
-
-            public bool Equals(StreamKey other) =>
-                string.Equals(Name, other.Name, StringComparison.Ordinal) &&
-                string.Equals(Namespace, other.Namespace, StringComparison.Ordinal);
-
-            public override bool Equals(object? obj) => obj is StreamKey other && Equals(other);
-
-            public override int GetHashCode() => HashCode.Combine(Name, Namespace);
-        }
     }
 }

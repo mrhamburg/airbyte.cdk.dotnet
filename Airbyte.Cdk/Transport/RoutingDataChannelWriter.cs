@@ -53,7 +53,7 @@ namespace Airbyte.Cdk.Transport
             switch (message.Type)
             {
                 case Type.RECORD:
-                    await SocketFor(StreamKey(message.Record?.Namespace, message.Record?.Stream))
+                    await SocketFor(KeyFor(message.Record?.Namespace, message.Record?.Stream))
                         .WriteAsync(message, cancellationToken);
                     return;
                 case Type.STATE:
@@ -74,7 +74,7 @@ namespace Airbyte.Cdk.Transport
             switch (message.Type)
             {
                 case Type.RECORD:
-                    return SocketFor(StreamKey(message.Record?.Namespace, message.Record?.Stream))
+                    return SocketFor(KeyFor(message.Record?.Namespace, message.Record?.Stream))
                         .TryWrite(message);
                 case Type.STATE:
                     _stdout.TryWrite(message);
@@ -96,25 +96,25 @@ namespace Airbyte.Cdk.Transport
                 await socket.CompleteAsync(error);
         }
 
-        private SocketDataChannelWriter SocketFor(string key)
+        private SocketDataChannelWriter SocketFor(StreamKey key)
         {
             if (_sockets.Count == 1)
                 return _sockets[0];
 
-            var hash = Fnv1a(key);
+            var hash = Fnv1a(key.ToString());
             return _sockets[(int)(hash % (uint)_sockets.Count)];
         }
 
-        private static string StateKey(AirbyteStateMessage? state)
+        private static StreamKey StateKey(AirbyteStateMessage? state)
         {
             if (state?.Stream?.StreamDescriptor is { } descriptor)
-                return StreamKey(descriptor.Namespace, descriptor.Name);
+                return StreamKey.From(descriptor);
 
             var first = state?.Global?.StreamStates?.FirstOrDefault()?.StreamDescriptor;
-            return first == null ? string.Empty : StreamKey(first.Namespace, first.Name);
+            return first == null ? StreamKey.Empty : StreamKey.From(first);
         }
 
-        private static string StreamKey(string? ns, string? name) => $"{ns}\u0000{name}";
+        private static StreamKey KeyFor(string? ns, string? name) => new(name ?? string.Empty, ns);
 
         private static uint Fnv1a(string value)
         {

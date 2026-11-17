@@ -22,8 +22,8 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             messages.Count.ShouldBe(1);
             messages[0].Type.ShouldBe(AirbyteStateType.STREAM);
-            messages[0].Stream.StreamDescriptor.Name.ShouldBe("exchange_rates");
-            messages[0].Stream.StreamState.Value.GetProperty("date").GetString().ShouldBe("2021-05-18");
+            messages[0].Stream!.StreamDescriptor.Name.ShouldBe("exchange_rates");
+            messages[0].Stream!.StreamState!.Value.GetProperty("date").GetString().ShouldBe("2021-05-18");
         }
 
         [Fact]
@@ -36,8 +36,8 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             messages.Count.ShouldBe(1);
             messages[0].Type.ShouldBe(AirbyteStateType.STREAM);
-            messages[0].Stream.StreamDescriptor.Name.ShouldBe("users");
-            messages[0].Stream.StreamDescriptor.Namespace.ShouldBe("public");
+            messages[0].Stream!.StreamDescriptor.Name.ShouldBe("users");
+            messages[0].Stream!.StreamDescriptor.Namespace.ShouldBe("public");
         }
 
         [Fact]
@@ -50,7 +50,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             messages.Count.ShouldBe(1);
             messages[0].Type.ShouldBe(AirbyteStateType.GLOBAL);
-            messages[0].Global.StreamStates[0].StreamDescriptor.Name.ShouldBe("users");
+            messages[0].Global!.StreamStates[0].StreamDescriptor.Name.ShouldBe("users");
         }
 
         [Fact]
@@ -62,7 +62,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var messages = StateReader.Parse(json.AsJsonElement());
 
             messages.Count.ShouldBe(1);
-            messages[0].Stream.StreamDescriptor.Name.ShouldBe("users");
+            messages[0].Stream!.StreamDescriptor.Name.ShouldBe("users");
         }
 
         [Fact]
@@ -80,7 +80,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             var messages = StateReader.Parse(("{\"" + name + "\":{\"id\":1}}").AsJsonElement());
 
             messages.Count.ShouldBe(1);
-            messages[0].Stream.StreamDescriptor.Name.ShouldBe(name);
+            messages[0].Stream!.StreamDescriptor.Name.ShouldBe(name);
         }
 
         [Fact]
@@ -150,10 +150,10 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
                 "{\"id\":1}".AsJsonElement(), 5);
 
             message.Type.ShouldBe(AirbyteStateType.STREAM);
-            message.Stream.StreamDescriptor.Name.ShouldBe("users");
-            message.Stream.StreamDescriptor.Namespace.ShouldBe("public");
-            message.Stream.StreamState.Value.GetProperty("id").GetInt32().ShouldBe(1);
-            message.SourceStats.RecordCount.ShouldBe(5);
+            message.Stream!.StreamDescriptor.Name.ShouldBe("users");
+            message.Stream!.StreamDescriptor.Namespace.ShouldBe("public");
+            message.Stream!.StreamState!.Value.GetProperty("id").GetInt32().ShouldBe(1);
+            message.SourceStats!.RecordCount.ShouldBe(5);
         }
 
         [Fact]
@@ -163,7 +163,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             var message = manager.CreateStateMessage(new StreamDescriptor { Name = "users" }, null, 0);
 
-            message.Stream.StreamState.ShouldBeNull();
+            message.Stream!.StreamState.ShouldBeNull();
         }
 
         [Fact]
@@ -215,8 +215,8 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
 
             channel.Reader.TryRead(out var message).ShouldBeTrue();
             message.Type.ShouldBe(MessageType.STATE);
-            message.State.Type.ShouldBe(AirbyteStateType.STREAM);
-            message.State.Stream.StreamState.ShouldBeNull();
+            message.State!.Type.ShouldBe(AirbyteStateType.STREAM);
+            message.State!.Stream!.StreamState.ShouldBeNull();
         }
 
         [Fact]

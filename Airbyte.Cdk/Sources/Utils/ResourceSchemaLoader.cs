@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -16,8 +17,14 @@ namespace Airbyte.Cdk.Sources.Utils
         /// Checks if the config is in line with the set specifications
         /// </summary>
         public static bool TryCheckConfigAgainstSpecOrExit(JsonElement config, ConnectorSpecification spec,
-            out Exception exc)
-            => VerifySchema(config, JsonSchema.FromText(spec.ConnectionSpecification.RootElement.GetRawText()), out exc);
+            out Exception? exc)
+        {
+            if (spec.ConnectionSpecification is null)
+                throw new InvalidOperationException("The connector spec has no connection specification.");
+
+            return VerifySchema(config, JsonSchema.FromText(spec.ConnectionSpecification.RootElement.GetRawText()),
+                out exc);
+        }
 
         /// <summary>
         /// Create a new instance for interpreting and validating the schema of a stream 
@@ -44,11 +51,12 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Checks if the jsonelement as provided is in accordance to the provided schema, returns false if this is not the case
         /// </summary>
-        public static bool VerifySchema(JsonElement jsonElement, JsonSchema schema, out Exception exc)
+        public static bool VerifySchema(JsonElement jsonElement, JsonSchema schema, out Exception? exc)
         {
             var result = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
             exc = !result.IsValid
-                ? new Exception(string.Join("; ", result.Errors.Select(x => $"{x.Key}: {x.Value}")))
+                ? new Exception(string.Join("; ", (result.Errors ?? new Dictionary<string, string>())
+                    .Select(x => $"{x.Key}: {x.Value}")))
                 : null;
             return result.IsValid;
         }

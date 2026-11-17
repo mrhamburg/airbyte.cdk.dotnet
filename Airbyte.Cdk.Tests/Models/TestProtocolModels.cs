@@ -31,7 +31,7 @@ namespace Airbyte.Cdk.Tests.Models
             var auth = JsonSerializer.Deserialize<AuthSpecification>(
                 "{\"auth_type\":\"oauth2.0\"}", AirbyteProtocolJson.Options);
 
-            auth.AuthType.ShouldBe(AuthType.oauth2_0);
+            auth!.AuthType.ShouldBe(AuthType.oauth2_0);
         }
 
         [Fact]
@@ -89,7 +89,7 @@ namespace Airbyte.Cdk.Tests.Models
 
             message.ShouldNotBeNull();
             message.Type.ShouldBe(AirbyteStateType.STREAM);
-            message.Stream.StreamDescriptor.Name.ShouldBe("users");
+            message.Stream!.StreamDescriptor.Name.ShouldBe("users");
         }
 
         [Fact]

@@ -23,9 +23,9 @@ namespace Airbyte.Cdk.Tests
             var parsed = AirbyteProtocolReader.TryParseMessage(json, out var message);
 
             parsed.ShouldBeTrue();
-            message.Type.ShouldBe(MessageType.RECORD);
-            message.Record.Stream.ShouldBe("users");
-            message.Record.Data.GetProperty("id").GetInt32().ShouldBe(1);
+            message!.Type.ShouldBe(MessageType.RECORD);
+            message!.Record!.Stream.ShouldBe("users");
+            message!.Record!.Data.GetProperty("id").GetInt32().ShouldBe(1);
         }
 
         [Fact]
@@ -63,7 +63,7 @@ namespace Airbyte.Cdk.Tests
                 var catalog = AirbyteProtocolReader.ReadCatalog(path);
 
                 catalog.Streams.Length.ShouldBe(1);
-                catalog.Streams[0].Stream.Name.ShouldBe("users");
+                catalog.Streams[0].Stream!.Name.ShouldBe("users");
                 catalog.Streams[0].SyncMode.ShouldBe(SyncMode.full_refresh);
                 catalog.Streams[0].DestinationSyncMode.ShouldBe(DestinationSyncMode.overwrite);
             }
