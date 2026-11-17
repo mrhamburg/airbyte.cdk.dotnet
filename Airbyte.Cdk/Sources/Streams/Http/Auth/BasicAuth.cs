@@ -7,6 +7,9 @@ namespace Airbyte.Cdk.Sources.Streams.Http.Auth
     {
         public BasicAuth(string[] tokens, string authmethod = "Bearer", string authheader = "Authorization")
         {
+            if (tokens == null || tokens.Length == 0)
+                throw new System.ArgumentException("At least one token is required.", nameof(tokens));
+
             Tokens = tokens;
             AuthMethod = authmethod;
             AuthHeader = authheader;
@@ -20,6 +23,8 @@ namespace Airbyte.Cdk.Sources.Streams.Http.Auth
 
         public IFlurlRequest GetAuthHeader(IFlurlRequest request)
             => request.WithHeader(AuthHeader, $"{AuthMethod} {Tokens.Aggregate((current, next) => current + " " + next)}");
+
+        public override void Apply(IFlurlRequest request) => GetAuthHeader(request);
     }
 
     public static class BasicAuthFlurlRequestExtension

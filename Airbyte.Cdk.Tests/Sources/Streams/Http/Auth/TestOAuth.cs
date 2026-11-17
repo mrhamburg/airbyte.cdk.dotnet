@@ -61,6 +61,22 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
         }
 
         [Fact]
+        public async System.Threading.Tasks.Task TestApplyAsync_UsesAsyncRefresh()
+        {
+            var system = new Mock<OAuth>(_refreshEndpoint, _clientId, _clientSecret, _refreshToken, null, null, "", "");
+            system.CallBase = true;
+            system.Setup(x => x.RefreshAccessTokenAsync()).ReturnsAsync(() =>
+                ("async_token", DateTime.UtcNow + TimeSpan.FromSeconds(1000)));
+            var request = new FlurlRequest(Url.Parse("airbyte.io"));
+
+            await system.Object.ApplyAsync(request);
+
+            request.Headers.Count.ShouldBe(1);
+            request.Headers[0].Name.ShouldBe("Authorization");
+            request.Headers[0].Value.ShouldBe("Bearer async_token");
+        }
+
+        [Fact]
         public void TestRefreshRequestBody()
         {
             //Should not retrieve new token if current token is valid.
@@ -72,7 +88,7 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 
             result.ShouldNotBeNullOrWhiteSpace();
             var expected =
-                "{\"grant_type\":\"refresh_token\",\"client_id\":\"client_id\",\"client_secret\":\"client_secret\",\"refresh_token\":\"refresh_token\",\"scopes\":[\"scope1\",\"scope2\"]}";
+                "{\"grant_type\":\"refresh_token\",\"client_id\":\"client_id\",\"client_secret\":\"client_secret\",\"refresh_token\":\"refresh_token\",\"scope\":[\"scope1\",\"scope2\"]}";
             result.ShouldBe(expected);
         }
 

@@ -1,28 +1,32 @@
-﻿using System.Text.Json;
+﻿#nullable enable
+using System.Text.Json;
 
 namespace Airbyte.Cdk.Sources.Utils
 {
     public static class JsonDocumentExtensions
     {
-        public static T ToType<T>(this JsonElement json)
+        public static T ToType<T>(this JsonElement json) =>
+            JsonSerializer.Deserialize<T>(json.GetRawText(), AirbyteProtocolJson.Options)!;
+
+        public static bool TryToType<T>(this JsonElement json, out T? value)
         {
             try
             {
-                return JsonSerializer.Deserialize<T>(json.GetRawText());
+                value = JsonSerializer.Deserialize<T>(json.GetRawText(), AirbyteProtocolJson.Options);
+                return true;
             }
-            catch
+            catch (JsonException)
             {
-                // ignored
+                value = default;
+                return false;
             }
-
-            return default;
         }
 
         /// <summary>
         /// Converts an object to its jsonelement form
         /// </summary>
         public static JsonElement AsJsonElement(this object obj) =>
-            JsonDocument.Parse(JsonSerializer.Serialize(obj)).RootElement.Clone();
+            JsonDocument.Parse(JsonSerializer.Serialize(obj, AirbyteProtocolJson.Options)).RootElement.Clone();
 
         /// <summary>
         /// Converts a json string to its jsonelement form

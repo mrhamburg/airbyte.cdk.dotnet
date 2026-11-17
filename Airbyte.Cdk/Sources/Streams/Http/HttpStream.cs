@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -24,7 +25,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// <summary>
         /// Get the latest response from the api stream
         /// </summary>
-        protected IFlurlResponse LastFlurlResponse { get; private set; }
+        protected IFlurlResponse? LastFlurlResponse { get; private set; }
 
         /// <summary>
         /// Currently used sync mode
@@ -34,7 +35,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// <summary>
         /// Most HTTP streams use a source defined cursor (i.e: the user can't configure it like on a SQL table)
         /// </summary>
-        public new virtual bool SourceDefinedCursor { get; protected set; } = true;
+        public override bool SourceDefinedCursor { get; protected set; } = true;
 
         /// <summary>
         /// Use this variable to define page size for API http requests with pagination support
@@ -44,12 +45,12 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// <summary>
         /// Set auth implementation to be used for each request
         /// </summary>
-        private AuthBase AuthImplementation { get; set; } = null;
+        private AuthBase? AuthImplementation { get; set; }
 
         /// <summary>
         /// Set the authentication implementation for this stream
         /// </summary>
-        public void WithAuth(AuthBase auth) => AuthImplementation = auth;
+        public void WithAuth(AuthBase? auth) => AuthImplementation = auth;
 
         /// <summary>
         /// URL base for the  API endpoint e.g: if you wanted to hit https://myapi.com/v1/some_entity then this should return "https://myapi.com/v1/"
@@ -87,8 +88,8 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// Returns the URL path for the API endpoint e.g: if you wanted to hit https://myapi.com/v1/some_entity then this should return "some_entity"
         /// Defaults to {UrlBase}/{Name} where Name is the name of this stream
         /// </summary>
-        public virtual string Path(JsonElement streamstate, Dictionary<string, object> streamslice = null,
-            Dictionary<string, object> nextpagetoken = null) =>
+        public virtual string Path(JsonElement streamstate, Dictionary<string, object>? streamslice = null,
+            Dictionary<string, object>? nextpagetoken = null) =>
             Name.ToLower();
 
         /// <summary>
@@ -96,14 +97,14 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// E.g: you might want to define query parameters for paging if next_page_token is not None.
         /// </summary>
         public virtual Dictionary<string, object> RequestParams(JsonElement streamstate,
-            Dictionary<string, object> streamslice = null, Dictionary<string, object> nextpagetoken = null) =>
+            Dictionary<string, object>? streamslice = null, Dictionary<string, object>? nextpagetoken = null) =>
             new();
 
         /// <summary>
         /// Override to return any non-auth headers. Authentication headers will overwrite any overlapping headers returned from this method.
         /// </summary>
         public virtual Dictionary<string, object> RequestHeaders(JsonElement streamstate,
-            Dictionary<string, object> streamslice = null, Dictionary<string, object> nextpagetoken = null) =>
+            Dictionary<string, object>? streamslice = null, Dictionary<string, object>? nextpagetoken = null) =>
             new();
 
         /// <summary>
@@ -115,16 +116,16 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// 
         /// At the same time only one of the 'request_body_data' and 'request_body_json' functions can be overridden.
         /// </summary>
-        public virtual string RequestBodyData(JsonElement streamstate, Dictionary<string, object> streamslice = null,
-            Dictionary<string, object> nextpagetoken = null) =>
+        public virtual string RequestBodyData(JsonElement streamstate, Dictionary<string, object>? streamslice = null,
+            Dictionary<string, object>? nextpagetoken = null) =>
             string.Empty;
 
         /// <summary>
         /// Override when creating POST/PUT/PATCH requests to populate the body of the request with a JSON payload.
         /// At the same time only one of the 'request_body_data' and 'request_body_json' functions can be overridden.
         /// </summary>
-        public virtual string RequestBodyJson(JsonElement streamstate, Dictionary<string, object> streamslice = null,
-            Dictionary<string, object> nextpagetoken = null) =>
+        public virtual string RequestBodyJson(JsonElement streamstate, Dictionary<string, object>? streamslice = null,
+            Dictionary<string, object>? nextpagetoken = null) =>
             string.Empty;
 
         /// <summary>
@@ -132,7 +133,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// By default, this returns an iterable containing the input. Override to parse differently.
         /// </summary>
         public abstract IEnumerable<JsonElement> ParseResponse(IFlurlResponse response, JsonElement streamstate,
-            Dictionary<string, object> streamslice = null, Dictionary<string, object> nextpagetoken = null);
+            Dictionary<string, object>? streamslice = null, Dictionary<string, object>? nextpagetoken = null);
 
         /// <summary>
         /// Override to set different conditions for backoff based on the response from the server.
@@ -143,23 +144,30 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// 
         /// Unexpected but transient exceptions (connection timeout, DNS resolution failed, etc..) are retried by default.
         /// </summary>
-        public virtual bool ShouldRetry(FlurlHttpException exc) => exc.StatusCode is 429 or 500 or < 600;
+        public virtual bool ShouldRetry(FlurlHttpException exc) => IsRetryableStatus(exc.StatusCode);
+
+        /// <summary>
+        /// Returns true for transient failures the retry policy may recover from: rate limits,
+        /// server errors, and connection failures that have no HTTP status.
+        /// </summary>
+        public static bool IsRetryableStatus(int? statusCode) =>
+            statusCode is null or 429 or (>= 500 and < 600);
 
         /// <summary>
         /// Override this method to dynamically determine backoff time e.g: by reading the X-Retry-After header.
         /// This method is called only if ShouldBackoff returns True for the input request.
         /// </summary>
         /// <returns>how long to backoff in seconds. The return value may be a floating point number for subsecond precision. Returning None defers backoff to the default backoff behavior (e.g using an exponential algorithm).</returns>
-        public virtual TimeSpan BackoffTime(int retryCount, IFlurlResponse response) =>
-            response.Headers.TryGetFirst("X-Retry-After", out string retryafter)
+        public virtual TimeSpan BackoffTime(int retryCount, IFlurlResponse? response) =>
+            response?.Headers.TryGetFirst("X-Retry-After", out string retryafter) == true
                 ? TimeSpan.FromSeconds(double.TryParse(retryafter, out var result) ? result : 5)
                 : TimeSpan.FromSeconds(5) * retryCount;
 
         /// <summary>
         /// Process and send the request to the endpoint as set by the urlbase, includes all configuration as set in this stream
         /// </summary>
-        public virtual async Task<(IFlurlRequest, IFlurlResponse)> Send(string path, Dictionary<string, object> headers = null,
-            Dictionary<string, object> parameters = null, string json = "", string data = "")
+        public virtual async Task<(IFlurlRequest, IFlurlResponse)> Send(string path, Dictionary<string, object>? headers = null,
+            Dictionary<string, object>? parameters = null, string json = "", string data = "")
         {
             //Create initial request object
             Url requestUrl = UrlBase().AppendPathSegment(path);
@@ -181,22 +189,16 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                 !string.IsNullOrWhiteSpace(data) ? data : string.Empty;
 
             //Check for authentication
-            switch (AuthImplementation)
-            {
-                case BasicAuth basicAuth:
-                    request.WithBasicAuth(basicAuth);
-                    break;
-                case OAuth oAuth:
-                    request.WithOauth(oAuth);
-                    break;
-            }
+            if (AuthImplementation != null)
+                await AuthImplementation.ApplyAsync(request);
 
             //Prepare requests
             Func<Task<IFlurlResponse>> requestFunc =
                 new[] {HttpMethod.Put, HttpMethod.Patch, HttpMethod.Post}.Contains(HttpMethod)
                     ? !string.IsNullOrWhiteSpace(stringContent)
                         ?
-                        async () => await request.SendAsync(HttpMethod, new StringContent(stringContent))
+                        async () => await request.SendAsync(HttpMethod, CreateBodyContent(stringContent,
+                            !string.IsNullOrWhiteSpace(json)))
                         : async () => await request.SendAsync(HttpMethod)
                     : async () => await request.GetAsync();
 
@@ -206,33 +208,47 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                 return await GetRetryPolicy()
                     .ExecuteAsync(async () =>
                     {
-                        LastFlurlResponse = await requestFunc();
-                        return (request, LastFlurlResponse);
+                        var response = await requestFunc();
+                        LastFlurlResponse = response;
+                        return (request, response);
                     });
             }
             catch (Exception e)
             {
-                if (RaiseOnHttpErrors)
+                if (!RaiseOnHttpErrors && e is FlurlHttpException { Call.Response: { } errorResponse })
                 {
-                    if (e is FlurlHttpException flurlHttpException)
-                        Logger.Info($"Giving up for returned HTTP status: {flurlHttpException.StatusCode}");
-                    throw;
+                    LastFlurlResponse = errorResponse;
+                    return (request, errorResponse);
                 }
-            }
 
-            return (null, null);
+                if (e is FlurlHttpException flurlHttpException)
+                    Logger.Info($"Giving up for returned HTTP status: {flurlHttpException.StatusCode}");
+                throw;
+            }
         }
+
+        /// <summary>
+        /// Builds the request body with the media type that matches the payload.
+        /// </summary>
+        public static HttpContent CreateBodyContent(string content, bool isJson) =>
+            new StringContent(content, System.Text.Encoding.UTF8,
+                isJson ? "application/json" : "application/x-www-form-urlencoded");
 
         /// <summary>
         /// Creates the retry policy to retry when needed
         /// </summary>
         private AsyncRetryPolicy GetRetryPolicy() =>
             Policy.Handle<FlurlHttpException>(ShouldRetry)
-                .WaitAndRetryAsync(MaxRetries, retryCount => BackoffTime(retryCount, LastFlurlResponse),
-                    (exc, span, count, _) =>
+                .WaitAndRetryAsync(MaxRetries,
+                    (int retryCount, Exception exception, Context _) => BackoffTime(retryCount,
+                        exception is FlurlHttpException flurlException
+                            ? flurlException.Call.Response
+                            : LastFlurlResponse),
+                    (Exception exc, TimeSpan span, int count, Context _) =>
                     {
                         Logger.Info(
                             $"Caught retryable error '{exc.Message}' after {count} tries. Waiting {Math.Round(span.TotalSeconds)} seconds then retrying...");
+                        return Task.CompletedTask;
                     });
 
         /// <summary>
@@ -240,13 +256,13 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// </summary>
         public override async Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
             ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
-            string[] cursorfield = null, Dictionary<string, object> streamslice = null)
+            string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
         {
             SyncMode = syncMode;
             Logger = logger;
             StateEmitter ??= new StateEmitter(streamchannel);
             bool paginationcompleted = false;
-            Dictionary<string, object> nextpagetoken = null;
+            Dictionary<string, object>? nextpagetoken = null;
             long recordcount = 0;
             long recordsSinceState = 0;
             JsonElement lastitem = "{}".AsJsonElement();
@@ -254,7 +270,9 @@ namespace Airbyte.Cdk.Sources.Streams.Http
 
             async Task UpdateState(JsonElement lastrecord)
             {
-                var updatedstate = GetUpdatedState(streamstate, lastrecord);
+                var updatedstate = SyncMode == SyncMode.incremental
+                    ? GetUpdatedState(streamstate, lastrecord)
+                    : streamstate;
                 Logger.Info($"Setting state of {Name} stream to {updatedstate.GetRawText()}");
                 var emitted = await StateEmitter.EmitAsync(
                     new StreamDescriptor { Name = Name, Namespace = Namespace },
@@ -285,14 +303,21 @@ namespace Airbyte.Cdk.Sources.Streams.Http
                     if (Limitreached()) break;
 
                     //Check state checkpoint
-                    if (SyncMode == SyncMode.incremental && StateCheckpointInterval.HasValue &&
-                        recordcount % StateCheckpointInterval == 0)
-                        await UpdateState(item);
+                    if (SyncMode == SyncMode.incremental && StateCheckpointInterval.HasValue)
+                    {
+                        if (StateCheckpointInterval.Value <= 0)
+                            throw new InvalidOperationException(
+                                "StateCheckpointInterval must be greater than zero.");
+
+                        if (recordcount % StateCheckpointInterval.Value == 0)
+                            await UpdateState(item);
+                    }
                 }
 
                 nextpagetoken = NextPageToken(result.request, result.response);
                 paginationcompleted = (nextpagetoken == null || nextpagetoken.Count == 0) || Limitreached();
-                if (paginationcompleted) await UpdateState(lastitem);
+                if (paginationcompleted && (SyncMode != SyncMode.incremental || recordcount > 0))
+                    await UpdateState(lastitem);
             }
 
             return recordcount;

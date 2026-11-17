@@ -259,12 +259,12 @@ namespace Airbyte.Cdk
                 {
                     "build", "-f", Path.Join(dir.FullName, "Dockerfile"), "-t", "local", repositorypath
                 });
-            await cmd.ExecuteAsync();
+            var result = await cmd.ExecuteAsync();
 
-            if (stdOutBuffer.ToString().Contains("exporting to image"))
+            if (result.ExitCode == 0)
                 ToConsole(Progress, step, Emoji.Known.CheckMark);
             else
-                throw new Exception("Could not build resulting docker image due to error");
+                throw new Exception("Could not build resulting docker image due to error: \n" + stdOutBuffer);
         }
 
         private static async Task AddDepdendency(DirectoryInfo dir, string project, string nuget)
@@ -316,12 +316,12 @@ namespace Airbyte.Cdk
             var stdOutBuffer = new StringBuilder();
             var cmd = Cli.Wrap("dotnet").WithArguments("--version") | stdOutBuffer;
             await cmd.ExecuteAsync();
-            if (Version.TryParse(stdOutBuffer.ToString(), out var v) && v.Major >= 6)
+            if (Version.TryParse(stdOutBuffer.ToString(), out var v) && v.Major >= 10)
                 ToConsole(Check, "Found dotnet version: ", v.ToString(), " ", Emoji.Known.CheckMark);
-            else if (v?.Major < 5)
+            else if (v != null && v.Major < 10)
             {
                 ToConsole(Check, "Validating dotnet...", Emoji.Known.CrossMark);
-                throw new Exception($"Your dotnet version is out of date, please download the latest version at: https://dotnet.microsoft.com/download");
+                throw new Exception($"Your dotnet version is out of date, please download version 10 at: https://dotnet.microsoft.com/download");
             }
             else
             {

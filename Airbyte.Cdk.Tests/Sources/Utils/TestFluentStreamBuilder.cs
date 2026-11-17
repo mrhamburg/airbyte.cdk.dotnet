@@ -19,7 +19,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseObject("$");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(input_json);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(input_json);
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
@@ -32,7 +32,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseObject("$.address");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(input_json);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(input_json);
 
             var expectedsresult = "{\"streetAddress\":\"naist street\",\"city\":\"Nara\",\"postalCode\":\"630-0192\"}";
 
@@ -47,7 +47,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseObject("$.addresses");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(input_json);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(input_json);
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
@@ -60,7 +60,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseArray("$.phoneNumbers[0]");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(input_json);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(input_json);
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
@@ -73,7 +73,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseObject("$.phoneNumbers");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(input_json);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(input_json);
 
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
@@ -87,7 +87,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseArray("$.phoneNumbers");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(input_json);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(input_json);
             
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 
@@ -105,7 +105,7 @@ namespace Airbyte.Cdk.Tests.Sources.Utils
             FluentStreamBuilder client = new FluentStreamBuilder();
             var func = client.ParseResponseArray("$");
             Mock<IFlurlResponse> response = new Mock<IFlurlResponse>();
-            response.Setup(x => x.GetStringAsync().Result).Returns(expectedsresult);
+            response.Setup(x => x.GetStringAsync()).ReturnsAsync(expectedsresult);
             
             var result = func.Create("x").ParseResponse(response.Object, "".AsJsonElement());
 

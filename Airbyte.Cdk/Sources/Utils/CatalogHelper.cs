@@ -1,4 +1,5 @@
-﻿using Airbyte.Cdk.Models;
+﻿using System.Text.Json;
+using Airbyte.Cdk.Models;
 
 namespace Airbyte.Cdk.Sources.Utils
 {
@@ -9,7 +10,9 @@ namespace Airbyte.Cdk.Sources.Utils
         /// </summary>
         public static AirbyteCatalog CoerceAirbyteCatalogAsFullRefresh(AirbyteCatalog catalog)
         {
-            var coercedCatalog = new AirbyteCatalog { Streams = catalog.Streams };
+            var json = JsonSerializer.Serialize(catalog, AirbyteProtocolJson.Options);
+            var coercedCatalog = JsonSerializer.Deserialize<AirbyteCatalog>(json, AirbyteProtocolJson.Options)
+                                 ?? throw new JsonException("Could not copy the catalog.");
             foreach (var stream in coercedCatalog.Streams)
             {
                 stream.SourceDefinedCursor = false;
