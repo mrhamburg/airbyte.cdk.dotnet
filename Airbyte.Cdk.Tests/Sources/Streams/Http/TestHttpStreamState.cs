@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
             var messages = await ReadAll(channel);
             messages.Count(x => x.Type == MessageType.RECORD).ShouldBe(1);
             var state = messages.Single(x => x.Type == MessageType.STATE).State;
-            state.Stream.StreamState.Value.GetProperty("id").GetInt32().ShouldBe(1);
+            state!.Stream!.StreamState!.Value.GetProperty("id").GetInt32().ShouldBe(1);
         }
 
         [Fact]
@@ -43,10 +44,10 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
 
             var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).Select(x => x.State).ToArray();
             states.Length.ShouldBe(2);
-            states[0].Stream.StreamState.Value.GetProperty("id").GetInt32().ShouldBe(1);
-            states[0].SourceStats.RecordCount.ShouldBe(1);
-            states[1].Stream.StreamState.Value.GetProperty("id").GetInt32().ShouldBe(2);
-            states[1].SourceStats.RecordCount.ShouldBe(1);
+            states[0]!.Stream!.StreamState!.Value.GetProperty("id").GetInt32().ShouldBe(1);
+            states[0]!.SourceStats!.RecordCount.ShouldBe(1);
+            states[1]!.Stream!.StreamState!.Value.GetProperty("id").GetInt32().ShouldBe(2);
+            states[1]!.SourceStats!.RecordCount.ShouldBe(1);
         }
 
         [Fact]
@@ -61,8 +62,8 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
 
             var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).Select(x => x.State).ToArray();
             states.Length.ShouldBe(2);
-            states[0].SourceStats.RecordCount.ShouldBe(1);
-            states[1].SourceStats.RecordCount.ShouldBe(1);
+            states[0]!.SourceStats!.RecordCount.ShouldBe(1);
+            states[1]!.SourceStats!.RecordCount.ShouldBe(1);
         }
 
         [Fact]
@@ -78,9 +79,9 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
 
             var states = (await ReadAll(channel)).Where(x => x.Type == MessageType.STATE).Select(x => x.State).ToArray();
             states.Length.ShouldBe(3);
-            states[0].SourceStats.RecordCount.ShouldBe(1);
-            states[1].SourceStats.RecordCount.ShouldBe(1);
-            states[2].SourceStats.RecordCount.ShouldBe(1);
+            states[0]!.SourceStats!.RecordCount.ShouldBe(1);
+            states[1]!.SourceStats!.RecordCount.ShouldBe(1);
+            states[2]!.SourceStats!.RecordCount.ShouldBe(1);
         }
 
         private static async Task<List<AirbyteMessage>> ReadAll(Channel<AirbyteMessage> channel)
@@ -109,19 +110,20 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http
                 new();
 
             public override IEnumerable<JsonElement> ParseResponse(IFlurlResponse response, JsonElement streamstate,
-                Dictionary<string, object> streamslice = null, Dictionary<string, object> nextpagetoken = null) =>
+                Dictionary<string, object>? streamslice = null, Dictionary<string, object>? nextpagetoken = null) =>
                 _records;
 
-            public Func<JsonElement, JsonElement> UpdatedState { get; set; }
+            public Func<JsonElement, JsonElement>? UpdatedState { get; set; }
 
             public override JsonElement GetUpdatedState(JsonElement currentstreamstate, JsonElement latestrecord) =>
                 UpdatedState?.Invoke(latestrecord) ??
                 new { id = latestrecord.GetProperty("id").GetInt32() }.AsJsonElement();
 
             public override Task<(IFlurlRequest, IFlurlResponse)> Send(string path,
-                Dictionary<string, object> headers = null, Dictionary<string, object> parameters = null,
+                Dictionary<string, object>? headers = null, Dictionary<string, object>? parameters = null,
                 string json = "", string data = "") =>
-                Task.FromResult<(IFlurlRequest, IFlurlResponse)>((null, new Mock<IFlurlResponse>().Object));
+                Task.FromResult<(IFlurlRequest, IFlurlResponse)>((new Mock<IFlurlRequest>().Object,
+                    new Mock<IFlurlResponse>().Object));
         }
     }
 }

@@ -129,9 +129,9 @@ namespace Airbyte.Cdk.Tests.Transport
             var decoded = AirbyteProtobufMapper.FromProtobuf(message, catalog);
 
             decoded!.Record!.Stream.ShouldBe("users");
-            decoded.Record.PartitionId.ShouldBe("p1");
-            decoded.Record.Data.GetProperty("name").GetString().ShouldBe("alice");
-            decoded.Record.Data.GetProperty("id").GetInt32().ShouldBe(42);
+            decoded.Record!.PartitionId.ShouldBe("p1");
+            decoded.Record!.Data.GetProperty("name").GetString().ShouldBe("alice");
+            decoded.Record!.Data.GetProperty("id").GetInt32().ShouldBe(42);
         }
 
         [Fact]
@@ -170,7 +170,7 @@ namespace Airbyte.Cdk.Tests.Transport
             var decoded = AirbyteProtobufMapper.FromProtobuf(message, catalog);
 
             decoded!.Record!.Data.GetProperty("t").GetString().ShouldBe("12:34:56.1234567");
-            decoded.Record.Data.GetProperty("z").GetString().ShouldBe("12:34:56.1234567+01:00");
+            decoded.Record!.Data.GetProperty("z").GetString().ShouldBe("12:34:56.1234567+01:00");
         }
 
         private static AirbyteMessage Record(string stream, int id) => new()
@@ -444,7 +444,7 @@ namespace Airbyte.Cdk.Tests.Transport
             var decoded = AirbyteProtobufMapper.FromProtobuf(message, catalog);
 
             decoded!.Record!.Data.GetProperty("t").GetString().ShouldBe("12:34:56.1234567");
-            decoded.Record.Data.GetProperty("z").GetString().ShouldBe("12:34:56.1234567+01:00");
+            decoded.Record!.Data.GetProperty("z").GetString().ShouldBe("12:34:56.1234567+01:00");
         }
 
         private static AirbyteMessage Record(string stream, int id) => new()

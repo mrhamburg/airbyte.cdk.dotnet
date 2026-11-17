@@ -24,7 +24,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http.Auth
 
         public string AccessTokenName { get; }
 
-        private string AccessToken { get; set; }
+        private string AccessToken { get; set; } = string.Empty;
 
         private readonly object _tokenLock = new();
         private readonly SemaphoreSlim _tokenLockAsync = new(1, 1);
@@ -34,7 +34,7 @@ namespace Airbyte.Cdk.Sources.Streams.Http.Auth
         public IEnumerable<string> Scopes { get; }
 
         public OAuth(string tokenrefreshendpoint, string clientid, string clientsecret, string refreshtoken,
-            IEnumerable<string> scopes = null, DateTime? tokenexpiry = null, string accesstokenname = "",
+            IEnumerable<string>? scopes = null, DateTime? tokenexpiry = null, string accesstokenname = "",
             string expiresinname = "")
         {
             TokenRefreshEndpoint = tokenrefreshendpoint;

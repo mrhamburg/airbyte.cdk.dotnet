@@ -91,7 +91,7 @@ namespace Airbyte.Cdk
         private static string MoveToUpperPath(string path, int level, bool removefilename = false)
         {
             for (int i = 0; i < level; i++)
-                path = Path.Combine(Path.GetDirectoryName(path), removefilename ? "" : Path.GetFileName(path));
+                path = Path.Combine(Path.GetDirectoryName(path) ?? string.Empty, removefilename ? "" : Path.GetFileName(path));
 
             return path;
         }

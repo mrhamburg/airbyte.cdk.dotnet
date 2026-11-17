@@ -1,7 +1,6 @@
 ﻿#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -9,11 +8,7 @@ using System.Threading.Tasks;
 using Airbyte.Cdk.Models;
 using Airbyte.Cdk.Sources.Streams.Http.Auth;
 using Airbyte.Cdk.Sources.Utils;
-using Flurl;
 using Flurl.Http;
-using Polly;
-using Polly.Retry;
-using Type = Airbyte.Cdk.Models.Type;
 
 namespace Airbyte.Cdk.Sources.Streams.Http
 {
@@ -166,161 +161,36 @@ namespace Airbyte.Cdk.Sources.Streams.Http
         /// <summary>
         /// Process and send the request to the endpoint as set by the urlbase, includes all configuration as set in this stream
         /// </summary>
-        public virtual async Task<(IFlurlRequest, IFlurlResponse)> Send(string path, Dictionary<string, object>? headers = null,
-            Dictionary<string, object>? parameters = null, string json = "", string data = "")
+        public virtual async Task<(IFlurlRequest, IFlurlResponse)> Send(string path,
+            Dictionary<string, object>? headers = null, Dictionary<string, object>? parameters = null,
+            string json = "", string data = "")
         {
-            //Create initial request object
-            Url requestUrl = UrlBase().AppendPathSegment(path);
-            IFlurlRequest request = requestUrl.WithTimeout(TimeOut);
-            LastFlurlResponse = null;
-
-            //Set header or query params
-            if (headers?.Count > 0)
-                request = headers.Aggregate(request, (current, header) => current.WithHeader(header.Key, header.Value));
-            if (parameters?.Count > 0)
-                request = parameters.Aggregate(request,
-                    (current, @params) => current.SetQueryParam(@params.Key, @params.Value));
-
-            //Set content
-            if (!string.IsNullOrWhiteSpace(json) && !string.IsNullOrWhiteSpace(data))
-                throw new Exception(
-                    "At the same time only one of the 'RequestBodyData' and 'RequestBodyJson' functions can return data");
-            string stringContent = !string.IsNullOrWhiteSpace(json) ? json :
-                !string.IsNullOrWhiteSpace(data) ? data : string.Empty;
-
-            //Check for authentication
-            if (AuthImplementation != null)
-                await AuthImplementation.ApplyAsync(request);
-
-            //Prepare requests
-            Func<Task<IFlurlResponse>> requestFunc =
-                new[] {HttpMethod.Put, HttpMethod.Patch, HttpMethod.Post}.Contains(HttpMethod)
-                    ? !string.IsNullOrWhiteSpace(stringContent)
-                        ?
-                        async () => await request.SendAsync(HttpMethod, CreateBodyContent(stringContent,
-                            !string.IsNullOrWhiteSpace(json)))
-                        : async () => await request.SendAsync(HttpMethod)
-                    : async () => await request.GetAsync();
-
-            //Execute request
-            try
-            {
-                return await GetRetryPolicy()
-                    .ExecuteAsync(async () =>
-                    {
-                        var response = await requestFunc();
-                        LastFlurlResponse = response;
-                        return (request, response);
-                    });
-            }
-            catch (Exception e)
-            {
-                if (!RaiseOnHttpErrors && e is FlurlHttpException { Call.Response: { } errorResponse })
-                {
-                    LastFlurlResponse = errorResponse;
-                    return (request, errorResponse);
-                }
-
-                if (e is FlurlHttpException flurlHttpException)
-                    Logger.Info($"Giving up for returned HTTP status: {flurlHttpException.StatusCode}");
-                throw;
-            }
+            var result = await new HttpRequestExecutor(this).SendAsync(path, headers, parameters, json, data);
+            LastFlurlResponse = result.Item2;
+            return result;
         }
 
         /// <summary>
         /// Builds the request body with the media type that matches the payload.
         /// </summary>
         public static HttpContent CreateBodyContent(string content, bool isJson) =>
-            new StringContent(content, System.Text.Encoding.UTF8,
-                isJson ? "application/json" : "application/x-www-form-urlencoded");
+            HttpRequestExecutor.CreateBodyContent(content, isJson);
 
-        /// <summary>
-        /// Creates the retry policy to retry when needed
-        /// </summary>
-        private AsyncRetryPolicy GetRetryPolicy() =>
-            Policy.Handle<FlurlHttpException>(ShouldRetry)
-                .WaitAndRetryAsync(MaxRetries,
-                    (int retryCount, Exception exception, Context _) => BackoffTime(retryCount,
-                        exception is FlurlHttpException flurlException
-                            ? flurlException.Call.Response
-                            : LastFlurlResponse),
-                    (Exception exc, TimeSpan span, int count, Context _) =>
-                    {
-                        Logger.Info(
-                            $"Caught retryable error '{exc.Message}' after {count} tries. Waiting {Math.Round(span.TotalSeconds)} seconds then retrying...");
-                        return Task.CompletedTask;
-                    });
+        internal Task ApplyAuthAsync(IFlurlRequest request) =>
+            AuthImplementation?.ApplyAsync(request) ?? Task.CompletedTask;
 
         /// <summary>
         /// Start reading records
         /// </summary>
-        public override async Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
+        public override Task<long> ReadRecords(AirbyteLogger logger, SyncMode syncMode,
             ChannelWriter<AirbyteMessage> streamchannel, JsonElement streamstate, long? recordlimit = null,
             string[]? cursorfield = null, Dictionary<string, object>? streamslice = null)
         {
             SyncMode = syncMode;
             Logger = logger;
             StateEmitter ??= new StateEmitter(streamchannel);
-            bool paginationcompleted = false;
-            Dictionary<string, object>? nextpagetoken = null;
-            long recordcount = 0;
-            long recordsSinceState = 0;
-            JsonElement lastitem = "{}".AsJsonElement();
-            bool Limitreached() => recordlimit.HasValue && recordcount >= recordlimit.Value;
-
-            async Task UpdateState(JsonElement lastrecord)
-            {
-                var updatedstate = SyncMode == SyncMode.incremental
-                    ? GetUpdatedState(streamstate, lastrecord)
-                    : streamstate;
-                Logger.Info($"Setting state of {Name} stream to {updatedstate.GetRawText()}");
-                var emitted = await StateEmitter.EmitAsync(
-                    new StreamDescriptor { Name = Name, Namespace = Namespace },
-                    updatedstate, recordsSinceState);
-                if (emitted)
-                    recordsSinceState = 0;
-                streamstate = updatedstate;
-            }
-
-            while (!paginationcompleted)
-            {
-                var requestheaders = RequestHeaders(streamstate, streamslice, nextpagetoken);
-                var path = Path(streamstate, streamslice, nextpagetoken);
-                var parameters = RequestParams(streamstate, streamslice, nextpagetoken);
-                var requestjson = RequestBodyJson(streamstate, streamslice, nextpagetoken);
-                var requestBodyData = RequestBodyData(streamstate, streamslice, nextpagetoken);
-                (IFlurlRequest request, IFlurlResponse response) result = await Send(path, requestheaders, parameters,
-                    requestjson, requestBodyData);
-
-                foreach (var item in ParseResponse(result.response, streamstate, streamslice, nextpagetoken))
-                {
-                    await streamchannel.WriteAsync(AbstractSource.AsAirbyteMessage(Name, Namespace, item));
-                    recordcount++;
-                    recordsSinceState++;
-                    lastitem = item;
-
-                    //Check record limit
-                    if (Limitreached()) break;
-
-                    //Check state checkpoint
-                    if (SyncMode == SyncMode.incremental && StateCheckpointInterval.HasValue)
-                    {
-                        if (StateCheckpointInterval.Value <= 0)
-                            throw new InvalidOperationException(
-                                "StateCheckpointInterval must be greater than zero.");
-
-                        if (recordcount % StateCheckpointInterval.Value == 0)
-                            await UpdateState(item);
-                    }
-                }
-
-                nextpagetoken = NextPageToken(result.request, result.response);
-                paginationcompleted = (nextpagetoken == null || nextpagetoken.Count == 0) || Limitreached();
-                if (paginationcompleted && (SyncMode != SyncMode.incremental || recordcount > 0))
-                    await UpdateState(lastitem);
-            }
-
-            return recordcount;
+            return HttpRecordReader.ReadAsync(this, logger, syncMode, streamchannel, streamstate, recordlimit,
+                cursorfield, streamslice);
         }
     }
 }

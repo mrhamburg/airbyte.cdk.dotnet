@@ -19,7 +19,7 @@ namespace Airbyte.Cdk.Tests.Sources
         [Fact]
         public void TestSuccesfullConnection()
         {
-            Exception noexc = null;
+            Exception noexc = null!;
             Mock.Setup(
                     (source => source.CheckConnection(It.IsAny<AirbyteLogger>(), It.IsAny<JsonElement>(), out noexc)))
                 .Returns(true);

@@ -29,9 +29,9 @@ namespace Airbyte.Cdk.Sources.Utils
 
             lock (_sync)
             {
-                var key = new StreamKey(descriptor.Name, descriptor.Namespace);
+                var key = StreamKey.From(descriptor);
                 if (!_segments.ContainsKey(key))
-                    _segments[key] = NewSegment(descriptor);
+                    _segments[key] = NewSegment();
             }
         }
 
@@ -62,7 +62,7 @@ namespace Airbyte.Cdk.Sources.Utils
 
             lock (_sync)
             {
-                var key = new StreamKey(descriptor.Name, descriptor.Namespace);
+                var key = StreamKey.From(descriptor);
                 var segment = GetSegment(descriptor);
                 if (!_nextStateIds.TryGetValue(key, out var nextStateId))
                     nextStateId = 1;
@@ -73,23 +73,23 @@ namespace Airbyte.Cdk.Sources.Utils
                 state.SourceStats.RecordCount = segment.RecordCount;
 
                 _nextStateIds[key] = nextStateId + 1;
-                _segments[key] = NewSegment(descriptor);
+                _segments[key] = NewSegment();
             }
         }
 
         private Segment GetSegment(StreamDescriptor descriptor)
         {
-            var key = new StreamKey(descriptor.Name, descriptor.Namespace);
+            var key = StreamKey.From(descriptor);
             if (!_segments.TryGetValue(key, out var segment))
             {
-                segment = NewSegment(descriptor);
+                segment = NewSegment();
                 _segments[key] = segment;
             }
 
             return segment;
         }
 
-        private static Segment NewSegment(StreamDescriptor descriptor) =>
+        private static Segment NewSegment() =>
             new(Guid.NewGuid().ToString("N"));
 
         private sealed class Segment
@@ -100,24 +100,5 @@ namespace Airbyte.Cdk.Sources.Utils
             public long RecordCount { get; set; }
         }
 
-        private readonly struct StreamKey : IEquatable<StreamKey>
-        {
-            public StreamKey(string name, string? ns)
-            {
-                Name = name;
-                Namespace = ns;
-            }
-
-            private string Name { get; }
-            private string? Namespace { get; }
-
-            public bool Equals(StreamKey other) =>
-                string.Equals(Name, other.Name, StringComparison.Ordinal) &&
-                string.Equals(Namespace, other.Namespace, StringComparison.Ordinal);
-
-            public override bool Equals(object? obj) => obj is StreamKey other && Equals(other);
-
-            public override int GetHashCode() => HashCode.Combine(Name, Namespace);
-        }
     }
 }

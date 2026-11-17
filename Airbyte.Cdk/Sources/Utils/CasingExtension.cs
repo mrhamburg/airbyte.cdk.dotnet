@@ -9,8 +9,12 @@ namespace Airbyte.Cdk.Sources.Utils
         /// <summary>
         /// Convert string to snake case formatting
         /// </summary>
-        public static string ToSnakeCase(this string str) => 
-            string.Concat((str ?? string.Empty).Select((x, i) => i > 0 && char.IsUpper(x) && !char.IsUpper(str[i - 1]) ? $"_{x}" : x.ToString())).ToLower();
+        public static string ToSnakeCase(this string? str)
+        {
+            var value = str ?? string.Empty;
+            return string.Concat(value.Select((x, i) =>
+                i > 0 && char.IsUpper(x) && !char.IsUpper(value[i - 1]) ? $"_{x}" : x.ToString())).ToLower();
+        }
         
         /// <summary>
         /// Convert string to pascal case formatting

@@ -24,8 +24,8 @@ namespace Airbyte.Cdk.Transport
         private readonly ConfiguredAirbyteCatalog _catalog;
         private readonly TextWriter _stateOutput;
         private readonly Dictionary<string, long> _written = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, SortedDictionary<int, AirbyteStateMessage>> _pending = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> _nextStateIds = new(StringComparer.Ordinal);
+        private readonly Dictionary<StreamKey, SortedDictionary<int, AirbyteStateMessage>> _pending = new();
+        private readonly Dictionary<StreamKey, int> _nextStateIds = new();
 
         public DestinationMessageDispatcher(Destination destination, AirbyteLogger logger, JsonElement config,
             ConfiguredAirbyteCatalog catalog, TextWriter stateOutput)
@@ -146,13 +146,10 @@ namespace Airbyte.Cdk.Transport
                 _written.Remove(partition);
         }
 
-        private static string StateOrderKey(AirbyteStateMessage state)
-        {
-            if (state.Stream?.StreamDescriptor is { } descriptor)
-                return $"{descriptor.Namespace}\u0000{descriptor.Name}";
-
-            return string.Empty;
-        }
+        private static StreamKey StateOrderKey(AirbyteStateMessage state) =>
+            state.Stream?.StreamDescriptor is { } descriptor
+                ? StreamKey.From(descriptor)
+                : StreamKey.Empty;
 
         private static IEnumerable<string> Partitions(AirbyteStateMessage state)
         {

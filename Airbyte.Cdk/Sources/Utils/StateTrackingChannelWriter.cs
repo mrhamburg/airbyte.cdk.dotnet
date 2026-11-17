@@ -18,7 +18,7 @@ namespace Airbyte.Cdk.Sources.Utils
         private readonly ChannelWriter<AirbyteMessage> _inner;
         private readonly StateEmitter _stateEmitter;
         private readonly PartitionTracker? _partitionTracker;
-        private readonly HashSet<string> _running = new();
+        private readonly HashSet<StreamKey> _running = new();
         private readonly object _sync = new();
 
         public StateTrackingChannelWriter(ChannelWriter<AirbyteMessage> inner, StateEmitter stateEmitter,
@@ -65,7 +65,7 @@ namespace Airbyte.Cdk.Sources.Utils
 
                 bool firstRecord;
                 lock (_sync)
-                    firstRecord = _running.Add(Key(CurrentDescriptor));
+                    firstRecord = _running.Add(StreamKey.From(CurrentDescriptor));
 
                 if (firstRecord)
                     Logger?.TraceStreamStatus(CurrentDescriptor, AirbyteStreamStatus.RUNNING);
@@ -85,7 +85,5 @@ namespace Airbyte.Cdk.Sources.Utils
             }
         }
 
-        private static string Key(StreamDescriptor descriptor) =>
-            descriptor.Name + "\u0000" + (descriptor.Namespace ?? string.Empty);
     }
 }

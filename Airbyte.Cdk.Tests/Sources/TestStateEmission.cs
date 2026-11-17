@@ -152,7 +152,7 @@ namespace Airbyte.Cdk.Tests.Sources
             var message = AbstractSource.AsAirbyteMessage("users", "{\"id\":1}".AsJsonElement());
 
             message.Record!.Stream.ShouldBe("users");
-            message.Record.Namespace.ShouldBeNull();
+            message.Record!.Namespace.ShouldBeNull();
         }
 
         [Fact]
@@ -194,7 +194,7 @@ namespace Airbyte.Cdk.Tests.Sources
         private static bool IsStatus(AirbyteMessage message, AirbyteStreamStatus status) =>
             message.Type == MessageType.TRACE &&
             message.Trace?.Type == AirbyteTraceType.STREAM_STATUS &&
-            message.Trace.StreamStatus?.Status == status;
+            message.Trace!.StreamStatus?.Status == status;
 
         private static ConfiguredAirbyteCatalog Catalog(string name, SyncMode syncMode, string? ns = null) =>
             new()
