@@ -64,13 +64,15 @@ namespace Airbyte.Cdk.Transport
                 return;
 
             _channel.Writer.TryComplete(error);
+            Exception? failure = null;
             try
             {
                 await _writerTask;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // The writer task records the failure; CompleteAsync must not mask the original error.
+                // The writer task records the failure. Keep it so the caller does not lose a bind or write error.
+                failure = e;
             }
             finally
             {
@@ -87,12 +89,16 @@ namespace Airbyte.Cdk.Transport
                 {
                     await _acceptTask;
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    failure ??= e;
                 }
 
                 TryDeleteSocket();
             }
+
+            if (failure != null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
 
         private async Task AcceptAsync()
@@ -167,8 +173,14 @@ namespace Airbyte.Cdk.Transport
 
             _disposed = true;
             _cancellation.Cancel();
-            await CompleteAsync();
-            _cancellation.Dispose();
+            try
+            {
+                await CompleteAsync();
+            }
+            finally
+            {
+                _cancellation.Dispose();
+            }
         }
     }
 }

@@ -52,7 +52,7 @@ namespace Airbyte.Cdk
             catch (Exception e)
             {
                 ToConsole(Error, $"Could not finish execution due to error: {e.Message}");
-                Environment.Exit(1);
+                Environment.ExitCode = 1;
             }
         }
         
@@ -180,7 +180,7 @@ namespace Airbyte.Cdk
                 .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
                 .WithArguments(commandargs) | Console.WriteLine;
             var result = await cmd.ExecuteAsync();
-            if (result.ExitCode == 1)
+            if (result.ExitCode != 0)
                 return false;
             ToConsole(Check, $"Building Docker Image...done");
 
@@ -204,9 +204,17 @@ namespace Airbyte.Cdk
                 .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
                 .WithArguments(new []{"manifest", "inspect", imagename}) | stdOutBuffer;
             
-            await cmd.ExecuteAsync();
+            var result = await cmd.ExecuteAsync();
+            if (result.ExitCode == 0)
+                return true;
 
-            return !stdOutBuffer.ToString().Contains("no such manifest") && !stdOutBuffer.ToString().Contains("requested access to the resource is denied");
+            var output = stdOutBuffer.ToString();
+            if (output.Contains("no such manifest") ||
+                output.Contains("requested access to the resource is denied"))
+                return false;
+
+            throw new InvalidOperationException(
+                $"Could not inspect image '{imagename}': {output}");
         }
 
         private static void ToConsole(params string[] lines) => AnsiConsole.MarkupLine(string.Concat(lines));

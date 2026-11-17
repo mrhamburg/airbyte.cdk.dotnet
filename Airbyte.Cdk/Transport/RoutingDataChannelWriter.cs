@@ -77,9 +77,8 @@ namespace Airbyte.Cdk.Transport
                     return SocketFor(StreamKey(message.Record?.Namespace, message.Record?.Stream))
                         .TryWrite(message);
                 case Type.STATE:
-                    var stdoutWritten = _stdout.TryWrite(message);
-                    var socketWritten = SocketFor(StateKey(message.State)).TryWrite(message);
-                    return stdoutWritten && socketWritten;
+                    _stdout.TryWrite(message);
+                    return SocketFor(StateKey(message.State)).TryWrite(message);
                 default:
                     return _stdout.TryWrite(message);
             }

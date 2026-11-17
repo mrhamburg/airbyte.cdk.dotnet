@@ -69,9 +69,11 @@ namespace Airbyte.Cdk.Sources
         {
             try
             {
-                return CheckConnection(logger, config, out var exc)
-                    ? new AirbyteConnectionStatus { Status = Status.SUCCEEDED }
-                    : throw exc;
+                if (CheckConnection(logger, config, out var exc))
+                    return new AirbyteConnectionStatus { Status = Status.SUCCEEDED };
+
+                throw exc ?? new InvalidOperationException(
+                    "The connection check failed but did not provide an error.");
             }
             catch (Exception e)
             {
@@ -105,7 +107,6 @@ namespace Airbyte.Cdk.Sources
 
             // The caller owns the logger. The entry point supplies a channel-backed logger so logs and
             // traces stay ordered with records/state; direct hosts may supply their own sink.
-            Logger = logger;
             trackingChannel.Logger = logger;
 
             var stateManager = new ConnectorStateManager(StateReader.Parse(state));
@@ -228,7 +229,8 @@ namespace Airbyte.Cdk.Sources
             ChannelWriter<AirbyteMessage>? channel = null)
         {
             var slices = streaminstance.StreamSlices(SyncMode.incremental, configuredstream.CursorField!, stateElement);
-            return await streaminstance.ReadRecords(logger, SyncMode.incremental, channel ?? Channel, stateElement, recordlimit, null!, slices);
+            return await streaminstance.ReadRecords(logger, SyncMode.incremental, channel ?? Channel, stateElement,
+                recordlimit, configuredstream.CursorField, slices);
         }
 
         /// <summary>
@@ -337,6 +339,7 @@ namespace Airbyte.Cdk.Sources
                 return (IReadOnlyList<JsonElement>)records;
             });
 
+            var previousEmitter = parent.StateEmitter;
             parent.StateEmitter = new StateEmitter(channel.Writer);
             try
             {
@@ -346,6 +349,7 @@ namespace Airbyte.Cdk.Sources
             {
                 // Completing in a finally keeps the collecting task from waiting forever when the parent read throws.
                 channel.Writer.TryComplete();
+                parent.StateEmitter = previousEmitter;
             }
 
             var records = await collecting;

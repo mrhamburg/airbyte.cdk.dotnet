@@ -189,7 +189,7 @@ namespace Airbyte.Cdk
                         })
                     };
 
-                    Task.WaitAll(readtasks);
+                    await Task.WhenAll(readtasks);
                     break;
                 case "write":
                 {
@@ -209,7 +209,7 @@ namespace Airbyte.Cdk
                     break;
                 }
                 default:
-                    throw new NotImplementedException($"Unexpected command: {Options.Command}");
+                    throw new ArgumentException($"Unexpected command: {Options.Command}", nameof(Options.Command));
             }
         }
 
@@ -240,7 +240,7 @@ namespace Airbyte.Cdk
         private static JsonElement GetConfig(ConnectorSpecification spec)
         {
             var contents = string.IsNullOrWhiteSpace(Options.Config) ? throw new Exception("Config is undefined!")
-                : !TryGetPath(Options.Config, out var filepath) ? throw new FileNotFoundException("Could not find config file: " + filepath)
+                : !TryGetPath(Options.Config, out var filepath) ? throw new FileNotFoundException("Could not find config file: " + Options.Config, Options.Config)
                 : File.ReadAllText(filepath);
 
             if (string.IsNullOrWhiteSpace(contents))

@@ -44,7 +44,7 @@ namespace Airbyte.Cdk.Sources.Streams
         /// <summary>
         /// If incremental support is to be implemented, this field needs to be set for determining the range of updates
         /// </summary>
-        public bool SourceDefinedCursor { get; protected set; } = true;
+        public virtual bool SourceDefinedCursor { get; protected set; } = true;
 
         /// <summary>
         /// Name of this stream 
@@ -112,7 +112,9 @@ namespace Airbyte.Cdk.Sources.Streams
         /// to indicate state should be updated to this object.
         /// </summary>
         public virtual JsonElement GetUpdatedState(JsonElement currentstreamstate,
-            JsonElement latestrecord) => "{}".AsJsonElement();
+            JsonElement latestrecord) =>
+            throw new NotSupportedException(
+                $"{GetType().Name} does not implement GetUpdatedState. Override it for incremental sync.");
 
         /// <summary>
         /// Converts the current stream to an Airbyte stream, to determine stream specifications

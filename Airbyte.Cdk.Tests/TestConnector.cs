@@ -20,27 +20,40 @@ namespace Airbyte.Cdk.Tests
         public void TestReadConfig()
         {
             var testfile = "{\"bogus\": \"file\"}";
-            string filepath = "TestReadConfig";
-            if (File.Exists(filepath))
+            string filepath = Path.Combine(Path.GetTempPath(), "airbyte-cdk-" + Guid.NewGuid().ToString("N"));
+
+            try
+            {
+                File.WriteAllText(filepath, testfile);
+
+                var result = Connector.ReadConfig(filepath);
+
+                result.GetRawText().ShouldBe(testfile, "output should match input");
+            }
+            finally
+            {
                 File.Delete(filepath);
-            File.WriteAllText(filepath, testfile);
-
-            var result = Connector.ReadConfig(filepath);
-
-            result.GetRawText().ShouldBe(testfile, "output should match input");
+            }
         }
 
         [Fact]
         public void TestWriteConfig()
         {
             var testfile = "{\"bogus\": \"file\"}";
-            string filepath = "TestWriteConfig";
-            
-            Connector.WriteConfig(testfile.AsJsonElement(), filepath);
+            string filepath = Path.Combine(Path.GetTempPath(), "airbyte-cdk-" + Guid.NewGuid().ToString("N"));
 
-            var result = File.ReadAllText(filepath);
+            try
+            {
+                Connector.WriteConfig(testfile.AsJsonElement(), filepath);
 
-            result.ShouldBe(testfile, "output should match input");
+                var result = File.ReadAllText(filepath);
+
+                result.ShouldBe(testfile, "output should match input");
+            }
+            finally
+            {
+                File.Delete(filepath);
+            }
         }
 
         [Fact]

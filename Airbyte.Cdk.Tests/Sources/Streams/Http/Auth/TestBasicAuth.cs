@@ -1,4 +1,5 @@
-﻿using Airbyte.Cdk.Sources.Streams.Http.Auth;
+﻿using System;
+using Airbyte.Cdk.Sources.Streams.Http.Auth;
 using Shouldly;
 using Flurl;
 using Flurl.Http;
@@ -9,6 +10,11 @@ namespace Airbyte.Cdk.Tests.Sources.Streams.Http.Auth
 {
     public class TestBasicAuth
     {
+        [Fact]
+        public void Test_EmptyTokens_AreRejected()
+        {
+            Should.Throw<ArgumentException>(() => new BasicAuth(Array.Empty<string>()));
+        }
         [Fact]
         public void TestTokenAuthentication()
         {
