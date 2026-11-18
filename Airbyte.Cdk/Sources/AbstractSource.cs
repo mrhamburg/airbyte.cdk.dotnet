@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Airbyte.Cdk.Models;
@@ -28,6 +30,13 @@ namespace Airbyte.Cdk.Sources
         protected JsonElement State { get; private set; }
 
         protected ConfiguredAirbyteCatalog Catalog { get; private set; } = null!;
+
+        /// <summary>
+        /// Maximum number of streams that may be read at the same time. The default of 1 keeps reads
+        /// sequential. Override this in a connector to read independent streams concurrently; streams that
+        /// form a parent/substream group are always read in order.
+        /// </summary>
+        public virtual int MaxConcurrency => 1;
 
         /// <summary>
         /// Check if a connection can be established
@@ -116,35 +125,186 @@ namespace Airbyte.Cdk.Sources
 
             logger.Info($"Starting syncing {Name}");
             var streamsInstances = Streams(config);
-            foreach (var configuredStream in catalog.Streams)
-            {
-                if (configuredStream.Stream == null)
-                    throw new Exception("The configured catalog contains a stream without a stream definition");
+            var concurrency = Concurrency(config);
 
-                var streamInstance = streamsInstances.FirstOrDefault(x =>
-                    x.Name == configuredStream.Stream.Name &&
-                    string.Equals(x.Namespace ?? string.Empty,
-                        configuredStream.Stream.Namespace ?? string.Empty, StringComparison.Ordinal));
-                if (streamInstance == null)
+            if (concurrency <= 1)
+            {
+                // Resolve lazily so a missing stream later in the catalog fails only when it is reached.
+                foreach (var configuredStream in catalog.Streams)
+                {
+                    var streamInstance = ResolveStream(configuredStream, streamsInstances);
+                    await ReadStreamSafely(logger, reader, streamInstance, configuredStream, streamsInstances);
+                }
+
+                return;
+            }
+
+            await ReadConcurrently(logger, ResolveStreams(catalog, streamsInstances), streamsInstances, channel,
+                stateEmitter, stateManager, concurrency);
+        }
+
+        private int Concurrency(JsonElement config) =>
+            config.TryGetProperty("_concurrency", out var element) &&
+            element.TryGetInt32(out var concurrency) && concurrency > 0
+                ? concurrency
+                : Math.Max(1, MaxConcurrency);
+
+        private static List<ResolvedStream> ResolveStreams(ConfiguredAirbyteCatalog catalog,
+            Stream[] streamsInstances)
+        {
+            var resolved = new List<ResolvedStream>(catalog.Streams.Length);
+            foreach (var configuredStream in catalog.Streams)
+                resolved.Add(new ResolvedStream(ResolveStream(configuredStream, streamsInstances), configuredStream));
+
+            return resolved;
+        }
+
+        private static Stream ResolveStream(ConfiguredAirbyteStream configuredStream, Stream[] streamsInstances)
+        {
+            if (configuredStream.Stream == null)
+                throw new Exception("The configured catalog contains a stream without a stream definition");
+
+            var streamInstance = streamsInstances.FirstOrDefault(x =>
+                x.Name == configuredStream.Stream.Name &&
+                string.Equals(x.Namespace ?? string.Empty,
+                    configuredStream.Stream.Namespace ?? string.Empty, StringComparison.Ordinal));
+            if (streamInstance == null)
+                throw new Exception(
+                    $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {string.Join(", ", streamsInstances.Select(x => x.Name))}");
+
+            return streamInstance;
+        }
+
+        private async Task ReadConcurrently(AirbyteLogger logger, List<ResolvedStream> configuredStreams,
+            Stream[] streamsInstances, ChannelWriter<AirbyteMessage> channel, StateEmitter stateEmitter,
+            ConnectorStateManager stateManager, int concurrency)
+        {
+            foreach (var configuredStream in configuredStreams)
+            {
+                var dependency = configuredStream.Stream.Dependency;
+                if (dependency == null)
+                    continue;
+
+                var parent = streamsInstances.FirstOrDefault(x => x.Name == dependency.ParentStream);
+                if (parent?.Dependency != null)
                     throw new Exception(
-                        $"The requested stream {configuredStream.Stream.Name} was not found in the source. Available streams: {string.Join(", ", streamsInstances.Select(x => x.Name))}");
+                        $"Stream '{parent.Name}' is itself a substream of '{parent.Dependency.ParentStream}'; nested substreams are not supported");
+            }
+
+            // Streams that share a parent are one unit: the parent is read once and its records feed every
+            // substream, so those streams cannot run beside each other. Independent units run in parallel.
+            var groups = GroupStreams(configuredStreams);
+            using var gate = new SemaphoreSlim(concurrency, concurrency);
+            using var cancellation = new CancellationTokenSource();
+            Exception? firstError = null;
+
+            var tasks = groups.Select(async group =>
+            {
+                try
+                {
+                    await gate.WaitAsync(cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
 
                 try
                 {
-                    await reader.ReadStreamAsync(streamInstance, configuredStream, streamsInstances);
+                    // Each parallel unit gets its own tracking channel and parent cache; the state emitter
+                    // and partition tracker are shared and thread-safe.
+                    var streamChannel =
+                        new StateTrackingChannelWriter(channel, stateEmitter, PartitionTracker) { Logger = logger };
+                    var context = new SourceReadContext(logger, streamChannel, Config, Catalog, State,
+                        PartitionTracker, stateEmitter, streamChannel, stateManager);
+                    var reader = new SourceStreamReader(context);
+
+                    foreach (var configuredStream in group)
+                        await ReadStreamSafely(logger, reader, configuredStream.Stream, configuredStream.Configured,
+                            streamsInstances);
                 }
                 catch (Exception e)
                 {
-                    logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
-                        e.StackTrace, AirbyteFailureType.system_error, new StreamDescriptor
-                        {
-                            Name = streamInstance.Name,
-                            Namespace = streamInstance.Namespace
-                        });
-                    e.Data[AirbyteLogger.TraceEmittedDataKey] = true;
+                    Interlocked.CompareExchange(ref firstError, e, null);
+                    cancellation.Cancel();
                     throw;
                 }
+                finally
+                {
+                    gate.Release();
+                }
+            }).ToArray();
+
+            try
+            {
+                await Task.WhenAll(tasks);
             }
+            catch
+            {
+                // The first stream failure is rethrown below; the other tasks were only observed here
+                // so their exceptions are not left unobserved.
+            }
+
+            if (firstError != null)
+                ExceptionDispatchInfo.Capture(firstError).Throw();
+        }
+
+        private static List<List<ResolvedStream>> GroupStreams(List<ResolvedStream> configuredStreams)
+        {
+            var groups = new List<List<ResolvedStream>>();
+            var byParent = new Dictionary<string, List<ResolvedStream>>(StringComparer.Ordinal);
+
+            foreach (var configuredStream in configuredStreams)
+            {
+                var key = configuredStream.Stream.Dependency?.ParentStream ?? configuredStream.Stream.Name;
+                if (!byParent.TryGetValue(key, out var group))
+                {
+                    group = new List<ResolvedStream>();
+                    byParent[key] = group;
+                    groups.Add(group);
+                }
+
+                group.Add(configuredStream);
+            }
+
+            // A configured parent must be read before its substreams so the substreams reuse its cache
+            // instead of reading the parent a second time.
+            for (var i = 0; i < groups.Count; i++)
+                groups[i] = groups[i].OrderBy(x => x.Stream.Dependency == null ? 0 : 1).ToList();
+
+            return groups;
+        }
+
+        private static async Task ReadStreamSafely(AirbyteLogger logger, SourceStreamReader reader,
+            Stream streamInstance, ConfiguredAirbyteStream configuredStream, Stream[] streamsInstances)
+        {
+            try
+            {
+                await reader.ReadStreamAsync(streamInstance, configuredStream, streamsInstances);
+            }
+            catch (Exception e)
+            {
+                logger.TraceError("The connector failed", $"{e.GetType().Name}: {e.Message}",
+                    e.StackTrace, AirbyteFailureType.system_error, new StreamDescriptor
+                    {
+                        Name = streamInstance.Name,
+                        Namespace = streamInstance.Namespace
+                    });
+                e.Data[AirbyteLogger.TraceEmittedDataKey] = true;
+                throw;
+            }
+        }
+
+        private sealed class ResolvedStream
+        {
+            public ResolvedStream(Stream stream, ConfiguredAirbyteStream configured)
+            {
+                Stream = stream;
+                Configured = configured;
+            }
+
+            public Stream Stream { get; }
+            public ConfiguredAirbyteStream Configured { get; }
         }
 
         public static AirbyteMessage AsAirbyteMessage(string streamname, JsonElement data) =>
